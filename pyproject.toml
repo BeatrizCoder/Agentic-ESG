@@ -50,7 +50,6 @@ aamad-support = "aamad.frontend:main"
 aamad-ui = "aamad.streamlit_app:main"
 aamad-backend = "aamad.backend:main"
 aamad-test = "test_backend:main"
-aamad-backend = "aamad.backend:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

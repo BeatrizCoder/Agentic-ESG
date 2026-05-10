@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-05-09T20:34:35.912507",
+    "inquiry": "test inquiry",
+    "category": "Billing",
+    "sentiment": "Neutral",
+    "escalation_required": false,
+    "final_response": "test response",
+    "reference_id": null
+  }
+]

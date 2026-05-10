@@ -19,18 +19,192 @@ AAMAD includes a complete customer support system powered by CrewAI with hierarc
 2. **Set up environment variables:**
    ```bash
    cp .env.example .env
-   # Edit .env with your GOOGLE_API_KEY
+   # Edit .env with your GOOGLE_API_KEY (optional, system works deterministically without it)
    ```
 
-3. **Start the backend:**
+3. **Configure feature flags (optional):**
+   ```bash
+   # In .env or environment variables
+   USE_LLM=false                    # Keep deterministic (default)
+   ENABLE_MEMORY=false              # Enable conversation memory (default: false)
+   ENABLE_CREWAI_KNOWLEDGE=false    # Use local knowledge files (default: false)
+   ENABLE_PROMPT_TEMPLATES=true     # Use prompt templates (default: true)
+   ```
+
+4. **Start the backend:**
    ```bash
    python -m src.aamad.backend
    ```
 
-4. **Launch the frontend:**
+5. **Launch the frontend:**
    ```bash
    streamlit run src/aamad/streamlit_app.py
    ```
+
+### Architecture: CrewAI-Inspired Multi-Agent System
+
+The support system implements a **CrewAI-inspired architecture** with modular components:
+
+#### Core Components
+
+- **`tools/` folder**: Modular tool implementations replacing inline tool classes
+  - `ClassificationTool`: Categorizes customer inquiries
+  - `SentimentTool`: Analyzes emotional tone and urgency
+  - `KnowledgeTool`: Retrieves relevant support articles
+  - `ResponseTool`: Generates contextual responses
+  - `EscalationTool`: Determines escalation needs
+  - `MemoryTool`: Manages conversation memory
+  - `PromptTool`: Handles prompt template management
+
+- **`skills/` folder**: Reusable skill definitions for agent capabilities
+  - `customer_support_analysis.md`: Core support skills
+  - `escalation_decision.md`: Escalation guidelines
+  - `empathetic_response.md`: Response quality standards
+  - `safety_validation.md`: Content safety checks
+  - `multilingual_support.md`: Language handling
+  - `safety_validation.md`: Content safety checks
+
+- **`tool_registry.py`**: Central tool execution governance
+  - Tool registration and discovery
+  - Execution caching and performance monitoring
+  - Governance checks (allowlist/blocklist)
+  - Error handling and logging
+
+- **`services/` folder**: Service layer for cross-cutting concerns
+  - `KnowledgeService`: Local knowledge base management
+  - `MemoryService`: Conversation persistence
+  - `PromptService`: Template management
+  - `SkillService`: Agent skill validation
+
+#### New Response Fields (Week 4)
+
+The API now returns additional observability and integration fields:
+
+```json
+{
+  "tools_used": ["Classification Tool", "Sentiment Analysis Tool", ...],
+  "skills_used": ["customer_support_analysis", "empathetic_response"],
+  "cache_used": true,
+  "execution_mode": "deterministic"
+}
+```
+
+#### Feature Flags (Week 4)
+
+Control system behavior with environment variables:
+
+```bash
+USE_LLM=false                    # Deterministic mode (default)
+ENABLE_MEMORY=false              # Conversation memory (default: false)
+ENABLE_CREWAI_KNOWLEDGE=false    # Local knowledge files (default: false)
+ENABLE_PROMPT_TEMPLATES=true     # Template-based responses (default: true)
+ENABLE_MCP=false                 # Model Context Protocol (future)
+ENABLE_EXTERNAL_APIS=false       # Real external APIs (default: false)
+ENABLE_MOCK_INTEGRATIONS=true    # Mock integrations (default: true)
+```
+
+### Full-Stack Integration (Week 4)
+
+The system now provides complete HTTP API integration between Streamlit frontend and FastAPI backend:
+
+#### API Endpoints
+
+- `POST /api/support` → Submit inquiry and process request
+- `GET /api/support/{reference_id}/status` → Return processing/escalation status
+- `GET /api/support/{reference_id}/steps` → Return agent/tool execution steps
+- `POST /api/support/{reference_id}/feedback` → Submit user feedback
+- `POST /api/support/{reference_id}/approve` → Approve escalated ticket
+- `POST /api/support/{reference_id}/reject` → Reject ticket (request revision)
+- `GET /api/health` → Health check
+
+#### Human-in-the-Loop Feedback
+
+The frontend now includes feedback mechanisms:
+- 👍 Helpful / 👎 Not Helpful buttons
+- 🔄 Request Revision for automated responses
+- Approve/Reject actions for escalated tickets
+- Audit trail showing submission → processing → escalation/automation → feedback
+
+#### Mock External Integrations (Week 4)
+
+Created `integrations/` folder with mock clients ready for real API integration:
+
+- **`ticketing_client.py`**: External support ticket system
+- **`crm_client.py`**: Customer Relationship Management
+- **`notification_client.py`**: Email/SMS notifications
+
+All integrations include:
+- REST client patterns with timeout/retry placeholders
+- Secure auth placeholders for API keys
+- Rate limiting placeholders
+- Error handling and logging
+
+Enable real integrations by setting:
+```bash
+ENABLE_EXTERNAL_APIS=true
+ENABLE_MOCK_INTEGRATIONS=false
+```
+
+#### External API Integration Tools (Week 4 Enhancement)
+
+The system now includes generic and specialized API integration tools ready for production use:
+
+##### Generic API Tools
+- **`RESTApiTool`**: Generic REST API client with retry, timeout, and rate limiting
+- **`GraphQLApiTool`**: GraphQL API client with query/mutation support
+
+##### Specialized API Tools
+- **`WeatherTool`**: Weather data integration (OpenWeatherMap, etc.)
+- **`GitHubTool`**: GitHub repository and user data integration
+
+##### Configuration
+```bash
+# Database (PostgreSQL-ready with SQLite fallback)
+DATABASE_PROVIDER=sqlite  # or postgres
+DATABASE_URL=sqlite:///src/aamad/data/tickets.db
+
+# Redis (optional caching)
+ENABLE_REDIS_CACHE=false
+REDIS_URL=redis://localhost:6379
+
+# API Authentication (secure placeholders)
+EXTERNAL_API_KEY=your_api_key_here
+GITHUB_TOKEN=your_github_token_here
+WEATHER_API_KEY=your_weather_api_key_here
+OAUTH_CLIENT_ID=your_oauth_client_id
+OAUTH_CLIENT_SECRET=your_oauth_client_secret
+
+# Integration Settings
+INTEGRATION_RETRY_COUNT=3
+INTEGRATION_TIMEOUT_SECONDS=30
+INTEGRATION_RATE_LIMIT_PER_MINUTE=60
+```
+
+##### Integration Logging
+All API integrations log attempts with structured data:
+```json
+{
+  "integration_name": "weather_api",
+  "mode": "mock",
+  "latency": 0.234,
+  "status": "success",
+  "error": null
+}
+```
+
+##### Database Abstraction
+- **SQLite fallback**: JSON file-based storage (default)
+- **PostgreSQL ready**: Full SQLAlchemy ORM support
+- **Automatic migration**: Schema created on startup
+- **Zero breaking changes**: Existing JSON storage preserved
+
+#### Data Persistence
+
+Lightweight JSON-based persistence for:
+- Support tickets with full audit trail
+- Feedback and approval status
+- Timestamps and execution metadata
+- Located in `src/aamad/data/tickets.json`
 
 ### How It Works
 
@@ -39,11 +213,60 @@ The system uses **hierarchical process** with these agents:
 - **Manager Agent**: Coordinates the entire support process, delegates tasks, and ensures quality
 - **Classifier Agent**: Categorizes inquiries (Order Issues, Billing, Account Access, Technical Issues, General Support)
 - **Sentiment Agent**: Analyzes emotional tone and urgency levels
-- **Knowledge Agent**: Retrieves relevant support articles
+- **Knowledge Agent**: Retrieves relevant support articles from local knowledge base
 - **Response Agent**: Generates helpful, contextual responses
 - **Escalation Agent**: Determines when human intervention is needed
 
 Tasks run in a coordinated workflow where the manager oversees execution and can dynamically adjust based on results.
+
+#### Current Mode: Deterministic (Zero-Cost)
+
+The system currently operates in **deterministic mode** with no LLM calls required:
+- **Knowledge**: Local keyword search in `knowledge/` folder files
+- **Memory**: Optional local storage in JSON format
+- **Prompts**: Template-based responses ready for future LLM integration
+- **No API keys required** for basic functionality
+
+#### Future-Ready Architecture
+
+The system is designed to seamlessly transition to LLM-powered mode:
+- Set `USE_LLM=true` to enable CrewAI LLM agents
+- Set `ENABLE_CREWAI_KNOWLEDGE=true` for vector-based knowledge retrieval
+- Set `ENABLE_MEMORY=true` for persistent conversation memory
+- All prompt templates are prepared in the `prompts/` folder
+
+### Testing New Features
+
+#### Test Knowledge Retrieval
+```bash
+# Test local knowledge search
+curl -X POST "http://localhost:8000/api/support" \
+  -H "Content-Type: application/json" \
+  -d '{"inquiry": "How do I get a refund for my order?"}'
+```
+Check response for `knowledge_source: "local_files"` and relevant articles.
+
+#### Test Memory (when enabled)
+```bash
+# Enable memory in environment
+export ENABLE_MEMORY=true
+
+# Make a request
+curl -X POST "http://localhost:8000/api/support" \
+  -H "Content-Type: application/json" \
+  -d '{"inquiry": "My order is delayed"}'
+
+# Check memory.json file is created/updated
+cat memory.json
+```
+
+#### Test Prompt Templates
+Prompt templates are loaded from `prompts/` folder and can be inspected in logs.
+
+#### Verify Deterministic Mode
+- No API keys required
+- System responds instantly
+- Check `execution_mode: "deterministic"` in response
 
 ---
 
@@ -63,7 +286,78 @@ Tasks run in a coordinated workflow where the manager oversees execution and can
 
 ---
 
-## What is AAMAD?
+## Repository Structure
+
+```
+AAMAD/
+├── CHANGELOG.md
+├── CHECKLIST.md
+├── LICENSE
+├── main.py
+├── pyproject.toml
+├── README.md
+├── .env.example              # Environment variables template
+├── config/
+│   ├── agents.yaml          # Agent configurations
+│   └── tasks.yaml           # Task definitions
+├── knowledge/               # Local knowledge base files
+├── memory.json              # Conversation memory (when enabled)
+├── prompts/                 # Prompt templates
+├── project-context/         # AAMAD framework artifacts
+│   ├── 1.define/
+│   │   ├── mrd.md          # Market Research Document
+│   │   └── prd.md          # Product Requirements Document
+│   ├── 2.build/
+│   │   └── sad.md          # System Architecture Document
+│   └── 3.deliver/
+├── scripts/
+│   └── update_bundle.py     # Bundle update script
+├── skills/                  # Agent skill definitions
+│   ├── customer_support_analysis.md
+│   ├── escalation_decision.md
+│   ├── empathetic_response.md
+│   ├── multilingual_support.md
+│   └── safety_validation.md
+├── src/aamad/
+│   ├── __init__.py
+│   ├── backend.py           # FastAPI backend with CrewAI flow
+│   ├── cli.py               # Command-line interface
+│   ├── claude_code.py       # Claude Code integration
+│   ├── config.py            # Configuration and constants
+│   ├── data_store.py        # Data persistence layer
+│   ├── frontend.py          # Streamlit frontend
+│   ├── installer.py         # Installation utilities
+│   ├── services.py          # Service layer (knowledge, memory, prompts, skills)
+│   ├── streamlit_app.py     # Streamlit UI application
+│   ├── tool_registry.py     # Tool execution governance
+│   ├── vscode_copilot.py    # VS Code + Copilot integration
+│   ├── data/                # Data storage directory
+│   │   └── tickets.json     # JSON ticket storage
+│   └── integrations/        # External API integrations
+│       ├── ticketing_client.py
+│       ├── crm_client.py
+│       └── notification_client.py
+├── tools/                   # Modular tool implementations
+│   ├── __init__.py
+│   ├── classification_tool.py
+│   ├── escalation_tool.py
+│   ├── github_tool.py       # GitHub API integration
+│   ├── graphql_api_tool.py  # GraphQL API client
+│   ├── knowledge_tool.py
+│   ├── memory_tool.py
+│   ├── prompt_tool.py
+│   ├── response_tool.py
+│   ├── rest_api_tool.py     # REST API client
+│   ├── sentiment_tool.py
+│   └── weather_tool.py      # Weather API integration
+├── tests/
+│   ├── test_backend.py      # Backend unit tests
+│   ├── test_claude_code.py
+│   ├── test_frontend.py
+│   ├── test_streamlit_app.py
+│   └── test_vscode_copilot.py
+└── aamad.egg-info/
+```
 
 AAMAD is a context engineering framework based on best practices in AI-assisted coding and multi-agent system development methodologies.  
 It enables teams to:
