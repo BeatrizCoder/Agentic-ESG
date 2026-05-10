@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -8,18 +9,19 @@ import urllib.request
 import streamlit as st
 from aamad.frontend import AGENTS, TicketResult, analyze_ticket
 
-BACKEND_API_URL = "http://127.0.0.1:8000/api/support"
+DEFAULT_BACKEND_API_URL = "http://127.0.0.1:8000/api/support"
+BACKEND_API_URL = os.environ.get("AAMAD_BACKEND_URL", DEFAULT_BACKEND_API_URL)
 
 
-def _call_backend(inquiry: str) -> dict | None:
+def _call_backend(inquiry: str, backend_url: str) -> dict | None:
     payload = json.dumps({"inquiry": inquiry}).encode("utf-8")
     request = urllib.request.Request(
-        BACKEND_API_URL,
+        backend_url,
         data=payload,
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             payload = response.read().decode("utf-8")
             return json.loads(payload)
     except (urllib.error.HTTPError, urllib.error.URLError, ValueError):
@@ -40,6 +42,7 @@ def _build_ticket_result_from_backend(data: dict) -> TicketResult:
         escalation_required=data.get("escalation_required", False),
         escalation_reason=data.get("escalation_reason", ""),
         reference_id=data.get("reference_id", ""),
+        triggered_keyword=data.get("triggered_keyword"),
     )
 
 
@@ -70,6 +73,8 @@ def _render_stage(idx: int, result: TicketResult) -> None:
         if result.escalation_required:
             st.warning("⚠️ ESCALATION TRIGGERED")
             st.write(f"Razão: {result.escalation_reason}")
+            if result.triggered_keyword:
+                st.write(f"Palavra-chave detectada: **{result.triggered_keyword}**")
         else:
             st.success("✅ Sem escalonamento necessário")
             st.write(f"Razão: {result.escalation_reason}")
@@ -127,6 +132,13 @@ def main(argv: list[str] | None = None) -> int:
 
     _render_history()
 
+    st.sidebar.header("Configuração de integração")
+    use_backend = st.sidebar.checkbox("Usar backend FastAPI", value=True)
+    backend_url = st.sidebar.text_input("URL do backend", value=BACKEND_API_URL)
+    st.sidebar.markdown(
+        "Use o backend FastAPI para processar a solicitação. Se o backend não estiver disponível, o app executará localmente."
+    )
+
     with st.form(key="support_form"):
         inquiry = st.text_area(
             "Digite sua dúvida ou problema de suporte:",
@@ -141,14 +153,19 @@ def main(argv: list[str] | None = None) -> int:
             st.warning("Por favor, informe um texto para sua solicitação.")
             return 0
 
-        backend_data = _call_backend(inquiry_text)
-        if backend_data is not None:
-            st.success("Executando no backend local.")
-            result = _build_ticket_result_from_backend(backend_data)
+        if use_backend:
+            backend_data = _call_backend(inquiry_text, backend_url)
+            if backend_data is not None:
+                st.success(f"Executando no backend: {backend_url}")
+                result = _build_ticket_result_from_backend(backend_data)
+            else:
+                st.error(
+                    f"Não foi possível conectar ao backend em {backend_url}."
+                )
+                result = analyze_ticket(inquiry_text)
+                st.warning("Usando execução local temporária.")
         else:
-            st.warning(
-                "Backend não disponível em http://127.0.0.1:8000. Usando execução local temporária."
-            )
+            st.info("Executando localmente no frontend Streamlit.")
             result = analyze_ticket(inquiry_text)
 
         _append_history(result)

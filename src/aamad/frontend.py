@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import json
+import os
 import random
 import re
 import sys
 import time
+import unicodedata
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Iterable
+
+DEFAULT_BACKEND_URL = "http://127.0.0.1:8000/api/support"
+BACKEND_API_URL = os.environ.get("AAMAD_BACKEND_URL", DEFAULT_BACKEND_URL)
 
 AGENTS = [
     {
@@ -86,6 +94,31 @@ SENTIMENT_NEGATIVE = [
 
 SENTIMENT_URGENT = ["urgent", "asap", "immediately", "right away", "now"]
 
+ESCALATION_KEYWORDS = {
+    "en": [
+        "escalate", "escalated", "talk to someone", "speak with someone",
+        "human agent", "support agent", "manager", "supervisor",
+        "refund", "reimbursement", "wrong order", "incorrect order",
+        "damaged item", "complaint"
+    ],
+    "pt": [
+        "reembolso", "quero reembolso", "nao recebi", "não recebi",
+        "pedido errado", "veio errado", "falar com atendente",
+        "suporte humano", "escalar", "escalada", "gerente", "supervisor",
+        "reclamação", "reclamacao", "atendente humano", "falar com gerente"
+    ]
+}
+
+def normalize_text(text: str) -> str:
+    """Normalize text for keyword matching: lowercase, remove accents, trim."""
+    # Convert to lowercase
+    text = text.lower()
+    # Remove accents
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
+    # Trim whitespace
+    return text.strip()
+
 RESPONSE_TEMPLATES = {
     "Order Issues": (
         "I'm sorry to hear about the delay with your order. "
@@ -125,6 +158,7 @@ class TicketResult:
     escalation_required: bool
     escalation_reason: str
     reference_id: str
+    triggered_keyword: str | None = None
 
 
 def normalize_text(text: str) -> str:
@@ -193,29 +227,76 @@ def build_response(inquiry: str, category: str, sentiment: str, urgency: str, ar
     return base, confidence
 
 
-def evaluate_escalation(response_confidence: int, sentiment: str, articles: list[str]) -> tuple[bool, str, str]:
+def evaluate_escalation(response_confidence: int, sentiment: str, articles: list[str], inquiry: str) -> tuple[bool, str, str, str | None]:
+    # Check for explicit escalation keywords in the inquiry (multilingual)
+    normalized_inquiry = normalize_text(inquiry)
+
+    # Combine all keywords from both languages
+    all_keywords = ESCALATION_KEYWORDS["en"] + ESCALATION_KEYWORDS["pt"]
+
+    for keyword in all_keywords:
+        normalized_keyword = normalize_text(keyword)
+        if normalized_keyword in normalized_inquiry:
+            return True, f"User explicitly requested escalation or human support (keyword: '{keyword}').", _build_reference_id(), keyword
+
     if response_confidence < 55:
-        return True, "Low confidence in automated response.", _build_reference_id()
+        return True, "Low confidence in automated response.", _build_reference_id(), None
     if sentiment == "Concerned" and response_confidence < 70:
-        return True, "Sensitive issue with low confidence.", _build_reference_id()
+        return True, "Sensitive issue with low confidence.", _build_reference_id(), None
     if not articles or len(articles) < 1:
-        return True, "Insufficient knowledge base support.", _build_reference_id()
-    return False, "Sufficient confidence in automated response.", _build_reference_id()
+        return True, "Insufficient knowledge base support.", _build_reference_id(), None
+    return False, "Sufficient confidence in automated response.", _build_reference_id(), None
 
 
 def _build_reference_id() -> str:
     return "ESC-2026-" + str(random.randint(1000, 9999))
 
 
-def analyze_ticket(inquiry: str) -> TicketResult:
+def analyze_ticket_remote(inquiry: str, backend_url: str) -> TicketResult:
+    request_body = json.dumps({"inquiry": inquiry}).encode("utf-8")
+    request = urllib.request.Request(
+        backend_url,
+        data=request_body,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            response_data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise ConnectionError(
+            f"Falha ao conectar ao backend em {backend_url}: {exc}"
+        )
+
+    return TicketResult(
+        inquiry=response_data.get("inquiry", inquiry),
+        category=response_data["category"],
+        category_confidence=response_data["category_confidence"],
+        sentiment_label=response_data.get("sentiment", "Neutral"),
+        sentiment_confidence=response_data["sentiment_confidence"],
+        urgency=response_data["urgency"],
+        articles=response_data["articles"],
+        response=response_data["response"],
+        response_confidence=response_data["response_confidence"],
+        escalation_required=response_data["escalation_required"],
+        escalation_reason=response_data["escalation_reason"],
+        reference_id=response_data["reference_id"],
+        triggered_keyword=response_data.get("triggered_keyword"),
+    )
+
+
+def analyze_ticket(inquiry: str, use_backend: bool = False, backend_url: str = BACKEND_API_URL) -> TicketResult:
+    if use_backend:
+        return analyze_ticket_remote(inquiry, backend_url)
+
     category, category_confidence = detect_category(inquiry)
     sentiment_label, sentiment_confidence, urgency = detect_sentiment(inquiry)
     articles = retrieve_knowledge(category)
     response, response_confidence = build_response(
         inquiry, category, sentiment_label, urgency, articles
     )
-    escalation_required, escalation_reason, reference_id = evaluate_escalation(
-        response_confidence, sentiment_label, articles
+    escalation_required, escalation_reason, reference_id, triggered_keyword = evaluate_escalation(
+        response_confidence, sentiment_label, articles, inquiry
     )
     return TicketResult(
         inquiry=inquiry,
@@ -230,6 +311,7 @@ def analyze_ticket(inquiry: str) -> TicketResult:
         escalation_required=escalation_required,
         escalation_reason=escalation_reason,
         reference_id=reference_id,
+        triggered_keyword=triggered_keyword,
     )
 
 
@@ -304,8 +386,10 @@ def sanitize_inquiry(inquiry: str) -> str:
     return inquiry.strip()
 
 
-def run_loop() -> None:
+def run_loop(use_backend: bool = False, backend_url: str = BACKEND_API_URL) -> None:
     print_header()
+    if use_backend:
+        print(f"Backend integration enabled: {backend_url}")
     while True:
         inquiry = input("\nEnter your customer support inquiry (or type 'exit' to quit):\n> ").strip()
         if not inquiry:
@@ -317,7 +401,15 @@ def run_loop() -> None:
 
         current_inquiry = sanitize_inquiry(inquiry)
         while True:
-            result = analyze_ticket(current_inquiry)
+            try:
+                result = analyze_ticket(current_inquiry, use_backend=use_backend, backend_url=backend_url)
+            except ConnectionError as exc:
+                print(f"\nErro: {exc}")
+                if use_backend:
+                    print("Voltando para o modo local.")
+                    result = analyze_ticket(current_inquiry, use_backend=False)
+                else:
+                    raise
             print("\nProcessing your inquiry...")
             print("=" * 40)
             print("\n🤖 Starting Multi-Agent Analysis...")
@@ -348,8 +440,25 @@ def run_loop() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Run the AAMAD frontend CLI. Use --backend to integrate with the FastAPI backend."
+    )
+    parser.add_argument(
+        "--backend",
+        action="store_true",
+        help="Send inquiries to the backend API instead of running local logic.",
+    )
+    parser.add_argument(
+        "--backend-url",
+        default=BACKEND_API_URL,
+        help=f"Backend support endpoint URL (default: {BACKEND_API_URL}).",
+    )
+    args = parser.parse_args(argv)
+
     try:
-        run_loop()
+        run_loop(use_backend=args.backend, backend_url=args.backend_url)
         return 0
     except KeyboardInterrupt:
         print("\nInterrupted. Goodbye!")
