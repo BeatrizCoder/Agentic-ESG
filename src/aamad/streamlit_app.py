@@ -9,7 +9,7 @@ import urllib.request
 import streamlit as st
 from aamad.frontend import AGENTS, TicketResult, analyze_ticket
 
-DEFAULT_BACKEND_API_URL = "http://127.0.0.1:8000/api/support"
+DEFAULT_BACKEND_API_URL = "http://127.0.0.1:9000/api/support"
 BACKEND_API_URL = os.environ.get("AAMAD_BACKEND_URL", DEFAULT_BACKEND_API_URL)
 
 
