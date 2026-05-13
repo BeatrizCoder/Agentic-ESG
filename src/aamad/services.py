@@ -5,6 +5,7 @@ import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import glob
+import yaml
 
 from .config import ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, ENABLE_PROMPT_TEMPLATES, KNOWLEDGE_DIR, PROMPTS_DIR, MEMORY_FILE, SKILLS_DIR
 
@@ -16,6 +17,8 @@ class KnowledgeService:
         self.knowledge_dir = KNOWLEDGE_DIR
         self.knowledge_data: Dict[str, str] = {}
         self._load_knowledge()
+        self._articles: List[Dict[str, Any]] = []
+        self._load_yaml_articles()
 
     def _load_knowledge(self) -> None:
         """Load knowledge from local files."""
@@ -37,6 +40,42 @@ class KnowledgeService:
                     self.knowledge_data[filename] = json.dumps(data, indent=2)
                 except json.JSONDecodeError:
                     continue
+
+    def _load_yaml_articles(self) -> None:
+        """Load structured articles from config/knowledge_base.yaml."""
+        yaml_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'knowledge_base.yaml')
+        yaml_path = os.path.normpath(yaml_path)
+        if not os.path.exists(yaml_path):
+            return
+        with open(yaml_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        self._articles = data.get('articles', [])
+
+    def get_articles(self, category: str, inquiry: str) -> List[str]:
+        """Return titles of articles in category whose keywords match the inquiry."""
+        inquiry_lower = inquiry.lower()
+        matched = []
+        for article in self._articles:
+            if article.get('category') != category:
+                continue
+            for kw in article.get('keywords', []):
+                if kw.lower() in inquiry_lower:
+                    matched.append(article['title'])
+                    break
+        return matched
+
+    def should_escalate(self, category: str, inquiry: str) -> bool:
+        """Return True if any matched article for this inquiry requires always escalating."""
+        inquiry_lower = inquiry.lower()
+        for article in self._articles:
+            if article.get('category') != category:
+                continue
+            for kw in article.get('keywords', []):
+                if kw.lower() in inquiry_lower:
+                    if 'always escalate' in str(article.get('escalate_if', '')):
+                        return True
+                    break
+        return False
 
     def search_knowledge(self, query: str, category: Optional[str] = None) -> Dict[str, Any]:
         """Search knowledge base using keyword matching."""

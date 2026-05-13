@@ -3,6 +3,8 @@
 from typing import Dict, Any
 from . import BaseSupportTool
 
+VALID_CATEGORIES = ["Order Issues", "Billing", "Account Access", "Technical Issue", "General Support"]
+
 
 class ClassificationTool(BaseSupportTool):
     """Tool for classifying customer inquiries into support categories."""
@@ -14,16 +16,57 @@ class ClassificationTool(BaseSupportTool):
         super().__init__()
 
     def _run(self, inquiry: str) -> Dict[str, Any]:
-        """Classify inquiry using keyword matching."""
-        # Import here to avoid circular imports
+        """Classify inquiry using LLM when USE_LLM=True, otherwise keyword matching."""
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-        from aamad.config import CATEGORY_KEYWORDS
+        from aamad.config import CATEGORY_KEYWORDS, USE_LLM, DEFAULT_MODEL
+
+        if USE_LLM:
+            try:
+                from anthropic import Anthropic
+                client = Anthropic()
+                prompt = (
+                    "You are a customer support classifier. Classify the following customer inquiry "
+                    "into exactly ONE of these categories:\n"
+                    "- Order Issues\n"
+                    "- Billing\n"
+                    "- Account Access\n"
+                    "- Technical Issue\n"
+                    "- General Support\n\n"
+                    "Rules:\n"
+                    "- Respond ONLY with a JSON object, no extra text.\n"
+                    "- Format: {\"category\": \"<category name>\", \"confidence\": <0-100>}\n"
+                    "- confidence reflects how certain you are (0=very uncertain, 100=very certain).\n"
+                    "- Works for any language (Portuguese, English, etc.).\n\n"
+                    f"Customer inquiry: \"{inquiry}\""
+                )
+                result = client.messages.create(
+                    model=DEFAULT_MODEL,
+                    max_tokens=60,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                import json, re
+                raw = result.content[0].text.strip()
+                raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
+                parsed = json.loads(raw)
+                category = parsed.get("category", "General Support")
+                if category not in VALID_CATEGORIES:
+                    category = "General Support"
+                confidence = int(parsed.get("confidence", 70))
+                scores = {cat: (confidence if cat == category else 0) for cat in VALID_CATEGORIES}
+                return {
+                    "category": category,
+                    "confidence": confidence,
+                    "scores": scores,
+                    "execution_mode": "llm",
+                }
+            except Exception:
+                pass
 
         inquiry_lower = inquiry.lower()
         scores = {cat: sum(word in inquiry_lower for word in keywords)
-                 for cat, keywords in CATEGORY_KEYWORDS.items()}
+                  for cat, keywords in CATEGORY_KEYWORDS.items()}
         best = max(scores, key=scores.get)
         count = scores[best]
         confidence = min(95, 40 + count * 15)
@@ -33,5 +76,6 @@ class ClassificationTool(BaseSupportTool):
         return {
             "category": best,
             "confidence": confidence,
-            "scores": scores
+            "scores": scores,
+            "execution_mode": "deterministic",
         }

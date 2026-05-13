@@ -14,25 +14,72 @@ class SentimentTool(BaseSupportTool):
         super().__init__()
 
     def _run(self, inquiry: str) -> Dict[str, Any]:
-        """Analyze sentiment using keyword matching."""
+        """Analyze sentiment using LLM when USE_LLM=True, otherwise keyword matching."""
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-        from aamad.config import SENTIMENT_NEGATIVE, SENTIMENT_URGENT
+        from aamad.config import SENTIMENT_NEGATIVE, SENTIMENT_URGENT, USE_LLM, DEFAULT_MODEL
+
+        if USE_LLM:
+            try:
+                from anthropic import Anthropic
+                client = Anthropic()
+                prompt = (
+                    "You are a sentiment analysis engine for customer support.\n"
+                    "Analyze the following customer inquiry and return a JSON object.\n\n"
+                    "Rules:\n"
+                    "- sentiment must be exactly one of: \"Neutral\", \"Concerned\", \"Urgent\"\n"
+                    "- urgency must be exactly one of: \"Low\", \"Medium\", \"High\"\n"
+                    "- confidence is 0-100 (how certain you are of the sentiment).\n"
+                    "- Respond ONLY with JSON, no extra text.\n"
+                    "- Format: {\"sentiment\": \"<value>\", \"urgency\": \"<value>\", \"confidence\": <0-100>}\n"
+                    "- Works for any language (Portuguese, English, etc.).\n\n"
+                    "Guidelines:\n"
+                    "- Urgent: customer uses words like 'urgente', 'immediately', 'asap', 'right now', 'agora'.\n"
+                    "- Concerned: customer expresses frustration, worry, or dissatisfaction.\n"
+                    "- Neutral: calm, informational tone.\n"
+                    "- High urgency matches Urgent sentiment; Medium matches Concerned; Low matches Neutral.\n\n"
+                    f"Customer inquiry: \"{inquiry}\""
+                )
+                result = client.messages.create(
+                    model=DEFAULT_MODEL,
+                    max_tokens=60,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                import json, re
+                raw = result.content[0].text.strip()
+                raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
+                parsed = json.loads(raw)
+                sentiment = parsed.get("sentiment", "Neutral")
+                urgency = parsed.get("urgency", "Low")
+                confidence = int(parsed.get("confidence", 70))
+
+                if sentiment not in ("Neutral", "Concerned", "Urgent"):
+                    sentiment = "Neutral"
+                if urgency not in ("Low", "Medium", "High"):
+                    urgency = "Low"
+
+                return {
+                    "sentiment": sentiment,
+                    "confidence": confidence,
+                    "urgency": urgency,
+                    "found_negative": sentiment == "Concerned",
+                    "found_urgent": sentiment == "Urgent",
+                    "execution_mode": "llm",
+                }
+            except Exception:
+                pass
 
         inquiry_lower = inquiry.lower()
         found_negative = any(term in inquiry_lower for term in SENTIMENT_NEGATIVE)
         found_urgent = any(term in inquiry_lower for term in SENTIMENT_URGENT)
 
         if found_negative:
-            label = "Concerned"
-            confidence = 80
+            label, confidence = "Concerned", 80
         elif found_urgent:
-            label = "Urgent"
-            confidence = 70
+            label, confidence = "Urgent", 70
         else:
-            label = "Neutral"
-            confidence = 65
+            label, confidence = "Neutral", 65
 
         urgency = "High" if found_urgent else "Medium" if found_negative else "Low"
 
@@ -41,5 +88,6 @@ class SentimentTool(BaseSupportTool):
             "confidence": confidence,
             "urgency": urgency,
             "found_negative": found_negative,
-            "found_urgent": found_urgent
+            "found_urgent": found_urgent,
+            "execution_mode": "deterministic",
         }

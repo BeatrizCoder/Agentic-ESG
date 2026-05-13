@@ -1,0 +1,2785 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupportAI · Multi-Agent Customer Support</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0A0A14;
+      --bg-grad: radial-gradient(ellipse at 20% 10%, rgba(99,60,180,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 90%, rgba(56,189,248,0.08) 0%, transparent 50%);
+      --surface: #111827;
+      --surface2: #1A2233;
+      --border: rgba(255,255,255,0.07);
+      --text: #E2E8F0;
+      --muted: #64748B;
+      --accent: #7C3AED;
+      --accent2: #38BDF8;
+      --accent3: #6EE7B7;
+      --green: #6EE7B7;
+      --danger: #F87171;
+      --warn: #FBBF24;
+      --glass: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.08);
+      --glass-hover: rgba(255,255,255,0.07);
+      --radius: 18px;
+      --radius-sm: 10px;
+      --max-width: 1240px;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Sora', sans-serif;
+    }
+
+    body {
+      background-image: var(--bg-grad);
+      background-attachment: fixed;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise" /></filter><rect width="100" height="100" fill="%23080C14" filter="url(%23noise)" opacity="0.02"/></svg>');
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    #app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    #sidebar {
+      width: 260px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(10,10,20,0.8);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-right: 1px solid rgba(255,255,255,0.06);
+      padding: 28px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo-shape {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #7C3AED, #38BDF8);
+      display: grid;
+      place-items: center;
+      color: var(--bg);
+      font-weight: 700;
+      font-size: 18px;
+      text-shadow: 0 0 14px rgba(124,58,237,0.35);
+    }
+
+    .sidebar-logo-text {
+      display: grid;
+      gap: 4px;
+    }
+
+    .sidebar-logo-text strong {
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+    }
+
+    .sidebar-logo-text small {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .nav-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.22s ease;
+    }
+
+    .nav-item.active {
+      background: rgba(124,58,237,0.15);
+      border-left: 2px solid #7C3AED;
+      padding-left: 14px;
+      color: #A78BFA;
+      border-top-left-radius: 14px;
+      border-bottom-left-radius: 14px;
+    }
+
+    .nav-item span {
+      opacity: 0.82;
+      font-size: 0.92rem;
+    }
+
+    .nav-indicator {
+      color: var(--accent);
+      font-size: 0.8rem;
+      opacity: 0.9;
+    }
+
+    .sidebar-section {
+      display: grid;
+      gap: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 18px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .sidebar-section h4 {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .metric-label {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .metric-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.8rem;
+      color: var(--text);
+      margin-top: 6px;
+    }
+
+    .sidebar-config {
+      display: grid;
+      gap: 10px;
+    }
+
+    body.customer-view .sidebar-config {
+      display: none;
+    }
+
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      transition: background 0.25s ease;
+      border: 1px solid var(--border);
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.25s ease;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: linear-gradient(135deg, #38BDF8, #60A5FA);
+      border-color: rgba(56,189,248,0.65);
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    .input-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .sidebar-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .sidebar-input:focus {
+      border-color: rgba(56,189,248,0.35);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background: rgba(56,189,248,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56,189,248,0.18);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      color: var(--muted);
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    #mainContent {
+      margin-left: 300px;
+      padding: 30px 38px 38px 38px;
+      width: calc(100% - 300px);
+      max-width: calc(100vw - 300px);
+    }
+
+    body.customer-view #mainContent {
+      background: linear-gradient(135deg, #F0F7FF 0%, #FAFFFE 50%, #F5F0FF 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+
+    .hero-card, .panel-card, .detail-card, .status-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 28px;
+      transition: all 0.2s ease;
+    }
+
+    .hero-card:hover, .panel-card:hover, .detail-card:hover, .status-card:hover {
+      background: var(--glass-hover);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+      transform: translateY(-1px);
+    }
+
+    body.customer-view .hero-card,
+    body.customer-view .panel-card,
+    body.customer-view .detail-card,
+    body.customer-view .status-card {
+      background: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.9);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,1) inset;
+      color: #1E293B;
+    }
+
+    body.customer-view .hero-card:hover,
+    body.customer-view .panel-card:hover,
+    body.customer-view .detail-card:hover,
+    body.customer-view .status-card:hover {
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,1) inset;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(56,189,248,0.3);
+      color: var(--accent2);
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.08);
+      font-size: 0.76rem;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    body.customer-view .hero-badge {
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.2);
+      color: #0EA5E9;
+    }
+
+    .hero-title {
+      margin: 18px 0 12px;
+      font-size: clamp(2.2rem, 3.6vw, 3.4rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    body.customer-view .hero-title {
+      color: #0F172A;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+
+    body.customer-view .hero-copy {
+      color: #64748B;
+    }
+
+    .form-card {
+      margin-top: 24px;
+    }
+
+    .field-group {
+      display: grid;
+      gap: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 170px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      padding: 18px 20px;
+      font-size: 1rem;
+      resize: vertical;
+      outline: none;
+      font-family: 'Sora', sans-serif;
+    }
+
+    textarea::placeholder {
+      color: rgba(226,232,240,0.48);
+    }
+
+    body.customer-view textarea {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(0,0,0,0.08);
+      color: #0F172A;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    body.customer-view textarea:focus {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 3px rgba(56,189,248,0.12);
+    }
+
+    .intake-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .intake-grid .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .intake-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 5px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    body.customer-view input[type="text"],
+    body.customer-view input[type="email"] {
+      width: 100%;
+      border: 1px solid rgba(0,0,0,0.10);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.9);
+      color: #0F172A;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: 'Sora', sans-serif;
+      outline: none;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.04);
+      box-sizing: border-box;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    body.customer-view input[type="text"]:focus,
+    body.customer-view input[type="email"]:focus {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 3px rgba(56,189,248,0.12);
+    }
+
+    body.customer-view input::placeholder {
+      color: rgba(15,23,42,0.35);
+    }
+
+    .intake-divider {
+      border: none;
+      border-top: 1px solid rgba(0,0,0,0.07);
+      margin: 16px 0;
+    }
+
+    .privacy-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .privacy-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: #0EA5E9;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .privacy-row label {
+      font-size: 0.82rem;
+      color: #475569;
+      line-height: 1.6;
+      cursor: pointer;
+    }
+
+    .feedback-inline {
+      text-align: center;
+      padding: 16px 0 4px;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+
+    body.customer-view textarea::placeholder {
+      color: rgba(15,23,42,0.48);
+    }
+
+    .button-row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .button-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-weight: 600;
+      font-size: 0.98rem;
+      letter-spacing: 0.01em;
+      color: white;
+      background: linear-gradient(135deg, #0EA5E9, #7C3AED);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px rgba(14,165,233,0.3);
+    }
+
+    .button-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(14,165,233,0.4);
+    }
+
+    .button-secondary {
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .button-secondary:hover {
+      background: rgba(255,255,255,0.06);
+    }
+
+    body.customer-view .button-secondary {
+      border: 1px solid rgba(0,0,0,0.1);
+      background: rgba(255,255,255,0.8);
+      color: #475569;
+      border-radius: 8px;
+    }
+
+    body.customer-view .button-secondary:hover {
+      background: white;
+      border-color: #38BDF8;
+      color: #0EA5E9;
+    }
+
+    .hint-line {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    body.customer-view .hint-line {
+      color: #64748B;
+    }
+
+    .card-grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .status-row {
+      border-left: 4px solid rgba(56,189,248,0.8);
+      background: rgba(255,255,255,0.03);
+      padding: 18px 20px;
+      border-radius: 16px;
+      position: relative;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    body.customer-view .status-row {
+      background: rgba(255,251,235,0.95);
+      border: 1px solid rgba(251,191,36,0.3);
+      border-left: 3px solid rgba(251,191,36,0.6);
+      border-radius: 16px;
+    }
+
+    body.customer-view .status-row h3 {
+      color: #92400E;
+    }
+
+    .status-row h3 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .pill.blue { background: rgba(56,189,248,0.12); color: var(--accent); border: 1px solid rgba(56,189,248,0.22); }
+    .pill.green { background: rgba(110,231,183,0.12); color: var(--green); border: 1px solid rgba(110,231,183,0.22); }
+    .pill.red { background: rgba(248,113,113,0.14); color: var(--danger); border: 1px solid rgba(248,113,113,0.22); }
+    .pill.yellow { background: rgba(251,191,36,0.14); color: var(--warn); border: 1px solid rgba(251,191,36,0.22); }
+    .pill.gray { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid rgba(255,255,255,0.08); }
+
+    .progress-card {
+      display: grid;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .progress-step {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+
+    body.customer-view .progress-step {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #0F172A;
+    }
+
+    .progress-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      position: relative;
+    }
+
+    .progress-dot.active {
+      background: radial-gradient(circle, #38BDF8 0%, #0F172A 45%);
+      box-shadow: 0 0 0 6px rgba(56,189,248,0.15);
+      animation: pulse 1s infinite ease-in-out;
+    }
+
+    body.customer-view .progress-dot.active {
+      background: #0EA5E9;
+      box-shadow: 0 0 0 6px rgba(14,165,233,0.15);
+    }
+
+    .progress-dot.done {
+      background: var(--green);
+    }
+
+    body.customer-view .progress-dot.done {
+      background: #10B981;
+    }
+
+    .progress-label {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    body.customer-view .progress-label {
+      color: #0F172A;
+    }
+
+    .progress-status {
+      color: var(--muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    body.customer-view .progress-status {
+      color: #64748B;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.16); }
+    }
+
+    #live-agent-panel {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      width: 272px;
+      background: rgba(17, 24, 39, 0.82);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 18px;
+      padding: 18px 20px;
+      z-index: 900;
+      box-shadow: 0 28px 80px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #live-agent-panel .live-panel-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--accent2);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    #live-agent-panel .live-step {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      font-size: 0.84rem;
+    }
+
+    #live-agent-panel .live-step-label {
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #live-agent-panel .live-step-status {
+      font-size: 0.76rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .result-card {
+      margin-top: 24px;
+      display: grid;
+      gap: 18px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      padding: 22px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    body.customer-view .result-card {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #1E293B;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,1) inset;
+    }
+
+    .result-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .response-bubble {
+      background: var(--surface2);
+      border-left: 4px solid rgba(56,189,248,0.9);
+      padding: 22px 24px;
+      border-radius: 16px;
+      line-height: 1.85;
+      font-size: 1rem;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+    }
+
+    body.customer-view .response-bubble {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(56,189,248,0.15);
+      border-left: 3px solid #38BDF8;
+      color: #1E293B;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    }
+
+    .confidence-row {
+      display: grid;
+      gap: 14px;
+    }
+
+    .confidence-bar {
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    body.customer-view .confidence-bar {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+
+    .confidence-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    body.customer-view .confidence-label {
+      color: #64748B;
+    }
+
+    .confidence-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    body.customer-view .confidence-track {
+      background: rgba(0,0,0,0.08);
+    }
+
+    .confidence-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #38BDF8, #2563EB);
+      width: 0;
+      animation: fillBar 1s ease forwards;
+    }
+
+    @keyframes fillBar {
+      to { width: var(--fill-width); }
+    }
+
+    .collapsible {
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      background: var(--glass);
+      overflow: hidden;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    body.customer-view .collapsible {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1);
+    }
+
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      cursor: pointer;
+      gap: 12px;
+    }
+
+    .collapsible-content {
+      padding: 0 20px 18px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.28s ease;
+    }
+
+    .collapsible.open .collapsible-content {
+      max-height: 420px;
+    }
+
+    .collapsible-title {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    body.customer-view .collapsible-title {
+      color: #0F172A;
+    }
+
+    .knowledge-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .article-card {
+      padding: 16px 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.95rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    body.customer-view .article-card {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(56,189,248,0.15);
+      color: #1E293B;
+    }
+
+    .article-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: rgba(56,189,248,0.14);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    .operator-panel {
+      display: grid;
+      gap: 22px;
+    }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    @media (max-width: 1440px) {
+      .metrics-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    .metric-card {
+      padding: 20px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      display: grid;
+      gap: 10px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .metric-card:hover {
+      background: var(--glass-hover);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+      transform: translateY(-2px);
+    }
+
+    .metric-card:nth-child(1) {
+      box-shadow: 0 4px 20px rgba(124,58,237,0.4), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric-card:nth-child(1):hover {
+      box-shadow: 0 6px 28px rgba(124,58,237,0.5), 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .metric-card:nth-child(2) {
+      box-shadow: 0 4px 20px rgba(248,113,113,0.4), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric-card:nth-child(2):hover {
+      box-shadow: 0 6px 28px rgba(248,113,113,0.5), 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .metric-card:nth-child(3) {
+      box-shadow: 0 4px 20px rgba(110,231,183,0.4), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric-card:nth-child(3):hover {
+      box-shadow: 0 6px 28px rgba(110,231,183,0.5), 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .metric-card:nth-child(4) {
+      box-shadow: 0 4px 20px rgba(56,189,248,0.4), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric-card:nth-child(4):hover {
+      box-shadow: 0 6px 28px rgba(56,189,248,0.5), 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .metric-card:nth-child(5) {
+      box-shadow: 0 4px 20px rgba(251,191,36,0.4), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric-card:nth-child(5):hover {
+      box-shadow: 0 6px 28px rgba(251,191,36,0.5), 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .metric-card strong {
+      font-size: 36px;
+      font-family: 'DM Mono', monospace;
+      font-weight: 500;
+      display: block;
+      animation: countUp 0.8s ease-out forwards;
+    }
+
+    @keyframes countUp {
+      from {
+        opacity: 0.5;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .metric-card span {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .operator-grid {
+      display: grid;
+      grid-template-columns: 0.42fr 0.58fr;
+      gap: 22px;
+    }
+
+    .panel-card h3 {
+      margin: 0 0 14px;
+      font-size: 1.12rem;
+      letter-spacing: -0.02em;
+    }
+
+    .inline-filters {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    select {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--glass);
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    select:focus {
+      border-color: var(--accent);
+      background: var(--glass-hover);
+    }
+
+    .queue-meta {
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .ticket-row {
+      border: 1px solid var(--glass-border);
+      border-left-width: 3px;
+      border-left-color: transparent;
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: grid;
+      gap: 10px;
+      transition: all 0.2s ease;
+      background: var(--glass);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .ticket-row:hover {
+      background: var(--glass-hover);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+      transform: translateY(-1px);
+    }
+
+    .ticket-row.escalated {
+      border-left-color: rgba(248,113,113,0.72);
+      background: var(--glass);
+      box-shadow: 0 4px 20px rgba(248,113,113,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .ticket-row.escalated:hover {
+      box-shadow: 0 6px 28px rgba(248,113,113,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .ticket-summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .ticket-id {
+      font-family: 'DM Mono', monospace;
+      color: var(--accent);
+      font-size: 0.88rem;
+      letter-spacing: 0.04em;
+    }
+
+    body.customer-view .ticket-id {
+      color: #7C3AED;
+    }
+
+    .ticket-preview {
+      color: var(--text);
+      line-height: 1.6;
+      min-width: 0;
+      flex: 1;
+    }
+
+    body.customer-view .ticket-preview {
+      color: #1E293B;
+    }
+
+    .ticket-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ticket-row .button-secondary {
+      width: fit-content;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+    }
+
+    .ticket-detail-card {
+      display: grid;
+      gap: 20px;
+    }
+
+    .detail-header {
+      background: var(--glass);
+      padding: 22px;
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      position: relative;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    body.customer-view .detail-header {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #0F172A;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,1) inset;
+    }
+
+    .detail-header .status-pill {
+      position: absolute;
+      right: 24px;
+      top: 24px;
+    }
+
+    .detail-title {
+      margin: 0 0 12px;
+      font-size: 1.35rem;
+      letter-spacing: -0.04em;
+    }
+
+    body.customer-view .detail-title {
+      color: #0F172A;
+    }
+
+    .detail-meta {
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    body.customer-view .detail-meta {
+      color: #64748B;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      padding: 4px;
+    }
+
+    .tab-button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-button.active {
+      background: var(--glass);
+      border-color: var(--glass-border);
+      color: var(--accent);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .card-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .danger-card {
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.18);
+      padding: 22px;
+      border-radius: 18px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(248,113,113,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .danger-card h4 {
+      margin: 0 0 10px;
+    }
+
+    .danger-card p {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .detail-action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .button-outline-yellow {
+      border: 1px solid rgba(251,191,36,0.5);
+      background: rgba(251,191,36,0.08);
+      color: #FBBF24;
+      border-radius: 14px;
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.98rem;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      flex: 1;
+    }
+
+    .button-outline-yellow:hover {
+      background: rgba(251,191,36,0.15);
+      border-color: rgba(251,191,36,0.8);
+    }
+
+    .warn-card {
+      background: rgba(251,191,36,0.08);
+      border: 1px solid rgba(251,191,36,0.25);
+      padding: 22px;
+      border-radius: 18px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(251,191,36,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .warn-card h4 {
+      margin: 0 0 10px;
+      color: #FBBF24;
+    }
+
+    .warn-card p {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 14px;
+      position: relative;
+      padding-left: 20px;
+    }
+
+    .timeline-list::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+    }
+
+    .timeline-step {
+      display: grid;
+      gap: 10px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      position: relative;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    body.customer-view .timeline-step {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1);
+    }
+
+    .timeline-step::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 24px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--bg);
+    }
+
+    .timeline-step .step-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    body.customer-view .timeline-step .step-title {
+      color: #0F172A;
+    }
+
+    .timeline-step .step-details {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+
+    body.customer-view .timeline-step .step-details {
+      color: #64748B;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .step-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tools-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .step-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    body.customer-view .step-pill {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: #475569;
+    }
+
+    .source-badge {
+      display: inline-flex;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.08);
+      color: var(--accent2);
+      border: 1px solid rgba(56,189,248,0.18);
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      font-family: 'DM Mono', monospace;
+    }
+
+    body.customer-view .source-badge {
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.2);
+      color: #0EA5E9;
+    }
+
+    .observability-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .mini-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .perf-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .perf-section-label {
+      margin: 0 0 12px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .mini-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    body.customer-view .mini-card {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #1E293B;
+    }
+
+    .mini-card strong {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+
+    body.customer-view .mini-card strong {
+      color: #0F172A;
+    }
+
+    .mini-card span {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    body.customer-view .mini-card span {
+      color: #64748B;
+    }
+
+    .json-block {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 18px;
+      overflow-x: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    body.customer-view .json-block {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #1E293B;
+    }
+
+    .json-key { color: #93C5FD; }
+    .json-string { color: #6EE7B7; }
+    .json-number { color: #FBBF24; }
+    .json-boolean { color: #F87171; }
+
+    .empty-state {
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+      text-align: center;
+      padding: 62px 24px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      border-radius: 18px;
+      background: var(--glass);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    body.customer-view .empty-state {
+      background: rgba(255,255,255,0.9);
+      border: 1px dashed rgba(255,255,255,0.3);
+      color: #0F172A;
+    }
+
+    .empty-state h3 {
+      margin: 0;
+      font-size: 1.3rem;
+    }
+
+    body.customer-view .empty-state h3 {
+      color: #0F172A;
+    }
+
+    .empty-state p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 320px;
+      line-height: 1.7;
+    }
+
+    body.customer-view .empty-state p {
+      color: #64748B;
+    }
+
+    #modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(8,12,20,0.72);
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      z-index: 40;
+    }
+
+    #modal.open {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal-card {
+      width: min(520px, calc(100% - 40px));
+      background: var(--glass);
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+      padding: 28px;
+      display: grid;
+      gap: 20px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--text);
+    }
+
+    body.customer-view .modal-header h3 {
+      color: #0F172A;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--glass-border);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    body.customer-view .modal-close {
+      background: rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.1);
+      color: #475569;
+    }
+
+    body.customer-view .modal-close:hover {
+      background: rgba(0,0,0,0.1);
+      border-color: #38BDF8;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: rgba(17,24,39,0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: var(--text);
+      padding: 16px 20px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      z-index: 45;
+      display: grid;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1180px) {
+      #mainContent { margin-left: 0; width: 100%; }
+      #sidebar { position: relative; width: 100%; height: auto; }
+      .operator-grid { grid-template-columns: 1fr; }
+      .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 820px) {
+      .page-header { flex-direction: column; align-items: stretch; }
+      .metrics-row { grid-template-columns: 1fr; }
+      .detail-header .status-pill { position: static; margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar"></aside>
+    <main id="mainContent"></main>
+  </div>
+
+  <div id="modal" aria-hidden="true"></div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000/api/support';
+    const AGENTS = [
+      { label: 'Classifier Agent', key: 'Classifier' },
+      { label: 'Sentiment Agent', key: 'Sentiment' },
+      { label: 'Knowledge Agent', key: 'Knowledge' },
+      { label: 'Response Generation Agent', key: 'Response Generation' },
+      { label: 'Escalation Agent', key: 'Escalation' },
+    ];
+
+    const CATEGORY_OPTIONS = ['All', 'Order Issues', 'Billing', 'Account Access', 'Technical Issue', 'General Support'];
+    const STATUS_OPTIONS = ['All', 'Escalated', 'Resolved'];
+
+    const AGENT_COLORS = {
+      'Classification': '#6EE7B7',
+      'Sentiment': '#38BDF8',
+      'Knowledge': '#FBBF24',
+      'Response Generation': '#A78BFA',
+      'Escalation': '#F87171',
+    };
+
+    const state = {
+      view: 'customer',
+      tickets: [],
+      activeTicketId: null,
+      useBackend: true,
+      backendUrl: DEFAULT_BACKEND_URL,
+      processing: false,
+      progressState: AGENTS.map(agent => ({ ...agent, status: 'waiting' })),
+      activeTab: 'response',
+      showOfflineBadge: false,
+      filters: { status: 'All', category: 'All' },
+      modal: null,
+      lastInquiry: '',
+      feedbackStatus: null,
+      feedbackSubmitted: false,
+      perfMetrics: null,
+      showResult: false,
+      feedbackDone: null,
+      customerName: '',
+      customerEmail: '',
+      customerPhone: '',
+      privacyAccepted: false,
+    };
+
+    function render() {
+      document.body.classList.toggle('customer-view', state.view === 'customer');
+      renderSidebar();
+      renderMain();
+      renderModal();
+    }
+
+    function renderSidebar() {
+      const total = state.tickets.length;
+      const escalatedCount = state.tickets.filter(t => t.escalation_required).length;
+      const activeCustomer = state.view === 'customer';
+      const sidebar = document.getElementById('sidebar');
+      sidebar.innerHTML = `
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-shape">⬡</div>
+          <div class="sidebar-logo-text">
+            <strong>SupportAI</strong>
+            <small>Multi-Agent Platform</small>
+          </div>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-item ${activeCustomer ? 'active' : ''}" data-view="customer">
+            <div>Customer Portal</div><span>Envio de solicitações</span>
+            ${activeCustomer ? '<div class="nav-indicator">●</div>' : ''}
+          </div>
+          <div class="nav-item ${!activeCustomer ? 'active' : ''}" data-view="operator">
+            <div>Operator Dashboard</div><span>Visão de tickets</span>
+            ${!activeCustomer ? '<div class="nav-indicator">●</div>' : ''}
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h4>Live stats</h4>
+          <div>
+            <span class="metric-label">Total tickets</span>
+            <span class="metric-value">${total}</span>
+          </div>
+          <div>
+            <span class="metric-label">Escalated</span>
+            <span class="metric-value">${escalatedCount}</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section sidebar-config">
+          <div class="toggle-group">
+            <div>
+              <div class="input-label">Use FastAPI Backend</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="backendToggle" ${state.useBackend ? 'checked' : ''} />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div>
+            <div class="input-label">Backend URL</div>
+            <input id="backendUrlInput" class="sidebar-input" value="${state.backendUrl}" />
+          </div>
+          <div>
+            <span class="badge">${state.useBackend ? 'online' : 'offline mode'}</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">v2.0 · CrewAI + FastAPI</div>
+      `;
+
+      sidebar.querySelectorAll('[data-view]').forEach(item => {
+        item.addEventListener('click', () => {
+          state.view = item.dataset.view;
+          if (state.view === 'operator') {
+            state.activeTab = 'response';
+          }
+          render();
+        });
+      });
+
+      document.getElementById('backendToggle').addEventListener('change', event => {
+        state.useBackend = event.target.checked;
+        render();
+      });
+
+      document.getElementById('backendUrlInput').addEventListener('input', event => {
+        state.backendUrl = event.target.value.trim() || DEFAULT_BACKEND_URL;
+      });
+    }
+
+    function renderMain() {
+      const main = document.getElementById('mainContent');
+      if (state.view === 'customer') {
+        main.innerHTML = renderCustomerView();
+      } else {
+        main.innerHTML = renderOperatorView();
+      }
+      attachMainEvents();
+    }
+
+    function renderCustomerView() {
+      const sessionTicket = state.tickets.find(t => !t._source) || null;
+      const resultSection = state.showResult && sessionTicket ? renderCustomerResult(sessionTicket) : '';
+      const submitDisabled = !state.privacyAccepted || state.processing ? 'disabled' : '';
+      return `
+        <section class="page-header">
+          <div class="hero-card">
+            <div class="hero-badge">⬡ AI-Powered · 5 Specialized Agents</div>
+            <h1 class="hero-title">How can we help you today?</h1>
+            <p class="hero-copy">Describe your issue and our AI agents will analyze and route it to the right solution instantly.</p>
+          </div>
+        </section>
+        <section class="form-card panel-card">
+          ${renderIntakeForm()}
+          <hr class="intake-divider">
+          <div class="field-group">
+            <textarea id="inquiryInput" placeholder="e.g. My order hasn't arrived and it's been 7 days. I'm really frustrated and need help urgently.">${escapeHtml(state.lastInquiry)}</textarea>
+          </div>
+          <div class="privacy-row">
+            <input type="checkbox" id="privacyCheckbox" ${state.privacyAccepted ? 'checked' : ''}>
+            <label for="privacyCheckbox">I agree to the Privacy Policy and Terms of Service</label>
+          </div>
+          <div class="button-row">
+            <button class="button-primary" id="submitRequest" ${submitDisabled}>⬡ Analyze Request</button>
+          </div>
+          <p class="hint-line">Processed by 5 specialized agents · typically &lt; 3s</p>
+          ${state.processing ? renderProgressCard() : ''}
+        </section>
+        ${resultSection}
+      `;
+    }
+
+    function renderIntakeForm() {
+      return `
+        <div class="intake-grid">
+          <div>
+            <label class="intake-label" for="customerName">Full Name <span style="color:#F87171;">*</span></label>
+            <input type="text" id="customerName" placeholder="Jane Smith" value="${escapeHtml(state.customerName)}">
+          </div>
+          <div>
+            <label class="intake-label" for="customerEmail">Email <span style="color:#F87171;">*</span></label>
+            <input type="email" id="customerEmail" placeholder="jane@example.com" value="${escapeHtml(state.customerEmail)}">
+          </div>
+          <div class="full-width">
+            <label class="intake-label" for="customerPhone">Phone <span style="color:var(--muted);">(optional)</span></label>
+            <input type="text" id="customerPhone" placeholder="+55 11 99999-9999" value="${escapeHtml(state.customerPhone)}">
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProgressCard() {
+      return `
+        <section class="status-card progress-card">
+          ${AGENTS.map((agent, index) => {
+            const step = state.progressState[index];
+            const dotClass = step.status === 'active' ? 'progress-dot active' : step.status === 'done' ? 'progress-dot done' : 'progress-dot';
+            const statusText = step.status === 'active' ? 'Analyzing...' : step.status === 'done' ? '✓ done' : 'waiting';
+            return `
+              <div class="progress-step">
+                <div class="${dotClass}"></div>
+                <div class="progress-label">${agent.label}</div>
+                <div class="progress-status">${statusText}</div>
+              </div>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    function renderCustomerResult(ticket) {
+      const offlineText = ticket.offline ? '<span class="badge" style="background: rgba(248,113,113,0.1); color: var(--danger); border-color: rgba(248,113,113,0.22);">offline</span>' : '';
+      let feedbackSection;
+      if (state.feedbackDone === 'helpful') {
+        feedbackSection = `
+          <div class="feedback-inline">Obrigado pelo feedback! 😊</div>
+          <div class="button-row" style="grid-template-columns: 1fr;">
+            <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+          </div>
+        `;
+      } else if (state.feedbackDone === 'not-helpful') {
+        feedbackSection = `
+          <div class="feedback-inline">Vamos melhorar. Tente reformular sua pergunta.</div>
+          <div class="button-row" style="grid-template-columns: 1fr;">
+            <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+          </div>
+        `;
+      } else {
+        feedbackSection = `
+          <div class="button-row" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <button class="button-secondary" data-feedback="true" data-helpful="true">👍 Helpful</button>
+            <button class="button-secondary" data-feedback="true" data-helpful="false">👎 Not Helpful</button>
+            <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+          </div>
+        `;
+      }
+      return `
+        <section class="result-card">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 6px;">AI Response</h2>
+              </div>
+              <div>${offlineText}</div>
+            </div>
+            <div class="response-bubble">${ticket.response}</div>
+            ${feedbackSection}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderConfidenceBar(label, value) {
+      const percentage = Math.round(value);
+      return `
+        <div class="confidence-bar">
+          <div class="confidence-label"><span>${label}</span><span>${percentage}%</span></div>
+          <div class="confidence-track"><div class="confidence-fill" style="--fill-width: ${percentage}%;"></div></div>
+        </div>
+      `;
+    }
+
+    function renderLiveAgentPanel() {
+      if (!state.processing) return '';
+      const steps = state.progressState.map(step => {
+        const dotClass = step.status === 'active' ? 'progress-dot active' : step.status === 'done' ? 'progress-dot done' : 'progress-dot';
+        const statusText = step.status === 'active' ? 'Analyzing…' : step.status === 'done' ? '✓' : '—';
+        return `
+          <div class="live-step">
+            <div class="${dotClass}"></div>
+            <div class="live-step-label">${step.label}</div>
+            <div class="live-step-status">${statusText}</div>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div id="live-agent-panel">
+          <div class="live-panel-title">⬡ Agent Pipeline — Live</div>
+          ${steps}
+        </div>
+      `;
+    }
+
+    function renderOperatorView() {
+      const metrics = calculateOperatorMetrics();
+      return `
+        ${renderLiveAgentPanel()}
+        <section class="page-header">
+          <div>
+            <div class="hero-badge">Operator Dashboard</div>
+            <h1 class="hero-title" style="font-size: clamp(2rem, 3vw, 2.8rem); margin-top: 12px;">Operator dashboard</h1>
+            <p class="hero-copy">Monitor ticket throughput, escalations, and agent timelines in a single control plane.</p>
+          </div>
+        </section>
+
+        <section class="metrics-row">
+          ${renderMetricCard(metrics.total, 'Total Tickets')}
+          ${renderMetricCard(metrics.escalated, 'Escalated')}
+          ${renderMetricCard(metrics.resolved, 'Resolved')}
+          ${renderMetricCard(metrics.avgConfidence, 'Avg Confidence')}
+          ${renderMetricCard(metrics.highUrgency, 'High Urgency')}
+        </section>
+
+        <section class="operator-grid">
+          <div class="panel-card ticket-queue-panel">
+            <h3>Ticket Queue</h3>
+            <div class="inline-filters">
+              <select id="filterStatus">${STATUS_OPTIONS.map(option => `<option value="${option}" ${state.filters.status === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
+              <select id="filterCategory">${CATEGORY_OPTIONS.map(option => `<option value="${option}" ${state.filters.category === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
+            </div>
+            <div class="queue-meta">${filteredTickets().length} tickets matching filter</div>
+            <div style="display:grid; gap: 14px; margin-top: 18px; max-height: 720px; overflow-y: auto; padding-right: 4px;">
+              ${renderTicketRows()}
+            </div>
+          </div>
+          <div class="ticket-detail-card">
+            ${renderTicketDetail()}
+          </div>
+        </section>
+      `;
+    }
+
+    function calculateOperatorMetrics() {
+      const total = state.tickets.length;
+      const escalated = state.tickets.filter(t => t.escalation_required).length;
+      const resolved = state.tickets.filter(t => !t.escalation_required).length;
+      const highUrgency = state.tickets.filter(t => t.urgency === 'High').length;
+      const avgConfidence = total === 0 ? '0%' : `${Math.round(state.tickets.reduce((sum, ticket) => sum + (ticket.response_confidence || 0), 0) / total)}%`;
+      return { total, escalated, resolved, avgConfidence, highUrgency };
+    }
+
+    function renderMetricCard(value, label) {
+      return `
+        <div class="metric-card">
+          <strong>${value}</strong>
+          <span>${label}</span>
+        </div>
+      `;
+    }
+
+    function filteredTickets() {
+      return state.tickets.filter(ticket => {
+        const statusMatches = state.filters.status === 'All' || (state.filters.status === 'Escalated' ? ticket.escalation_required : !ticket.escalation_required);
+        const categoryMatches = state.filters.category === 'All' || ticket.category === state.filters.category;
+        return statusMatches && categoryMatches;
+      });
+    }
+
+    function renderTicketRows() {
+      const filtered = filteredTickets();
+      if (filtered.length === 0) {
+        return `
+          <div class="empty-state" style="padding: 36px;">
+            <div style="font-size: 1.4rem;">⬡</div>
+            <h3>There are no tickets to show</h3>
+            <p>Process a request in Customer Portal to populate the queue and start reviewing agent activity.</p>
+          </div>
+        `;
+      }
+      return filtered.map(ticket => {
+        const isEscalated = ticket.escalation_required;
+        const isAwaiting = ticket.status === 'awaiting_customer_info';
+        const statusLabel = isAwaiting ? 'Awaiting' : isEscalated ? 'Escalated' : 'Resolved';
+        const statusPillClass = isAwaiting ? 'yellow' : isEscalated ? 'red' : 'green';
+        const fromDb = ticket._source === 'db';
+        return `
+          <div class="ticket-row ${isEscalated ? 'escalated' : ''}">
+            <div class="ticket-summary">
+              <div>
+                <div class="ticket-id">${ticket.reference_id}${fromDb ? ' <span style="font-size:0.65rem;color:var(--muted);font-weight:400;">from DB</span>' : ''}</div>
+                <div class="ticket-preview">${truncate(ticket.inquiry, 78)}</div>
+              </div>
+              <div class="ticket-meta">
+                <span class="pill ${isEscalated ? 'red' : 'blue'}">${ticket.category}</span>
+                <span class="pill ${ticket.urgency === 'High' ? 'red' : ticket.urgency === 'Medium' ? 'yellow' : 'green'}">${ticket.urgency}</span>
+                <span class="pill ${statusPillClass}">${statusLabel}</span>
+                <button class="button-secondary" data-view-ticket="${ticket.reference_id}">View</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTicketDetail() {
+      const ticket = state.tickets.find(item => item.reference_id === state.activeTicketId);
+      if (!ticket) {
+        return `
+          <div class="empty-state">
+            <div style="font-size: 1.8rem;">⬡</div>
+            <h3>Select a ticket</h3>
+            <p>Choose a ticket from the queue to inspect agent timeline, knowledge, and observability details.</p>
+          </div>
+        `;
+      }
+      const statusText = ticket.escalation_required ? 'Escalated' : 'Resolved';
+      const statusClass = ticket.escalation_required ? 'red' : 'green';
+      const pills = [
+        `<span class="pill blue">${ticket.category}</span>`,
+        `<span class="pill ${ticket.sentiment === 'Urgent' ? 'red' : ticket.sentiment === 'Concerned' ? 'yellow' : 'green'}">${ticket.sentiment}</span>`,
+        `<span class="pill ${ticket.urgency === 'High' ? 'red' : ticket.urgency === 'Medium' ? 'yellow' : 'green'}">${ticket.urgency}</span>`,
+        `<span class="pill gray">${ticket.execution_mode || 'local'}</span>`,
+        `<span class="pill gray">${ticket.elapsed || '—'}</span>`,
+      ].join('');
+      return `
+        <div class="detail-header">
+          <div class="status-pill"><span class="pill ${statusClass}">${statusText}</span></div>
+          <h2 class="detail-title">${truncate(ticket.inquiry, 72)}</h2>
+          <div class="detail-meta">Reference <span class="ticket-id">${ticket.reference_id}</span> · ${ticket.timestamp}</div>
+          ${ticket.customerName ? `<div class="detail-meta" style="margin-top:6px;">👤 ${escapeHtml(ticket.customerName)}${ticket.customerEmail ? ` · ${escapeHtml(ticket.customerEmail)}` : ''}${ticket.customerPhone ? ` · ${escapeHtml(ticket.customerPhone)}` : ''}</div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;">${pills}</div>
+        </div>
+        <div class="tabs">
+          ${renderTabButton('response', '📋 Response')}
+          ${renderTabButton('timeline', '⬡ Agent Timeline')}
+          ${renderTabButton('knowledge', '📚 Knowledge')}
+          ${renderTabButton('observability', '🔬 Observability')}
+        </div>
+        <div class="card-stack" style="margin-top: 18px;">
+          ${renderTicketTab(ticket)}
+        </div>
+      `;
+    }
+
+    function renderTabButton(tab, label) {
+      return `<button class="tab-button ${state.activeTab === tab ? 'active' : ''}" data-tab="${tab}">${label}</button>`;
+    }
+
+    function renderTicketTab(ticket) {
+      if (state.activeTab === 'timeline') {
+        return renderTimelineTab(ticket);
+      }
+      if (state.activeTab === 'knowledge') {
+        return renderKnowledgeTab(ticket);
+      }
+      if (state.activeTab === 'observability') {
+        return renderObservabilityTab(ticket);
+      }
+      return renderResponseTab(ticket);
+    }
+
+    function renderResponseTab(ticket) {
+      let confirmAction;
+      if (ticket.status === 'awaiting_customer_info') {
+        confirmAction = `
+          <div class="warn-card">
+            <h4>⏳ Waiting for customer response</h4>
+            <p>This ticket is on hold until the customer provides more information.</p>
+          </div>
+          <div class="detail-action-row">
+            <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Mark as Resolved</button>
+            <button class="button-secondary" data-action="reject" data-id="${ticket.reference_id}">❌ Reject</button>
+          </div>
+        `;
+      } else if (ticket.escalation_required) {
+        const awaitBtn = ticket.response ? `
+          <button class="button-outline-yellow" data-action="await-customer" data-id="${ticket.reference_id}">⏳ Awaiting Customer Info</button>
+        ` : '';
+        confirmAction = `
+          <div class="danger-card">
+            <h4>Escalation required</h4>
+            <p>${ticket.escalation_reason || 'The AI team flagged this request for human review.'}</p>
+            ${ticket.triggered_keyword ? `<p><strong>Trigger:</strong> ${ticket.triggered_keyword}</p>` : ''}
+          </div>
+          ${ticket.response ? `<div class="response-bubble">${ticket.response}</div>` : ''}
+          <p style="margin: 0; font-size: 0.82rem; color: var(--muted);">Select action after reviewing the AI response above:</p>
+          <div class="detail-action-row">
+            <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Approve & Resolve</button>
+            ${awaitBtn}
+            <button class="button-secondary" data-action="reject" data-id="${ticket.reference_id}">❌ Reject</button>
+          </div>
+        `;
+      } else {
+        confirmAction = `<div class="response-bubble">${ticket.response}</div>`;
+      }
+      return `
+        <div class="card-stack">
+          ${confirmAction}
+          <div class="confidence-row">
+            ${renderConfidenceBar('Response Confidence', ticket.response_confidence)}
+            ${renderConfidenceBar('Category Confidence', ticket.category_confidence)}
+            ${renderConfidenceBar('Sentiment Confidence', ticket.sentiment_confidence)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTimelineTab(ticket) {
+      if (!ticket.steps || ticket.steps.length === 0) {
+        return `
+          <div class="empty-state">
+            <div style="font-size: 1.4rem;">⬡</div>
+            <h3>No agent timeline available</h3>
+            <p>This ticket was processed in offline mode or agent steps were not captured.</p>
+          </div>
+        `;
+      }
+      return `
+        <div class="timeline-list">
+          ${ticket.steps.map(step => {
+            const label = step.agent || 'Agent';
+            const color = AGENT_COLORS[label.split(' ')[0]] || '#64748B';
+            const details = formatStepDetails(step.details || {});
+            return `
+              <div class="timeline-step">
+                <div class="step-title" style="color: ${color};">
+                  <span class="step-label"><span class="step-dot" style="background:${color};"></span>${label}</span>
+                  <span>${step.details?.status || 'completed'}</span>
+                </div>
+                <div class="step-details">${details}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="tools-pills" style="margin-top: 12px;">${(ticket.tools_used || []).map(tool => `<span class="step-pill">${tool}</span>`).join('') || '<span class="step-pill">No tools captured</span>'}</div>
+      `;
+    }
+
+    function renderKnowledgeTab(ticket) {
+      return `
+        <div class="card-stack">
+          <div class="knowledge-grid">
+            ${ticket.articles.length > 0 ? ticket.articles.map(article => `
+              <div class="article-card"><div class="article-icon">⬡</div><span>${article}</span></div>
+            `).join('') : `
+              <div class="article-card"><div class="article-icon">•</div><span>No knowledge articles were detected.</span></div>
+            `}
+          </div>
+          <div class="source-badge">${ticket.offline ? 'Local fallback source' : 'FastAPI knowledge source'}</div>
+        </div>
+      `;
+    }
+
+    function renderObservabilityTab(ticket) {
+      const m = state.perfMetrics;
+      const avgTime = m && m.wall_time_sec != null ? m.wall_time_sec.toFixed(1) + 's' : '--';
+      const successRate = m && m.success_rate != null ? m.success_rate.toFixed(0) + '%' : '--';
+      const totalRuns = m && m.total_runs != null ? m.total_runs : '--';
+      const escalationRate = m && m.total_runs > 0
+        ? ((m.total_escalated / m.total_runs) * 100).toFixed(0) + '%'
+        : (m ? '0%' : '--');
+
+      const stepsHtml = ticket.steps.map((step, index) => `
+        <div class="collapsible" data-accordion="step-${index}">
+          <div class="collapsible-header"><div class="collapsible-title">Step ${index + 1}: ${step.agent}</div><span class="pill gray">details</span></div>
+          <div class="collapsible-content"><div class="json-block">${syntaxHighlight(JSON.stringify(step, null, 2))}</div></div>
+        </div>
+      `).join('');
+      return `
+        <div class="observability-grid">
+          <div>
+            <p class="perf-section-label">Performance Metrics</p>
+            <div class="perf-metrics-grid">
+              <div class="mini-card"><strong>${avgTime}</strong><span>Avg Response Time</span></div>
+              <div class="mini-card"><strong>${successRate}</strong><span>Success Rate</span></div>
+              <div class="mini-card"><strong>${totalRuns}</strong><span>Total Runs</span></div>
+              <div class="mini-card"><strong>${escalationRate}</strong><span>Escalation Rate</span></div>
+            </div>
+          </div>
+          <div class="mini-metrics">
+            <div class="mini-card"><strong>${ticket.steps.length}</strong><span>Steps</span></div>
+            <div class="mini-card"><strong>${ticket.elapsed || '—'}</strong><span>Elapsed</span></div>
+            <div class="mini-card"><strong>${(ticket.tools_used || []).length}</strong><span>Tools</span></div>
+          </div>
+          ${stepsHtml}
+          <div class="collapsible" data-accordion="payload">
+            <div class="collapsible-header"><div class="collapsible-title">Full Ticket Payload</div><span class="pill gray">JSON</span></div>
+            <div class="collapsible-content"><div class="json-block">${syntaxHighlight(JSON.stringify(ticket, null, 2))}</div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatStepDetails(details) {
+      if (typeof details === 'string') return details;
+      const entries = Object.entries(details || {});
+      if (entries.length === 0) return 'No additional details.';
+      return entries.map(([key, value]) => `<strong>${key}:</strong> ${sanitize(String(value))}`).join('<br>');
+    }
+
+    function sanitize(text) {
+      return text.replace(/[&<>]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[tag]));
+    }
+
+    function truncate(text, limit) {
+      return text.length > limit ? text.slice(0, limit - 1) + '…' : text;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function attachMainEvents() {
+      const submitButton = document.getElementById('submitRequest');
+      if (submitButton) {
+        submitButton.addEventListener('click', handleSubmitInquiry);
+      }
+      const newInquiry = document.getElementById('newInquiry');
+      if (newInquiry) {
+        newInquiry.addEventListener('click', () => {
+          state.lastInquiry = '';
+          state.feedbackStatus = null;
+          state.showResult = false;
+          state.feedbackDone = null;
+          render();
+        });
+      }
+
+      document.querySelectorAll('[data-feedback="true"]').forEach(button => {
+        button.addEventListener('click', event => {
+          const helpful = event.currentTarget.dataset.helpful === 'true';
+          const ticket = state.tickets.find(t => !t._source);
+          if (ticket) sendFeedback(ticket.reference_id, helpful);
+          state.feedbackDone = helpful ? 'helpful' : 'not-helpful';
+          render();
+        });
+      });
+
+      ['customerName', 'customerEmail', 'customerPhone'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', e => { state[id] = e.target.value; });
+      });
+
+      const privacyCheckbox = document.getElementById('privacyCheckbox');
+      if (privacyCheckbox) {
+        privacyCheckbox.addEventListener('change', e => {
+          state.privacyAccepted = e.target.checked;
+          const btn = document.getElementById('submitRequest');
+          if (btn) btn.disabled = !state.privacyAccepted || state.processing;
+        });
+      }
+
+      document.querySelectorAll('[data-view-ticket]').forEach(button => {
+        button.addEventListener('click', event => {
+          state.activeTicketId = event.currentTarget.dataset.viewTicket;
+          render();
+        });
+      });
+
+      document.querySelectorAll('[data-tab]').forEach(button => {
+        button.addEventListener('click', event => {
+          state.activeTab = event.currentTarget.dataset.tab;
+          render();
+        });
+      });
+
+      document.querySelectorAll('[data-action]').forEach(button => {
+        button.addEventListener('click', event => {
+          const action = event.currentTarget.dataset.action;
+          const id = event.currentTarget.dataset.id;
+          const ticket = state.tickets.find(item => item.reference_id === id);
+          if (!ticket) return;
+          if (action === 'approve') {
+            openModal('Confirm approval', 'Approve and resolve this escalated ticket?', 'Approve', () => approveTicket(ticket.reference_id));
+          }
+          if (action === 'reject') {
+            openModal('Confirm rejection', 'Reject this escalated ticket and mark it for revision?', 'Reject', () => rejectTicket(ticket.reference_id));
+          }
+          if (action === 'await-customer') {
+            openModal('Awaiting customer info', 'Put this ticket on hold until the customer provides more information?', 'Confirm', () => awaitCustomerInfo(ticket.reference_id));
+          }
+        });
+      });
+
+      document.querySelectorAll('[data-collapsible]').forEach(panel => {
+        const header = panel.querySelector('.collapsible-header');
+        if (!header) return;
+        header.addEventListener('click', () => {
+          panel.classList.toggle('open');
+        });
+      });
+
+      document.querySelectorAll('[data-accordion]').forEach(panel => {
+        const header = panel.querySelector('.collapsible-header');
+        if (!header) return;
+        header.addEventListener('click', () => {
+          panel.classList.toggle('open');
+        });
+      });
+
+      const filterStatus = document.getElementById('filterStatus');
+      if (filterStatus) {
+        filterStatus.addEventListener('change', event => {
+          state.filters.status = event.target.value;
+          render();
+        });
+      }
+
+      const filterCategory = document.getElementById('filterCategory');
+      if (filterCategory) {
+        filterCategory.addEventListener('change', event => {
+          state.filters.category = event.target.value;
+          render();
+        });
+      }
+    }
+
+    function handleSubmitInquiry() {
+      if (!state.privacyAccepted) {
+        showToast('Aceite a Política de Privacidade para continuar.');
+        return;
+      }
+      if (!state.customerName.trim()) {
+        showToast('Por favor informe seu nome completo.');
+        return;
+      }
+      if (!state.customerEmail.trim()) {
+        showToast('Por favor informe seu e-mail.');
+        return;
+      }
+      const inquiry = document.getElementById('inquiryInput').value.trim();
+      if (!inquiry) {
+        showToast('Por favor descreva seu problema antes de enviar.');
+        return;
+      }
+      if (state.processing) return;
+      state.processing = true;
+      state.showResult = false;
+      state.feedbackDone = null;
+      state.progressState = AGENTS.map(agent => ({ ...agent, status: 'waiting' }));
+      state.feedbackStatus = null;
+      render();
+      state.lastInquiry = inquiry;
+      const startTime = Date.now();
+      const progressPromise = simulateProgress();
+      callSupportApi(inquiry).then(ticket => {
+        ticket.elapsed = formatElapsed(startTime, new Date());
+        ticket.customerName = state.customerName.trim();
+        ticket.customerEmail = state.customerEmail.trim();
+        ticket.customerPhone = state.customerPhone.trim();
+        state.tickets.unshift(ticket);
+        state.activeTicketId = ticket.reference_id;
+        state.processing = false;
+        state.showResult = true;
+        render();
+        Promise.all([progressPromise]).then(() => {
+          showToast('✅ Sua solicitação foi processada com sucesso!');
+        });
+      }).catch(() => {
+        state.processing = false;
+        showToast('Não foi possível processar o pedido. Verifique o backend ou use o modo offline.');
+        render();
+      });
+    }
+
+    let _animGeneration = 0;
+
+    function simulateProgress() {
+      const generation = ++_animGeneration;
+      return new Promise(resolve => {
+        let current = 0;
+        function nextStep() {
+          if (generation !== _animGeneration) { resolve(); return; }
+          if (current > 0) {
+            state.progressState[current - 1].status = 'done';
+          }
+          if (current === AGENTS.length) {
+            resolve();
+            return;
+          }
+          state.progressState[current].status = 'active';
+          render();
+          setTimeout(() => {
+            current += 1;
+            nextStep();
+          }, 850);
+        }
+        nextStep();
+      });
+    }
+
+    function callSupportApi(inquiry) {
+      return new Promise(async resolve => {
+        if (!state.useBackend) {
+          return resolve(generateOfflineTicket(inquiry));
+        }
+        try {
+          const response = await fetch(state.backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inquiry }),
+          });
+          if (!response.ok) {
+            throw new Error('backend error');
+          }
+          const data = await response.json();
+          const ticket = normalizeTicket(data, false);
+          resolve(ticket);
+        } catch (error) {
+          showToast('Backend indisponível. Alternando para modo offline.');
+          resolve(generateOfflineTicket(inquiry));
+        }
+      });
+    }
+
+    function normalizeTicket(data, offline) {
+      const timestamp = new Date();
+      return {
+        inquiry: data.inquiry || state.lastInquiry || '',
+        category: data.category || 'General Support',
+        category_confidence: Number(data.category_confidence || 0),
+        sentiment: data.sentiment || 'Neutral',
+        sentiment_confidence: Number(data.sentiment_confidence || 0),
+        urgency: data.urgency || 'Low',
+        articles: Array.isArray(data.articles) ? data.articles : [],
+        response: data.response || 'The AI agent generated a response successfully.',
+        response_confidence: Number(data.response_confidence || 0),
+        escalation_required: !!data.escalation_required,
+        escalation_reason: data.escalation_reason || '',
+        reference_id: data.reference_id || generateReferenceId(),
+        triggered_keyword: data.triggered_keyword || null,
+        steps: Array.isArray(data.steps) ? data.steps : [],
+        execution_mode: data.execution_mode || 'backend',
+        tools_used: Array.isArray(data.tools_used) ? data.tools_used : [],
+        offline,
+        timestamp: formatTimestamp(timestamp),
+        timestampRaw: timestamp.toISOString(),
+      };
+    }
+
+    function generateReferenceId() {
+      return 'ESC-' + Math.random().toString(36).slice(2, 8).toUpperCase() + '-' + Date.now().toString().slice(-5);
+    }
+
+    function generateOfflineTicket(inquiry) {
+      const reference_id = generateReferenceId();
+      const normalizedInquiry = inquiry.toLowerCase();
+      const categories = {
+        'Order Issues': ['order', 'delivery', 'package', 'shipment', 'tracking'],
+        Billing: ['charge', 'payment', 'invoice', 'bill', 'refund', 'money'],
+        'Account Access': ['password', 'login', 'access', 'account', 'locked', 'reset'],
+        'Technical Issue': ['error', 'bug', 'crash', 'slow', 'broken', 'issue'],
+      };
+      let category = 'General Support';
+      for (const [name, list] of Object.entries(categories)) {
+        if (list.some(term => normalizedInquiry.includes(term))) {
+          category = name;
+          break;
+        }
+      }
+      const urgentTerms = ['urgent', 'asap', 'immediately', 'emergency', 'critical'];
+      const concernTerms = ['frustrated', 'angry', 'disappointed', 'upset', 'problem', 'issue'];
+      let urgency = 'Low';
+      let sentiment = 'Neutral';
+      if (urgentTerms.some(term => normalizedInquiry.includes(term))) {
+        urgency = 'High';
+        sentiment = 'Urgent';
+      } else if (concernTerms.some(term => normalizedInquiry.includes(term))) {
+        urgency = 'Medium';
+        sentiment = 'Concerned';
+      }
+      const escalation_required = urgency === 'High' || normalizedInquiry.includes('refund') || normalizedInquiry.includes('manager') || normalizedInquiry.includes('escalate');
+      const response = escalation_required
+        ? `Obrigado por relatar este problema. Nossa equipe especializada irá revisar sua solicitação imediatamente e retornará em até 24 horas.`
+        : `Recebemos sua solicitação e nossa equipe de agentes está trabalhando para responder com precisão. Em breve teremos um retorno baseado nas informações fornecidas.`;
+      const articles = {
+        'Order Issues': ['Tracking Your Package', 'Delivery Delays and Solutions'],
+        Billing: ['Understanding Your Invoice', 'Refund and Charge Disputes'],
+        'Account Access': ['Resetting Your Password', 'Account Recovery Steps'],
+        'Technical Issue': ['Troubleshooting Common Errors', 'Improve App Performance'],
+        'General Support': ['Customer Support Best Practices', 'How to Get Faster Help'],
+      }[category] || ['Customer support policies'];
+      const triggered_keyword = ['refund', 'escalate', 'manager'].find(term => normalizedInquiry.includes(term)) || null;
+      const steps = [
+        { agent: 'Classifier Agent', details: { tool_used: 'Keyword matcher', category, confidence: 0.76 } },
+        { agent: 'Sentiment Agent', details: { sentiment, urgency, confidence: 0.72 } },
+        { agent: 'Knowledge Agent', details: { articles_found: articles.length, source: 'Local knowledge pack' } },
+        { agent: 'Response Generation Agent', details: { output: response, confidence: 0.68 } },
+        { agent: 'Escalation Agent', details: { escalation: escalation_required, reason: escalation_required ? 'High urgency or refund request' : 'Confidence acceptable' } },
+      ];
+      return {
+        inquiry,
+        category,
+        category_confidence: 0.75,
+        sentiment,
+        sentiment_confidence: 0.72,
+        urgency,
+        articles,
+        response,
+        response_confidence: 0.66,
+        escalation_required,
+        escalation_reason: escalation_required ? 'Detected urgent or refund terms.' : '',
+        reference_id,
+        triggered_keyword,
+        steps,
+        execution_mode: 'offline',
+        tools_used: ['Classifier Tool', 'Sentiment Tool', 'Knowledge Tool', 'Response Tool', 'Escalation Tool'],
+        offline: true,
+        timestamp: formatTimestamp(new Date()),
+        timestampRaw: new Date().toISOString(),
+      };
+    }
+
+    function formatTimestamp(date) {
+      return date.toLocaleString('pt-BR', { hour12: false });
+    }
+
+    function formatElapsed(start, end) {
+      const diff = Math.max(0, new Date(end) - new Date(start));
+      const seconds = Math.round(diff / 1000);
+      return `${seconds}s`;
+    }
+
+    function sendFeedback(referenceId, helpful) {
+      const ticket = state.tickets.find(item => item.reference_id === referenceId);
+      if (!ticket) return;
+      if (!state.useBackend) {
+        state.feedbackStatus = helpful ? 'Feedback registrado localmente.' : 'Feedback negativo registrado localmente.';
+        render();
+        return;
+      }
+      fetch(`${state.backendUrl}/${referenceId}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helpful }),
+      }).then(response => {
+        if (response.ok) {
+          state.feedbackStatus = helpful ? 'Feedback enviado com sucesso.' : 'Feedback negativo enviado.';
+        } else {
+          state.feedbackStatus = 'Não foi possível enviar feedback para o backend.';
+        }
+        render();
+      }).catch(() => {
+        state.feedbackStatus = 'Falha no envio do feedback. Verifique a conexão.';
+        render();
+      });
+    }
+
+    function openModal(title, message, confirmLabel, onConfirm) {
+      state.modal = { title, message, confirmLabel, onConfirm };
+      renderModal();
+    }
+
+    function closeModal() {
+      state.modal = null;
+      renderModal();
+    }
+
+    function renderModal() {
+      const modalRoot = document.getElementById('modal');
+      if (!state.modal) {
+        modalRoot.className = '';
+        modalRoot.innerHTML = '';
+        modalRoot.setAttribute('aria-hidden', 'true');
+        return;
+      }
+      modalRoot.className = 'open';
+      modalRoot.setAttribute('aria-hidden', 'false');
+      modalRoot.innerHTML = `
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <div><h3>${state.modal.title}</h3><p style="color: var(--muted); margin: 4px 0 0; font-size: 0.95rem;">${state.modal.message}</p></div>
+            <button class="modal-close" aria-label="Close modal">✕</button>
+          </div>
+          <div class="modal-buttons">
+            <button class="button-primary" id="modalConfirm">${state.modal.confirmLabel}</button>
+            <button class="button-secondary" id="modalCancel">Cancelar</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('modalConfirm').addEventListener('click', () => {
+        state.modal.onConfirm();
+        closeModal();
+      });
+      document.getElementById('modalCancel').addEventListener('click', closeModal);
+      modalRoot.addEventListener('click', event => {
+        if (event.target === modalRoot) closeModal();
+      });
+    }
+
+    function approveTicket(referenceId) {
+      const ticket = state.tickets.find(t => t.reference_id === referenceId);
+      if (!ticket) return;
+      if (!state.useBackend) {
+        ticket.escalation_required = false;
+        state.feedbackStatus = 'Ticket aprovado localmente.';
+        render();
+        return;
+      }
+      fetch(`${state.backendUrl}/${referenceId}/approve`, { method: 'POST' })
+        .then(response => {
+          if (response.ok) {
+            ticket.escalation_required = false;
+            state.feedbackStatus = 'Ticket aprovado e resolvido.';
+          } else {
+            state.feedbackStatus = 'Falha ao aprovar ticket no backend.';
+          }
+          render();
+        }).catch(() => {
+          state.feedbackStatus = 'Erro de conexão ao aprovar ticket.';
+          render();
+        });
+    }
+
+    function rejectTicket(referenceId) {
+      const ticket = state.tickets.find(t => t.reference_id === referenceId);
+      if (!ticket) return;
+      if (!state.useBackend) {
+        ticket.escalation_required = true;
+        state.feedbackStatus = 'Ticket marcado como rejeitado localmente.';
+        render();
+        return;
+      }
+      fetch(`${state.backendUrl}/${referenceId}/reject`, { method: 'POST' })
+        .then(response => {
+          if (response.ok) {
+            ticket.escalation_required = true;
+            state.feedbackStatus = 'Ticket rejeitado e retornado para revisão.';
+          } else {
+            state.feedbackStatus = 'Falha ao rejeitar ticket no backend.';
+          }
+          render();
+        }).catch(() => {
+          state.feedbackStatus = 'Erro de conexão ao rejeitar ticket.';
+          render();
+        });
+    }
+
+    function awaitCustomerInfo(referenceId) {
+      const ticket = state.tickets.find(t => t.reference_id === referenceId);
+      if (!ticket) return;
+      if (!state.useBackend) {
+        ticket.status = 'awaiting_customer_info';
+        state.feedbackStatus = 'Ticket marcado como aguardando resposta do cliente.';
+        render();
+        return;
+      }
+      fetch(`${state.backendUrl}/${referenceId}/await-customer`, { method: 'POST' })
+        .then(response => {
+          if (response.ok) {
+            ticket.status = 'awaiting_customer_info';
+            state.feedbackStatus = 'Ticket marcado como aguardando resposta do cliente.';
+          } else {
+            state.feedbackStatus = 'Falha ao atualizar status do ticket.';
+          }
+          render();
+        }).catch(() => {
+          state.feedbackStatus = 'Erro de conexão ao atualizar ticket.';
+          render();
+        });
+    }
+
+    async function loadHistoricalTickets() {
+      if (!state.useBackend) return;
+      try {
+        const resp = await fetch('http://127.0.0.1:8000/api/tickets');
+        if (!resp.ok) return;
+        const dbTickets = await resp.json();
+        const existingIds = new Set(state.tickets.map(t => t.reference_id));
+        for (const t of dbTickets) {
+          if (!existingIds.has(t.reference_id)) {
+            t._source = 'db';
+            t.timestamp = t.created_at ? new Date(t.created_at).toLocaleTimeString() : '—';
+            state.tickets.push(t);
+          }
+        }
+        render();
+      } catch (e) {}
+    }
+
+    function syntaxHighlight(json) {
+      const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return escaped.replace(/("(.*?)"")?(: )?/g, match => {
+        if (/": $/.test(match)) return `<span class="json-key">${match}</span>`;
+        return `<span class="json-string">${match}</span>`;
+      }).replace(/\b(true|false|null)\b/g, '<span class="json-boolean">$1</span>').replace(/(\b\d+\.?\d*\b)/g, '<span class="json-number">$1</span>');
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toast.timeoutId);
+      toast.timeoutId = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3200);
+    }
+
+    render();
+    loadHistoricalTickets();
+  </script>
+</body>
+</html>

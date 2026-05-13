@@ -4,6 +4,11 @@ from typing import Dict, Any
 from . import BaseSupportTool
 
 
+def _build_reference_id() -> str:
+    import random
+    return f"ESC-2026-{random.randint(1000, 9999)}"
+
+
 class EscalationTool(BaseSupportTool):
     """Tool for evaluating if cases need escalation to human support."""
 
@@ -18,7 +23,7 @@ class EscalationTool(BaseSupportTool):
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-        from aamad.config import ESCALATION_KEYWORDS, normalize_text
+        from aamad.config import ESCALATION_KEYWORDS, ESCALATION_PHRASES, normalize_text
         import random
 
         escalate = False
@@ -38,6 +43,18 @@ class EscalationTool(BaseSupportTool):
                 triggered_keyword = keyword
                 reason = f"User explicitly requested escalation or human support (keyword: '{keyword}')."
                 break
+
+        # Check multi-word phrases
+        if not escalate:
+            for phrase in ESCALATION_PHRASES:
+                normalized_phrase = normalize_text(phrase)
+                if normalized_phrase in normalized_inquiry:
+                    return {
+                        "escalation_required": True,
+                        "reason": f"Escalation phrase detected: '{phrase}'.",
+                        "reference_id": _build_reference_id(),
+                        "triggered_keyword": phrase,
+                    }
 
         if not escalate:
             if response_confidence < 55:

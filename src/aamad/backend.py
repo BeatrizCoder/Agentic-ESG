@@ -11,6 +11,8 @@ from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
 import asyncio
+import time
+import uuid
 from datetime import datetime
 
 # Import new services and config
@@ -70,6 +72,30 @@ class StepsResponse(BaseModel):
     status: str
 
 
+class TraceResponse(BaseModel):
+    reference_id: str
+    run_id: str
+    steps: List[Dict[str, Any]]
+    total_steps: int
+    execution_time_ms: int
+    tools_used: List[str]
+    tracing_enabled: bool
+
+
+class RunMetrics(BaseModel):
+    run_id: str
+    reference_id: str
+    status: str
+    started_at: float
+    finished_at: Optional[float] = None
+    wall_time_sec: Optional[float] = None
+    token_usage: Dict[str, int] = {}
+    tool_latency_ms: Dict[str, float] = {}
+    step_count: int = 0
+    success_rate: float = 1.0
+    error: Optional[str] = None
+
+
 class SupportResponse(BaseModel):
     inquiry: str
     category: str
@@ -92,6 +118,8 @@ class SupportResponse(BaseModel):
     skills_used: list[str] | None = None
     tools_used: list[str] | None = None
     cache_used: bool | None = None
+    run_id: str | None = None
+    wall_time_sec: float | None = None
 
 
 class SupportState(BaseModel):
@@ -116,9 +144,14 @@ class SupportState(BaseModel):
     skills_used: list[str] = []
     tools_used: list[str] = []
     cache_used: bool = False
+    run_id: str = ""
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
-        self.steps.append({"agent": agent_name, "details": details})
+        self.steps.append({
+            "agent": agent_name,
+            "timestamp": datetime.now().isoformat(),
+            "details": details
+        })
 
 
 class SupportCrew:
@@ -218,6 +251,7 @@ class SupportCrew:
             classification_result["category"],
             sentiment_result["urgency"],
             knowledge_result["count"],
+            inquiry,
         )
 
         self.delegate_task(
@@ -273,20 +307,31 @@ class SupportCrew:
 
 class SupportFlow(Flow[SupportState]):
     def __init__(self):
-        super().__init__()
+        super().__init__(tracing=True)
         self.steps: list[dict[str, Any]] = []
+        self._start_time: float = time.time()
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
-        self.steps.append({"agent": agent_name, "details": details})
+        self.steps.append({
+            "agent": agent_name,
+            "timestamp": datetime.now().isoformat(),
+            "elapsed_ms": round(
+                (time.time() - self._start_time) * 1000
+            ) if hasattr(self, '_start_time') else 0,
+            "details": details
+        })
 
     async def execute_tool(self, tool_name: str, *args, **kwargs) -> dict[str, Any]:
         """Execute tool through registry with logging."""
+        start_timestamp = datetime.now().isoformat()
         result = await asyncio.to_thread(tool_registry.execute_tool, tool_name, *args, **kwargs)
+        end_timestamp = datetime.now().isoformat()
         self.log_step(f"{tool_name} Agent", {
             "tool_used": tool_name,
-            "input": args,
-            "kwargs": kwargs,
-            "output": result,
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "input_summary": str(args)[:300],
+            "output_summary": str(result)[:300],
             "cached": result.get("cached", False),
             "execution_time": result.get("execution_time", 0)
         })
@@ -294,6 +339,7 @@ class SupportFlow(Flow[SupportState]):
 
     @start()
     async def classify_inquiry(self):
+        self._start_time = time.time()
         self.steps = []
         result = await self.execute_tool("Classification Tool", self.state.inquiry)
         self.state.category = result["category"]
@@ -336,6 +382,7 @@ class SupportFlow(Flow[SupportState]):
             self.state.category,
             self.state.urgency,
             len(self.state.articles),
+            self.state.inquiry,
         )
         self.state.response = result["response"]
         self.state.response_confidence = result["confidence"]
@@ -453,6 +500,9 @@ tool_registry.tools["Knowledge Retrieval Tool"].knowledge_service = knowledge_se
 tool_registry.tools["Memory Management Tool"].memory_service = memory_service
 tool_registry.tools["Prompt Management Tool"].prompt_service = prompt_service
 
+# In-memory metrics store (keyed by reference_id)
+_metrics_store: Dict[str, RunMetrics] = {}
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:
@@ -465,19 +515,42 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
     if not inquiry:
         raise HTTPException(status_code=400, detail="Inquiry text cannot be empty.")
 
-    import time
-    from datetime import datetime
+    run_id = str(uuid.uuid4())
+    start_time = time.time()
 
     # Process the support request through the CrewAI flow
     support_flow = SupportFlow()
-    await support_flow.kickoff_async({"inquiry": inquiry})
-    final_state = support_flow.state
+    await support_flow.kickoff_async({"inquiry": inquiry, "run_id": run_id})
+    # Unwrap the StateProxy so Pydantic/pydantic-core sees real Python lists,
+    # not LockedListProxy (whose C-level list buffer is always empty).
+    final_state = support_flow.state._unwrap()
+
+    wall_time = round(time.time() - start_time, 3)
+    execution_time_ms = int(wall_time * 1000)
 
     # Generate reference ID
     reference_id = final_state.reference_id if final_state.escalation_required else f"REF-{int(time.time())}"
 
     # Determine status based on escalation
     status = "pending_human_review" if final_state.escalation_required else "completed"
+
+    # Capture RunMetrics and store in memory
+    metrics = RunMetrics(
+        run_id=run_id,
+        reference_id=reference_id,
+        status=status,
+        started_at=start_time,
+        finished_at=time.time(),
+        wall_time_sec=wall_time,
+        step_count=len(final_state.steps),
+        tool_latency_ms={
+            step["agent"]: step.get("elapsed_ms", 0)
+            for step in final_state.steps
+        },
+        token_usage={},
+        success_rate=1.0 if not final_state.escalation_required else 0.8,
+    )
+    _metrics_store[reference_id] = metrics
 
     # Create ticket data for persistence
     ticket_data = SupportTicketData(
@@ -504,7 +577,9 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         cache_used=final_state.cache_used,
         status=status,
         created_at=datetime.now().isoformat(),
-        updated_at=datetime.now().isoformat()
+        updated_at=datetime.now().isoformat(),
+        run_id=run_id,
+        execution_time_ms=execution_time_ms
     )
 
     # Save to data store
@@ -560,6 +635,8 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         tools_used=final_state.tools_used,
         skills_used=final_state.skills_used,
         cache_used=final_state.cache_used,
+        run_id=run_id,
+        wall_time_sec=wall_time,
     )
 
     return response
@@ -594,6 +671,84 @@ async def get_ticket_steps(reference_id: str) -> StepsResponse:
         steps=ticket.steps,
         status=ticket.status
     )
+
+
+@app.get("/api/support/{reference_id}/trace", response_model=TraceResponse)
+async def get_ticket_trace(reference_id: str) -> TraceResponse:
+    """Get observability trace for a support ticket execution."""
+    ticket = data_store.get_ticket(reference_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    return TraceResponse(
+        reference_id=ticket.reference_id,
+        run_id=ticket.run_id or "",
+        steps=ticket.steps,
+        total_steps=len(ticket.steps),
+        execution_time_ms=ticket.execution_time_ms,
+        tools_used=ticket.tools_used,
+        tracing_enabled=True
+    )
+
+
+@app.get("/api/metrics/summary")
+async def get_metrics_summary() -> Dict[str, Any]:
+    """Aggregate performance metrics across all tickets."""
+    tickets = data_store.get_all_tickets()
+    if not tickets:
+        return {
+            "total_runs": 0,
+            "avg_wall_time_sec": 0.0,
+            "success_rate": 1.0,
+            "total_escalated": 0,
+            "avg_step_count": 0.0,
+            "slowest_tool": None,
+            "fastest_run_sec": 0.0,
+            "slowest_run_sec": 0.0,
+        }
+
+    total = len(tickets)
+    total_escalated = sum(1 for t in tickets if t.escalation_required)
+    avg_wall_time = sum(t.execution_time_ms for t in tickets) / total / 1000
+    success_rate = round((total - total_escalated) / total, 3)
+    avg_step_count = round(sum(len(t.steps) for t in tickets) / total, 1)
+
+    # Compute per-tool average latency from stored step details
+    tool_times: Dict[str, list] = {}
+    for ticket in tickets:
+        for step in ticket.steps:
+            details = step.get("details", {})
+            tool = details.get("tool_used")
+            exec_time = details.get("execution_time")
+            if tool and exec_time:
+                tool_times.setdefault(tool, []).append(float(exec_time))
+
+    slowest_tool = None
+    if tool_times:
+        slowest_tool = max(tool_times, key=lambda t: sum(tool_times[t]) / len(tool_times[t]))
+
+    run_times = [t.execution_time_ms / 1000 for t in tickets if t.execution_time_ms]
+    fastest = round(min(run_times), 3) if run_times else 0.0
+    slowest = round(max(run_times), 3) if run_times else 0.0
+
+    return {
+        "total_runs": total,
+        "avg_wall_time_sec": round(avg_wall_time, 3),
+        "success_rate": success_rate,
+        "total_escalated": total_escalated,
+        "avg_step_count": avg_step_count,
+        "slowest_tool": slowest_tool,
+        "fastest_run_sec": fastest,
+        "slowest_run_sec": slowest,
+    }
+
+
+@app.get("/api/support/{reference_id}/metrics", response_model=RunMetrics)
+async def get_ticket_metrics(reference_id: str) -> RunMetrics:
+    """Return RunMetrics for a specific ticket (in-memory, current session only)."""
+    if reference_id not in _metrics_store:
+        raise HTTPException(status_code=404, detail="Metrics not found for this ticket")
+    return _metrics_store[reference_id]
 
 
 @app.post("/api/support/{reference_id}/feedback")
@@ -658,6 +813,28 @@ async def reject_ticket(reference_id: str):
             print(f"Integration error: {e}")
 
     return {"message": "Ticket rejected and marked for revision", "reference_id": reference_id}
+
+
+@app.post("/api/support/{reference_id}/await-customer")
+async def await_customer_info(reference_id: str):
+    """Mark ticket as awaiting customer information."""
+    ticket = data_store.get_ticket(reference_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if ticket.status not in ("pending_human_review", "awaiting_customer_info"):
+        raise HTTPException(status_code=400, detail="Ticket cannot be set to awaiting from current status")
+
+    data_store.update_ticket_status(reference_id, "awaiting_customer_info")
+    return {"message": "Ticket awaiting customer response", "reference_id": reference_id}
+
+
+@app.get("/api/tickets")
+async def get_all_tickets_endpoint():
+    """Get all tickets ordered by created_at descending."""
+    tickets = data_store.get_all_tickets()
+    sorted_tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)
+    return [ticket.model_dump() for ticket in sorted_tickets]
 
 
 def main(argv: list[str] | None = None) -> int:

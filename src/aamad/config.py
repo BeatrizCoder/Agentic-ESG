@@ -5,7 +5,8 @@ import unicodedata
 from typing import Dict, Any, List
 
 # Feature flags
-USE_LLM: bool = os.getenv("USE_LLM", "false").lower() == "true"
+USE_LLM: bool = True
+DEFAULT_MODEL: str = "claude-haiku-4-5-20251001"
 ENABLE_MEMORY: bool = os.getenv("ENABLE_MEMORY", "false").lower() == "true"
 ENABLE_CREWAI_KNOWLEDGE: bool = os.getenv("ENABLE_CREWAI_KNOWLEDGE", "false").lower() == "true"
 ENABLE_PROMPT_TEMPLATES: bool = os.getenv("ENABLE_PROMPT_TEMPLATES", "true").lower() == "true"
@@ -87,17 +88,63 @@ SENTIMENT_URGENT = ["urgent", "asap", "immediately", "right away", "now"]
 ESCALATION_KEYWORDS = {
     "en": [
         "escalate", "escalated", "talk to someone", "speak with someone",
-        "human agent", "support agent", "manager", "supervisor",
-        "refund", "reimbursement", "wrong order", "incorrect order",
-        "damaged item", "complaint"
+        "speak to someone", "human agent", "support agent", "live agent",
+        "real person", "real agent", "manager", "supervisor", "team lead",
+        "refund", "reimbursement", "money back", "charge back", "chargeback",
+        "dispute", "unauthorized charge", "wrong charge", "overcharged",
+        "wrong order", "incorrect order", "missing order", "never arrived",
+        "damaged item", "broken item", "defective", "not working",
+        "never received", "where is my order", "lost package",
+        "account hacked", "unauthorized access", "data breach", "lawsuit",
+        "legal action", "lawyer", "attorney", "report", "fraud",
+        "unacceptable", "ridiculous", "terrible service", "worst experience",
+        "completely useless", "incompetent", "furious", "outraged",
+        "cancel account", "cancel subscription", "close account",
+        "delete account", "terminate",
+        "complaint", "file a complaint", "formal complaint",
     ],
     "pt": [
-        "reembolso", "quero reembolso", "nao recebi", "não recebi",
-        "pedido errado", "veio errado", "falar com atendente",
-        "suporte humano", "escalar", "escalada", "gerente", "supervisor",
-        "reclamação", "reclamacao", "atendente humano", "falar com gerente"
-    ]
+        "falar com atendente", "falar com alguem", "falar com alguém",
+        "quero atendente", "quero humano", "atendente humano",
+        "falar com gerente", "falar com supervisor", "pessoa real",
+        "escalar", "escalada", "gerente", "supervisor", "responsavel",
+        "responsável",
+        "reembolso", "reemb", "quero meu dinheiro", "dinheiro de volta",
+        "estornar", "estorno", "cobrado errado", "cobrança indevida",
+        "cobrança errada", "cobrança duplicada", "me cobraram",
+        "pagamento errado", "não autorizei", "nao autorizei",
+        "pedido errado", "veio errado", "produto errado", "item errado",
+        "nao recebi", "não recebi", "nunca chegou", "cadê meu pedido",
+        "cade meu pedido", "sumiu", "perdido", "extraviado",
+        "produto danificado", "chegou quebrado", "chegou com defeito",
+        "com defeito", "nao funciona", "não funciona", "defeituoso",
+        "conta hackeada", "acesso nao autorizado", "acesso não autorizado",
+        "fraude", "golpe", "processo", "advogado", "procon",
+        "reclame aqui", "tribunal",
+        "inaceitavel", "inaceitável", "absurdo", "ridiculo", "ridículo",
+        "pessimo", "péssimo", "horrivel", "horrível", "vergonhoso",
+        "incompetente", "furioso", "furiosa", "revoltado", "revoltada",
+        "indignado", "indignada",
+        "cancelar conta", "cancelar assinatura", "encerrar conta",
+        "fechar conta", "deletar conta", "cancelamento",
+        "reclamação", "reclamacao", "quero reclamar",
+    ],
 }
+
+ESCALATION_PHRASES = [
+    "not happy with", "very disappointed", "extremely frustrated",
+    "this is unacceptable", "i want to speak", "i need to speak",
+    "i demand", "i require a refund", "give me my money",
+    "where is my money", "fix this now", "resolve this immediately",
+    "nao estou satisfeito", "não estou satisfeito",
+    "muito insatisfeito", "muito insatisfeita",
+    "quero meu dinheiro de volta", "me devolve o dinheiro",
+    "preciso falar com", "quero falar com",
+    "exijo um reembolso", "quero cancelar",
+    "isso é um absurdo", "isso e um absurdo",
+    "me sinto lesado", "me sinto lesada",
+    "vou no procon", "vou reclamar",
+]
 
 # MCP configuration (for future use)
 MCP_SERVERS: List[str] = []

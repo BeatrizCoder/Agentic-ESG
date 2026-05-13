@@ -53,6 +53,8 @@ if SQLALCHEMY_AVAILABLE:
         created_at = Column(DateTime, nullable=False)
         updated_at = Column(DateTime, nullable=False)
         feedback = Column(JSON)
+        run_id = Column(String(36))
+        execution_time_ms = Column(Integer, default=0)
 
 
 class SupportTicketData(BaseModel):
@@ -82,6 +84,8 @@ class SupportTicketData(BaseModel):
     created_at: str
     updated_at: str
     feedback: Optional[Dict[str, Any]] = None
+    run_id: Optional[str] = None
+    execution_time_ms: int = 0
 
 
 class DataStore:
@@ -90,13 +94,13 @@ class DataStore:
     def __init__(self, data_dir: str = "src/aamad/data"):
         self.data_dir = data_dir
         self.tickets_file = os.path.join(data_dir, "tickets.json")
-        self.use_database = DATABASE_PROVIDER.lower() == "postgres" and SQLALCHEMY_AVAILABLE
+        self.use_database = DATABASE_PROVIDER.lower() in ("postgres", "sqlite") and SQLALCHEMY_AVAILABLE
 
         if self.use_database:
             self.engine = create_engine(DATABASE_URL)
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             Base.metadata.create_all(bind=self.engine)
-            logger.info("Using PostgreSQL database for data storage")
+            logger.info("Using %s database for data storage", DATABASE_PROVIDER)
         else:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_data_file()
@@ -148,7 +152,9 @@ class DataStore:
             status=db_ticket.status,
             created_at=db_ticket.created_at.isoformat(),
             updated_at=db_ticket.updated_at.isoformat(),
-            feedback=db_ticket.feedback
+            feedback=db_ticket.feedback,
+            run_id=db_ticket.run_id,
+            execution_time_ms=db_ticket.execution_time_ms or 0
         )
 
     def save_ticket(self, ticket_data: SupportTicketData):
@@ -182,7 +188,9 @@ class DataStore:
                     status=ticket_data.status,
                     created_at=datetime.fromisoformat(ticket_data.created_at),
                     updated_at=datetime.fromisoformat(ticket_data.updated_at),
-                    feedback=ticket_data.feedback
+                    feedback=ticket_data.feedback,
+                    run_id=ticket_data.run_id,
+                    execution_time_ms=ticket_data.execution_time_ms
                 )
                 db.merge(db_ticket)  # Use merge to handle updates
                 db.commit()
