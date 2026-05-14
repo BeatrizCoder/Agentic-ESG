@@ -10,6 +10,7 @@ build/
 
 # Environment variables
 .env
+.env.*
 *.env
 
 # Test cache
@@ -18,7 +19,26 @@ build/
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
 
 # Local-only docs (not on remote)
 docs/
 
+# Logs
+*.log
+*.log.*
+backend.log
+frontend.log
+
+# Database files
+*.db
+*.sqlite
+src/aamad/data/tickets.db
+src/aamad/data/tickets.json
+src/aamad/data/memory.json
+
+# Memory
+memory.json
+
+# Migration scripts
+migrate_json_to_sqlite.py

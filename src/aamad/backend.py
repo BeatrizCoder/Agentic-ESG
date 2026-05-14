@@ -1,12 +1,14 @@
 from crewai import Agent, Flow
 from crewai.flow.flow import start, listen
 from crewai.tools import BaseTool
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 import yaml
 import random
 import unicodedata
+import logging
 from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
@@ -14,6 +16,8 @@ import asyncio
 import time
 import uuid
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # Import new services and config
 from .config import USE_LLM, ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, DEFAULT_CONFIG, ENABLE_EXTERNAL_APIS, ENABLE_MOCK_INTEGRATIONS
@@ -40,12 +44,32 @@ from tools.github_tool import GitHubTool
 # Load environment variables
 load_dotenv()
 
+# API key authentication
+_API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "dev-key-change-in-production")
+
+
+async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
+    if api_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    return api_key
+
+
 # Load configuration
 with open("config/agents.yaml", "r") as f:
     agents_config = yaml.safe_load(f)
 
 with open("config/tasks.yaml", "r") as f:
     tasks_config = yaml.safe_load(f)
+
+
+def _is_portuguese(text: str) -> bool:
+    pt_words = ['meu', 'minha', 'não', 'nao', 'quero', 'preciso',
+                'pedido', 'ajuda', 'problema', 'como', 'por', 'que',
+                'olá', 'ola', 'obrigado', 'produto', 'conta']
+    text_lower = text.lower()
+    return sum(1 for w in pt_words if w in text_lower) >= 2
+
 
 class SupportTicket(BaseModel):
     inquiry: str
@@ -120,6 +144,8 @@ class SupportResponse(BaseModel):
     cache_used: bool | None = None
     run_id: str | None = None
     wall_time_sec: float | None = None
+    token_usage: dict | None = None
+    cost_usd: float | None = None
 
 
 class SupportState(BaseModel):
@@ -145,6 +171,8 @@ class SupportState(BaseModel):
     tools_used: list[str] = []
     cache_used: bool = False
     run_id: str = ""
+    token_usage: dict = {}
+    cost_usd: float = 0.0
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -181,7 +209,7 @@ class SupportCrew:
                 goal=config["goal"],
                 backstory=config["backstory"],
                 tools=tools,
-                verbose=True
+                verbose=os.environ.get("CREWAI_VERBOSE", "false").lower() == "true"
             )
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
@@ -270,6 +298,7 @@ class SupportCrew:
             sentiment_result["sentiment"],
             knowledge_result["count"],
             inquiry,
+            sentiment_result.get("urgency", "Low"),
         )
 
         # Store in memory if enabled
@@ -387,6 +416,8 @@ class SupportFlow(Flow[SupportState]):
         self.state.response = result["response"]
         self.state.response_confidence = result["confidence"]
         self.state.prompt_template_used = result.get("template_used")
+        self.state.token_usage = result.get("token_usage", {})
+        self.state.cost_usd = result.get("cost_usd", 0.0)
         self.state.tools_used.append("Response Generation Tool")
 
         # Validate response with skills
@@ -416,6 +447,7 @@ class SupportFlow(Flow[SupportState]):
             self.state.sentiment,
             len(self.state.articles),
             self.state.inquiry,
+            self.state.urgency,
         )
         self.state.escalation_required = result["escalation_required"]
         self.state.escalation_reason = result["reason"]
@@ -431,12 +463,20 @@ class SupportFlow(Flow[SupportState]):
 
         # Update response if escalation is required
         if self.state.escalation_required:
-            self.state.response += (
-                "\n\nYour inquiry has been flagged for human review. "
-                "A support agent will contact you within 24 hours to assist you further."
-            )
-            if self.state.reference_id:
-                self.state.response += f"\n\nReference ID: {self.state.reference_id}"
+            if _is_portuguese(self.state.inquiry):
+                self.state.response += (
+                    "\n\nSua solicitação foi encaminhada para análise humana. "
+                    "Um agente de suporte entrará em contato em até 24 horas."
+                )
+                if self.state.reference_id:
+                    self.state.response += f"\n\nID de Referência: {self.state.reference_id}"
+            else:
+                self.state.response += (
+                    "\n\nYour inquiry has been flagged for human review. "
+                    "A support agent will contact you within 24 hours to assist you further."
+                )
+                if self.state.reference_id:
+                    self.state.response += f"\n\nReference ID: {self.state.reference_id}"
 
         # Store in memory if enabled
         if ENABLE_MEMORY:
@@ -462,12 +502,17 @@ app = FastAPI(
     version="0.1.0",
 )
 
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
 
 # Initialize services
@@ -579,7 +624,10 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         created_at=datetime.now().isoformat(),
         updated_at=datetime.now().isoformat(),
         run_id=run_id,
-        execution_time_ms=execution_time_ms
+        execution_time_ms=execution_time_ms,
+        wall_time_sec=wall_time,
+        token_usage=final_state.token_usage,
+        cost_usd=final_state.cost_usd,
     )
 
     # Save to data store
@@ -609,8 +657,7 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
             )
 
         except Exception as e:
-            # Log integration errors but don't fail the request
-            print(f"Integration error: {e}")
+            logger.error("Integration error: %s", e)
 
     # Build response model with the same fields
     response = SupportResponse(
@@ -637,6 +684,8 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         cache_used=final_state.cache_used,
         run_id=run_id,
         wall_time_sec=wall_time,
+        token_usage=final_state.token_usage or None,
+        cost_usd=final_state.cost_usd or None,
     )
 
     return response
@@ -674,7 +723,7 @@ async def get_ticket_steps(reference_id: str) -> StepsResponse:
 
 
 @app.get("/api/support/{reference_id}/trace", response_model=TraceResponse)
-async def get_ticket_trace(reference_id: str) -> TraceResponse:
+async def get_ticket_trace(reference_id: str, _=Depends(verify_api_key)) -> TraceResponse:
     """Get observability trace for a support ticket execution."""
     ticket = data_store.get_ticket(reference_id)
     if not ticket:
@@ -692,7 +741,7 @@ async def get_ticket_trace(reference_id: str) -> TraceResponse:
 
 
 @app.get("/api/metrics/summary")
-async def get_metrics_summary() -> Dict[str, Any]:
+async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
     """Aggregate performance metrics across all tickets."""
     tickets = data_store.get_all_tickets()
     if not tickets:
@@ -705,6 +754,11 @@ async def get_metrics_summary() -> Dict[str, Any]:
             "slowest_tool": None,
             "fastest_run_sec": 0.0,
             "slowest_run_sec": 0.0,
+            "csat_score": None,
+            "helpful_count": 0,
+            "not_helpful_count": 0,
+            "total_feedback": 0,
+            "feedback_rate": 0,
         }
 
     total = len(tickets)
@@ -731,6 +785,21 @@ async def get_metrics_summary() -> Dict[str, Any]:
     fastest = round(min(run_times), 3) if run_times else 0.0
     slowest = round(max(run_times), 3) if run_times else 0.0
 
+    # Aggregate CSAT from ticket feedback
+    helpful_count = 0
+    not_helpful_count = 0
+    total_feedback = 0
+    for ticket in tickets:
+        feedback = getattr(ticket, "feedback", None) or {}
+        if feedback:
+            total_feedback += 1
+            if feedback.get("helpful") is True:
+                helpful_count += 1
+            elif feedback.get("helpful") is False:
+                not_helpful_count += 1
+
+    csat_score = round((helpful_count / total_feedback) * 100) if total_feedback > 0 else None
+
     return {
         "total_runs": total,
         "avg_wall_time_sec": round(avg_wall_time, 3),
@@ -740,11 +809,16 @@ async def get_metrics_summary() -> Dict[str, Any]:
         "slowest_tool": slowest_tool,
         "fastest_run_sec": fastest,
         "slowest_run_sec": slowest,
+        "csat_score": csat_score,
+        "helpful_count": helpful_count,
+        "not_helpful_count": not_helpful_count,
+        "total_feedback": total_feedback,
+        "feedback_rate": round((total_feedback / total) * 100) if total > 0 else 0,
     }
 
 
 @app.get("/api/support/{reference_id}/metrics", response_model=RunMetrics)
-async def get_ticket_metrics(reference_id: str) -> RunMetrics:
+async def get_ticket_metrics(reference_id: str, _=Depends(verify_api_key)) -> RunMetrics:
     """Return RunMetrics for a specific ticket (in-memory, current session only)."""
     if reference_id not in _metrics_store:
         raise HTTPException(status_code=404, detail="Metrics not found for this ticket")
@@ -772,7 +846,7 @@ async def submit_feedback(reference_id: str, feedback: FeedbackRequest):
 
 
 @app.post("/api/support/{reference_id}/approve")
-async def approve_ticket(reference_id: str):
+async def approve_ticket(reference_id: str, _=Depends(verify_api_key)):
     """Approve a support ticket (mark as resolved)."""
     ticket = data_store.get_ticket(reference_id)
     if not ticket:
@@ -788,13 +862,13 @@ async def approve_ticket(reference_id: str):
         try:
             ticketing_client.update_ticket_status(f"EXT-{reference_id}", "resolved")
         except Exception as e:
-            print(f"Integration error: {e}")
+            logger.error("Integration error: %s", e)
 
     return {"message": "Ticket approved successfully", "reference_id": reference_id}
 
 
 @app.post("/api/support/{reference_id}/reject")
-async def reject_ticket(reference_id: str):
+async def reject_ticket(reference_id: str, _=Depends(verify_api_key)):
     """Reject a support ticket (requires revision)."""
     ticket = data_store.get_ticket(reference_id)
     if not ticket:
@@ -810,13 +884,13 @@ async def reject_ticket(reference_id: str):
         try:
             ticketing_client.update_ticket_status(f"EXT-{reference_id}", "needs_revision")
         except Exception as e:
-            print(f"Integration error: {e}")
+            logger.error("Integration error: %s", e)
 
     return {"message": "Ticket rejected and marked for revision", "reference_id": reference_id}
 
 
 @app.post("/api/support/{reference_id}/await-customer")
-async def await_customer_info(reference_id: str):
+async def await_customer_info(reference_id: str, _=Depends(verify_api_key)):
     """Mark ticket as awaiting customer information."""
     ticket = data_store.get_ticket(reference_id)
     if not ticket:
@@ -830,7 +904,7 @@ async def await_customer_info(reference_id: str):
 
 
 @app.get("/api/tickets")
-async def get_all_tickets_endpoint():
+async def get_all_tickets_endpoint(_=Depends(verify_api_key)):
     """Get all tickets ordered by created_at descending."""
     tickets = data_store.get_all_tickets()
     sorted_tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)

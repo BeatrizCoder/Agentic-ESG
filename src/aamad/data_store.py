@@ -86,6 +86,9 @@ class SupportTicketData(BaseModel):
     feedback: Optional[Dict[str, Any]] = None
     run_id: Optional[str] = None
     execution_time_ms: int = 0
+    wall_time_sec: Optional[float] = None
+    token_usage: Dict[str, Any] = {}
+    cost_usd: float = 0.0
 
 
 class DataStore:
@@ -154,7 +157,8 @@ class DataStore:
             updated_at=db_ticket.updated_at.isoformat(),
             feedback=db_ticket.feedback,
             run_id=db_ticket.run_id,
-            execution_time_ms=db_ticket.execution_time_ms or 0
+            execution_time_ms=db_ticket.execution_time_ms or 0,
+            wall_time_sec=round((db_ticket.execution_time_ms or 0) / 1000, 3),
         )
 
     def save_ticket(self, ticket_data: SupportTicketData):

@@ -18,7 +18,7 @@ class EscalationTool(BaseSupportTool):
     def __init__(self):
         super().__init__()
 
-    def _run(self, response_confidence: int, sentiment: str, articles_count: int, inquiry: str) -> Dict[str, Any]:
+    def _run(self, response_confidence: int, sentiment: str, articles_count: int, inquiry: str, urgency: str = "Low") -> Dict[str, Any]:
         """Evaluate if case needs escalation."""
         import sys
         import os
@@ -29,6 +29,15 @@ class EscalationTool(BaseSupportTool):
         escalate = False
         reason = "Sufficient confidence in automated response."
         triggered_keyword = None
+
+        # Auto-escalate concerned/urgent customers with medium or high urgency
+        if sentiment in ("Concerned", "Urgent") and urgency in ("Medium", "High"):
+            return {
+                "escalation_required": True,
+                "reason": f"Customer sentiment is {sentiment} with {urgency} urgency — escalating for human review.",
+                "reference_id": _build_reference_id(),
+                "triggered_keyword": None,
+            }
 
         # Check for explicit escalation keywords in the inquiry (multilingual)
         normalized_inquiry = normalize_text(inquiry)
