@@ -1,11 +1,12 @@
 from crewai import Agent, Flow
-from crewai.flow.flow import start, listen
+from crewai.flow.flow import start, listen, and_
 from crewai.tools import BaseTool
 from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 import yaml
+import hashlib
 import random
 import unicodedata
 import logging
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Import new services and config
 from .config import USE_LLM, ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, DEFAULT_CONFIG, ENABLE_EXTERNAL_APIS, ENABLE_MOCK_INTEGRATIONS
 from .services import KnowledgeService, MemoryService, PromptService, SkillService
+from .observability import ObservabilityService, ObservabilityEvent
+from .routing_engine import route_ticket, RoutingDecision
 from .tool_registry import ToolRegistry
 from .data_store import data_store, SupportTicketData
 from .integrations.ticketing_client import TicketingClient
@@ -146,6 +149,9 @@ class SupportResponse(BaseModel):
     wall_time_sec: float | None = None
     token_usage: dict | None = None
     cost_usd: float | None = None
+    routing_action: str | None = None
+    routing_reason: str | None = None
+    routing_missing_info: list[str] | None = None
 
 
 class SupportState(BaseModel):
@@ -173,6 +179,13 @@ class SupportState(BaseModel):
     run_id: str = ""
     token_usage: dict = {}
     cost_usd: float = 0.0
+    knowledge_context: str = ""
+    knowledge_sources: list[str] = []
+    estimated_context_tokens: int = 0
+    routing_action: str = ""
+    routing_reason: str = ""
+    routing_missing_info: list[str] = []
+    routing_confidence: float = 0.0
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -280,6 +293,8 @@ class SupportCrew:
             sentiment_result["urgency"],
             knowledge_result["count"],
             inquiry,
+            knowledge_result.get("context_string", ""),
+            "resolve",
         )
 
         self.delegate_task(
@@ -339,6 +354,8 @@ class SupportFlow(Flow[SupportState]):
         super().__init__(tracing=True)
         self.steps: list[dict[str, Any]] = []
         self._start_time: float = time.time()
+        self._cache_hit: bool = False
+        self._inquiry_hash: str = ''
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -353,6 +370,7 @@ class SupportFlow(Flow[SupportState]):
     async def execute_tool(self, tool_name: str, *args, **kwargs) -> dict[str, Any]:
         """Execute tool through registry with logging."""
         start_timestamp = datetime.now().isoformat()
+        t0 = time.time()
         result = await asyncio.to_thread(tool_registry.execute_tool, tool_name, *args, **kwargs)
         end_timestamp = datetime.now().isoformat()
         self.log_step(f"{tool_name} Agent", {
@@ -364,12 +382,45 @@ class SupportFlow(Flow[SupportState]):
             "cached": result.get("cached", False),
             "execution_time": result.get("execution_time", 0)
         })
+        observability_service.record_tool_execution(
+            reference_id=self.state.run_id,
+            agent_name=f"{tool_name} Agent",
+            tool_name=tool_name,
+            start_time=t0,
+            input_summary=str(args)[:200],
+            output_summary=str(result)[:200],
+            status="success",
+            confidence=float(result.get("confidence", 0)),
+            execution_mode=result.get("execution_mode", "deterministic"),
+            llm_used=result.get("execution_mode") == "llm",
+            cache_used=bool(result.get("cached", False)),
+            knowledge_sources=result.get("sources_used", []),
+            estimated_tokens=result.get("estimated_context_tokens", 0),
+            cost_usd=float(result.get("cost_usd", 0.0)),
+            input_tokens=result.get("input_tokens", 0),
+            output_tokens=result.get("output_tokens", 0),
+            total_tokens=result.get("total_tokens", 0),
+        )
         return result
 
     @start()
     async def classify_inquiry(self):
         self._start_time = time.time()
         self.steps = []
+        # --- Response cache check ---
+        inquiry_hash = hashlib.md5(
+            self.state.inquiry.lower().strip().encode()
+        ).hexdigest()[:8]
+        self._inquiry_hash = inquiry_hash
+        cached_entry = _response_cache.get(inquiry_hash)
+        if cached_entry and (time.time() - cached_entry['ts'] < 300):
+            logger.info(f"Cache hit for inquiry hash: {inquiry_hash}")
+            for k, v in cached_entry['state'].items():
+                setattr(self.state, k, v)
+            self.state.cache_used = True
+            self._cache_hit = True
+            return "Cache hit"
+        # --- Normal path ---
         result = await self.execute_tool("Classification Tool", self.state.inquiry)
         self.state.category = result["category"]
         self.state.category_confidence = result["confidence"]
@@ -377,8 +428,20 @@ class SupportFlow(Flow[SupportState]):
         self.state.cache_used = result.get("cached", False)
         return f"Classified inquiry as {self.state.category}"
 
-    @listen(classify_inquiry)
+    @staticmethod
+    def _is_portuguese(text: str) -> bool:
+        pt_words = [
+            "meu", "minha", "não", "nao", "quero", "preciso",
+            "pedido", "ajuda", "problema", "como", "por", "que",
+            "olá", "ola", "obrigado", "produto", "conta", "fatura"
+        ]
+        text_lower = text.lower()
+        return sum(1 for w in pt_words if w in text_lower) >= 2
+
+    @start()
     async def analyze_sentiment(self):
+        if self._cache_hit:
+            return "Skipped (cache hit)"
         result = await self.execute_tool("Sentiment Analysis Tool", self.state.inquiry)
         self.state.sentiment = result["sentiment"]
         self.state.sentiment_confidence = result["confidence"]
@@ -387,11 +450,39 @@ class SupportFlow(Flow[SupportState]):
         self.state.cache_used = self.state.cache_used or result.get("cached", False)
         return f"Analyzed sentiment as {self.state.sentiment}"
 
-    @listen(analyze_sentiment)
+    @listen(and_(classify_inquiry, analyze_sentiment))
+    async def route_inquiry(self):
+        decision = route_ticket(
+            inquiry=self.state.inquiry,
+            category=self.state.category,
+            sentiment=self.state.sentiment,
+            urgency=self.state.urgency,
+        )
+        self.state.routing_action = decision.action
+        self.state.routing_reason = decision.reason
+        self.state.routing_missing_info = decision.missing_info
+        self.state.routing_confidence = decision.confidence
+        if decision.triggered_keyword:
+            self.state.triggered_keyword = decision.triggered_keyword
+        self.log_step("Routing Engine", {
+            "action": decision.action,
+            "reason": decision.reason,
+            "missing_info": decision.missing_info,
+            "has_order_number": decision.has_order_number,
+            "has_email": decision.has_email,
+            "explicit_escalation": decision.explicit_escalation,
+            "confidence": decision.confidence,
+        })
+        return f"Routed as: {decision.action}"
+
+    @listen(route_inquiry)
     async def retrieve_knowledge(self):
         result = await self.execute_tool("Knowledge Retrieval Tool", self.state.category, self.state.inquiry)
         self.state.articles = result["articles"]
         self.state.knowledge_source = result.get("source", "unknown")
+        self.state.knowledge_context = result.get("context_string", "")
+        self.state.knowledge_sources = result.get("sources_used", [])
+        self.state.estimated_context_tokens = result.get("estimated_context_tokens", 0)
         self.state.tools_used.append("Knowledge Retrieval Tool")
         self.state.cache_used = self.state.cache_used or result.get("cached", False)
         return f"Retrieved {len(self.state.articles)} knowledge articles from {self.state.knowledge_source}"
@@ -412,6 +503,8 @@ class SupportFlow(Flow[SupportState]):
             self.state.urgency,
             len(self.state.articles),
             self.state.inquiry,
+            self.state.knowledge_context,
+            self.state.routing_action,
         )
         self.state.response = result["response"]
         self.state.response_confidence = result["confidence"]
@@ -419,6 +512,18 @@ class SupportFlow(Flow[SupportState]):
         self.state.token_usage = result.get("token_usage", {})
         self.state.cost_usd = result.get("cost_usd", 0.0)
         self.state.tools_used.append("Response Generation Tool")
+
+        self.log_step("Response Generation Agent", {
+            "tool_used": "Response Generation Tool",
+            "category": self.state.category,
+            "urgency": self.state.urgency,
+            "knowledge_context_used": bool(self.state.knowledge_context),
+            "knowledge_sources": self.state.knowledge_sources,
+            "estimated_context_tokens": self.state.estimated_context_tokens,
+            "response_length": len(result.get("response", "")),
+            "confidence": result.get("confidence", 0),
+            "execution_mode": result.get("execution_mode", "unknown"),
+        })
 
         # Validate response with skills
         skills_validation = skill_service.validate_response_with_skills(
@@ -452,8 +557,13 @@ class SupportFlow(Flow[SupportState]):
         self.state.escalation_required = result["escalation_required"]
         self.state.escalation_reason = result["reason"]
         self.state.reference_id = result["reference_id"]
-        self.state.triggered_keyword = result.get("triggered_keyword")
+        if result.get("triggered_keyword") and not self.state.triggered_keyword:
+            self.state.triggered_keyword = result.get("triggered_keyword")
         self.state.tools_used.append("Escalation Evaluation Tool")
+
+        # Re-key observability events from run_id to the final reference_id
+        if self.state.reference_id and self.state.run_id:
+            observability_service.remap_events(self.state.run_id, self.state.reference_id)
 
         # Validate escalation with skills
         escalation_skills = skill_service.validate_response_with_skills(
@@ -461,8 +571,60 @@ class SupportFlow(Flow[SupportState]):
         )
         self.state.skills_used.extend(escalation_skills.get("skills_used", []))
 
-        # Update response if escalation is required
-        if self.state.escalation_required:
+        # ── Apply routing engine decision (overrides escalation tool) ──
+        if self.state.routing_action == "escalate":
+            self.state.escalation_required = True
+            self.state.escalation_reason = self.state.routing_reason
+
+        elif self.state.routing_action == "awaiting":
+            self.state.escalation_required = True
+            self.state.escalation_reason = (
+                f"Awaiting customer information: "
+                f"{', '.join(self.state.routing_missing_info)}"
+            )
+            missing = self.state.routing_missing_info
+            pt = self._is_portuguese(self.state.inquiry)
+            if "order_number" in missing and "email" in missing:
+                self.state.response = (
+                    "Entendo sua situação e quero ajudá-la o mais rápido possível! "
+                    "Para isso, preciso de algumas informações:\n\n"
+                    "1. Número do pedido\n"
+                    "2. E-mail cadastrado na conta\n\n"
+                    "Assim que receber essas informações, encaminharei para nossa equipe especializada."
+                ) if pt else (
+                    "I'd love to help resolve this quickly! To proceed, I need:\n\n"
+                    "1. Your order number\n"
+                    "2. Email address on the account\n\n"
+                    "Once I have these details, I'll route your case to our specialist team immediately."
+                )
+            elif "order_number" in missing:
+                self.state.response = (
+                    "Para localizar seu pedido e ajudá-la, preciso do número do pedido. "
+                    "Você pode encontrá-lo no e-mail de confirmação da compra. Pode me informar?"
+                ) if pt else (
+                    "To locate your order and help you, I need your order number. "
+                    "You can find it in your purchase confirmation email. Could you share it?"
+                )
+            elif "screenshot_or_description" in missing:
+                self.state.response = (
+                    "Para diagnosticar o problema técnico, pode me fornecer:\n\n"
+                    "1. Um screenshot do erro (se possível)\n"
+                    "2. Qual navegador e dispositivo está usando\n"
+                    "3. Mensagem de erro exata (se aparecer)\n\n"
+                    "Com essas informações consigo ajudá-la melhor!"
+                ) if pt else (
+                    "To diagnose the technical issue, could you provide:\n\n"
+                    "1. A screenshot of the error (if possible)\n"
+                    "2. Which browser and device you're using\n"
+                    "3. The exact error message (if any)\n\n"
+                    "This will help me assist you better!"
+                )
+
+        elif self.state.routing_action in ("step_by_step", "resolve"):
+            self.state.escalation_required = False
+
+        # ── Append escalation notice to response ──
+        if self.state.escalation_required and self.state.routing_action != "awaiting":
             if _is_portuguese(self.state.inquiry):
                 self.state.response += (
                     "\n\nSua solicitação foi encaminhada para análise humana. "
@@ -493,6 +655,25 @@ class SupportFlow(Flow[SupportState]):
 
         self.state.execution_mode = DEFAULT_CONFIG["execution_mode"]
         self.state.steps = self.steps
+
+        # Populate response cache for identical future inquiries
+        if self._inquiry_hash and not self._cache_hit:
+            _response_cache[self._inquiry_hash] = {
+                'ts': time.time(),
+                'state': {
+                    'category': self.state.category,
+                    'category_confidence': self.state.category_confidence,
+                    'sentiment': self.state.sentiment,
+                    'sentiment_confidence': self.state.sentiment_confidence,
+                    'urgency': self.state.urgency,
+                    'articles': list(self.state.articles),
+                    'response': self.state.response,
+                    'response_confidence': self.state.response_confidence,
+                    'escalation_required': self.state.escalation_required,
+                    'escalation_reason': self.state.escalation_reason,
+                }
+            }
+
         return f"Escalation {'required' if self.state.escalation_required else 'not required'}"
 
 
@@ -520,6 +701,7 @@ knowledge_service = KnowledgeService()
 memory_service = MemoryService()
 prompt_service = PromptService()
 skill_service = SkillService()
+observability_service = ObservabilityService()
 
 # Initialize integration clients (mock)
 ticketing_client = TicketingClient()
@@ -547,6 +729,9 @@ tool_registry.tools["Prompt Management Tool"].prompt_service = prompt_service
 
 # In-memory metrics store (keyed by reference_id)
 _metrics_store: Dict[str, RunMetrics] = {}
+
+# Response cache: hash → {ts, state_snapshot} — expires after 300 s
+_response_cache: Dict[str, Dict[str, Any]] = {}
 
 
 @app.get("/health")
@@ -576,8 +761,13 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
     # Generate reference ID
     reference_id = final_state.reference_id if final_state.escalation_required else f"REF-{int(time.time())}"
 
-    # Determine status based on escalation
-    status = "pending_human_review" if final_state.escalation_required else "completed"
+    # Determine status based on routing action and escalation
+    if final_state.routing_action == "awaiting":
+        status = "awaiting_customer_info"
+    elif final_state.escalation_required:
+        status = "pending_human_review"
+    else:
+        status = "completed"
 
     # Capture RunMetrics and store in memory
     metrics = RunMetrics(
@@ -686,6 +876,9 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         wall_time_sec=wall_time,
         token_usage=final_state.token_usage or None,
         cost_usd=final_state.cost_usd or None,
+        routing_action=final_state.routing_action or None,
+        routing_reason=final_state.routing_reason or None,
+        routing_missing_info=final_state.routing_missing_info or None,
     )
 
     return response
@@ -800,6 +993,8 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
 
     csat_score = round((helpful_count / total_feedback) * 100) if total_feedback > 0 else None
 
+    obs_summary = observability_service.get_summary()
+
     return {
         "total_runs": total,
         "avg_wall_time_sec": round(avg_wall_time, 3),
@@ -814,6 +1009,12 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
         "not_helpful_count": not_helpful_count,
         "total_feedback": total_feedback,
         "feedback_rate": round((total_feedback / total) * 100) if total > 0 else 0,
+        "agent_performance": obs_summary.get("agent_performance", {}),
+        "tool_usage": obs_summary.get("tool_usage", {}),
+        "total_llm_calls": obs_summary.get("llm_calls", 0),
+        "total_events": obs_summary.get("total_events", 0),
+        "avg_tool_latency_ms": obs_summary.get("avg_latency_ms", 0),
+        "total_real_cost_usd": obs_summary.get("total_cost_usd", 0.0),
     }
 
 
@@ -823,6 +1024,34 @@ async def get_ticket_metrics(reference_id: str, _=Depends(verify_api_key)) -> Ru
     if reference_id not in _metrics_store:
         raise HTTPException(status_code=404, detail="Metrics not found for this ticket")
     return _metrics_store[reference_id]
+
+
+@app.get("/api/observability/summary")
+async def get_observability_summary(_=Depends(verify_api_key)) -> dict:
+    """Get aggregate observability metrics."""
+    return observability_service.get_summary()
+
+
+@app.get("/api/observability/tickets/{reference_id}")
+async def get_ticket_observability(
+    reference_id: str,
+    _=Depends(verify_api_key),
+) -> dict:
+    """Get structured observability events for a ticket."""
+    events = observability_service.get_events(reference_id)
+    if not events:
+        raise HTTPException(
+            status_code=404,
+            detail="No observability events found for this ticket",
+        )
+    return {
+        "reference_id": reference_id,
+        "events": events,
+        "total_events": len(events),
+        "total_latency_ms": sum(e["latency_ms"] for e in events),
+        "llm_calls": sum(1 for e in events if e["llm_used"]),
+        "total_tokens": sum(e["estimated_tokens"] for e in events),
+    }
 
 
 @app.post("/api/support/{reference_id}/feedback")

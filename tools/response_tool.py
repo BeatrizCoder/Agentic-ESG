@@ -21,7 +21,9 @@ class ResponseTool(BaseSupportTool):
         text_lower = text.lower()
         return sum(1 for w in pt_words if w in text_lower) >= 2
 
-    def _run(self, category: str, urgency: str, articles_count: int, inquiry: str = "") -> Dict[str, Any]:
+    def _run(self, category: str, urgency: str, article_count: int,
+             inquiry: str = "", knowledge_context: str = "",
+             routing_action: str = "resolve") -> Dict[str, Any]:
         """Generate response using LLM when USE_LLM=True, otherwise use templates."""
         import sys
         import os
@@ -32,21 +34,72 @@ class ResponseTool(BaseSupportTool):
             try:
                 from anthropic import Anthropic
                 client = Anthropic()
-                detected_lang = "Portuguese (pt-BR)" if self._is_portuguese(inquiry) else "English"
-                prompt = (
-                    f"You are a friendly, empathetic customer support agent.\n\n"
-                    f"IMPORTANT: Detected language: {detected_lang}. "
-                    f"You MUST write your entire response in {detected_lang}. "
-                    f"Never switch to a different language.\n\n"
-                    f"Category: {category}\n"
-                    f"Urgency: {urgency}\n"
-                    f"Customer inquiry: {inquiry or '(not provided)'}\n\n"
-                    f"Generate a helpful, empathetic response. Be concise and friendly. "
-                    f"Do not mention internal categories or system details."
+                has_knowledge = bool(knowledge_context and knowledge_context.strip())
+                knowledge_section = (
+                    f"Relevant knowledge base information:\n{knowledge_context}"
+                    if has_knowledge
+                    else "Use general knowledge."
                 )
+
+                is_direct_answer = (
+                    routing_action == "resolve" or category == "General Support"
+                )
+
+                if routing_action == "step_by_step":
+                    prompt = f"""You are a helpful customer support agent providing step-by-step guidance.
+
+Customer inquiry: {inquiry}
+Category: {category}
+
+{knowledge_section}
+
+Instructions for your response:
+- Respond in the same language as the customer
+- Provide clear numbered steps (1. 2. 3. etc.)
+- Include the relevant links from the knowledge base as plain text URLs
+- Be warm and reassuring
+- Keep response under 200 words
+- End with: "Let me know if you need help with any of these steps!" (PT: "Me diga se precisar de ajuda com algum desses passos!")
+- Do not use markdown ** or # formatting
+- Write links as plain text URLs"""
+                else:
+                    direct_answer_block = ""
+                    if is_direct_answer:
+                        direct_answer_block = """
+IMPORTANT: This is a general information request.
+The customer is asking a question, NOT reporting a problem.
+You MUST answer the question directly and completely
+using the knowledge base information provided.
+Do NOT ask for more details.
+Do NOT ask clarifying questions.
+Just answer what was asked, clearly and completely.
+
+Example:
+- Customer asks 'What is your return policy?'
+  → Answer: explain the return policy directly
+- Customer asks 'How do I track my order?'
+  → Answer: explain tracking steps directly
+"""
+                    prompt = f"""You are a helpful, empathetic customer support agent.
+
+Customer inquiry: {inquiry}
+Category: {category}
+Urgency: {urgency}
+
+{knowledge_section}
+{direct_answer_block}
+Instructions:
+- Respond in the same language as the customer used
+- If customer wrote in Portuguese, respond in Portuguese
+- Be warm, empathetic and solution-focused
+- Use the knowledge base information to give accurate answers
+- Keep response concise — under 150 words
+- Do not mention internal systems, agent names, or tools
+- Do not use markdown formatting (no **, no #, no bullet hyphens)
+- Write in plain conversational text"""
                 result = client.messages.create(
                     model=DEFAULT_MODEL,
-                    max_tokens=500,
+                    max_tokens=400,
                     messages=[{"role": "user", "content": prompt}]
                 )
                 import re
@@ -54,7 +107,6 @@ class ResponseTool(BaseSupportTool):
                 text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
                 text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
                 text = text.strip()
-                # Capture real token usage and cost
                 input_tokens = result.usage.input_tokens
                 output_tokens = result.usage.output_tokens
                 # claude-haiku-4-5: $0.80/M input, $4.00/M output
@@ -67,6 +119,11 @@ class ResponseTool(BaseSupportTool):
                     "confidence": 90,
                     "template_used": "llm",
                     "execution_mode": "llm",
+                    "knowledge_used": has_knowledge,
+                    "knowledge_sources": [],
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": input_tokens + output_tokens,
                     "token_usage": {
                         "input_tokens": input_tokens,
                         "output_tokens": output_tokens,
@@ -88,7 +145,7 @@ class ResponseTool(BaseSupportTool):
             confidence += 15
         if urgency == "Low":
             confidence += 5
-        if articles_count >= 2:
+        if article_count >= 2:
             confidence += 10
 
         return {

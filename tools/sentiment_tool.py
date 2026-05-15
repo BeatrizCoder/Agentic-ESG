@@ -59,6 +59,12 @@ class SentimentTool(BaseSupportTool):
                 if urgency not in ("Low", "Medium", "High"):
                     urgency = "Low"
 
+                input_tokens = result.usage.input_tokens
+                output_tokens = result.usage.output_tokens
+                total_tokens = input_tokens + output_tokens
+                cost_usd = round(
+                    (input_tokens * 0.0000008) + (output_tokens * 0.000004), 6
+                )
                 return {
                     "sentiment": sentiment,
                     "confidence": confidence,
@@ -66,6 +72,10 @@ class SentimentTool(BaseSupportTool):
                     "found_negative": sentiment == "Concerned",
                     "found_urgent": sentiment == "Urgent",
                     "execution_mode": "llm",
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                    "cost_usd": cost_usd,
                 }
             except Exception:
                 pass

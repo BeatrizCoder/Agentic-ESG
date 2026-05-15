@@ -36,6 +36,7 @@ frontend.log
 src/aamad/data/tickets.db
 src/aamad/data/tickets.json
 src/aamad/data/memory.json
+src/aamad/data/observability_events.json
 
 # Memory
 memory.json

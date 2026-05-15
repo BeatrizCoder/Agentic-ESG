@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SupportAI · Multi-Agent Customer Support</title>
+  <title>Agentic Support Platform · Multi-Agent Customer Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -350,6 +350,43 @@
       background: rgba(255,255,255,0.9);
       box-shadow: 0 6px 32px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,1) inset;
     }
+
+    .hero-split {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .hero-left  { flex: 0 0 55%; }
+    .hero-right {
+      flex: 0 0 45%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      background: radial-gradient(circle at 50% 50%, rgba(56,189,248,0.08) 0%, transparent 70%);
+      padding: 8px;
+    }
+    @media (max-width: 700px) {
+      .hero-split { flex-direction: column; }
+      .hero-left, .hero-right { flex: unset; width: 100%; }
+      .hero-right { display: none; }
+    }
+    @keyframes agentLineDash {
+      0%   { stroke-dashoffset: 95; opacity: 0.15; }
+      35%  { stroke-dashoffset: 0;  opacity: 0.6;  }
+      65%  { stroke-dashoffset: 0;  opacity: 0.6;  }
+      100% { stroke-dashoffset: -95; opacity: 0.15; }
+    }
+    @keyframes nodePulse {
+      0%, 100% { opacity: 0.75; }
+      50%       { opacity: 1;    }
+    }
+    @keyframes floatDot {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-14px); }
+    }
+    .agent-line { animation: agentLineDash 3s ease-in-out infinite; }
+    .node-pulse { animation: nodePulse 3s ease-in-out infinite; }
 
     .hero-badge {
       display: inline-flex;
@@ -1651,6 +1688,48 @@
       flex-wrap: wrap;
     }
 
+    #agent-perf-modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(8,12,20,0.78);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      z-index: 50;
+    }
+
+    #agent-perf-modal.open {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .agent-perf-modal-card {
+      width: min(560px, calc(100% - 40px));
+      max-height: 88vh;
+      overflow-y: auto;
+      background: #111827;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 28px 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .apm-section-title {
+      font-size: 0.68rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin: 0 0 10px;
+    }
+
     .toast {
       position: fixed;
       bottom: 22px;
@@ -1694,35 +1773,191 @@
       to { transform: rotate(360deg); }
     }
     .customer-loading-card {
+      background: #fff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 16px;
+      padding: 32px 28px;
+      margin-top: 12px;
+      text-align: center;
+    }
+    .customer-loading-icon {
+      font-size: 1.6rem;
+      margin-bottom: 10px;
+      display: block;
+      animation: nodePulse 2s ease-in-out infinite;
+    }
+    .customer-loading-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #0F172A;
+      margin: 0 0 16px;
+    }
+    .customer-loading-bar-wrap {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.07);
+      overflow: hidden;
+      margin: 0 auto 16px;
+      max-width: 300px;
+    }
+    .customer-loading-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #38BDF8, #7C3AED);
+      width: 0%;
+      animation: loadProgress 10s ease-out forwards;
+    }
+    @keyframes loadProgress {
+      from { width: 0%; }
+      to   { width: 85%; }
+    }
+    .customer-loading-status {
+      font-size: 0.85rem;
+      color: #64748B;
+      margin: 0 0 12px;
+      min-height: 1.4em;
+    }
+    .customer-loading-hint {
+      font-size: 0.75rem;
+      color: #94A3B8;
+      margin: 0;
+    }
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .step-item:last-child { border-bottom: none; }
+    .step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38BDF8, #0EA5E9);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1E293B;
+    }
+    .step-text a { color: #0EA5E9; text-decoration: underline; }
+    .upload-dropzone {
+      border: 2px dashed rgba(56,189,248,0.4);
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: rgba(56,189,248,0.02);
+      margin-top: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 14px;
-      padding: 36px 24px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-top: 12px;
     }
-    .customer-loading-spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: ah-spin 0.8s linear infinite;
+    .upload-dropzone:hover,
+    .upload-dropzone.drag-over {
+      border-color: #38BDF8;
+      background: rgba(56,189,248,0.06);
     }
-    .customer-loading-title {
-      font-size: 15px;
+    .upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-text { font-size: 14px; color: #374151; }
+    .upload-link {
+      color: #38BDF8;
+      cursor: pointer;
+      text-decoration: underline;
       font-weight: 600;
-      color: var(--text);
-      margin: 0;
     }
-    .customer-loading-sub {
-      font-size: 13px;
-      color: var(--muted);
-      margin: 0;
+    .upload-subtext {
+      font-size: 11px;
+      color: #9CA3AF;
+      margin-top: 4px;
+    }
+
+    /* Pre-escalation modal */
+    #pre-esc-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+    #pre-esc-modal.open {
+      visibility: visible;
+      opacity: 1;
+    }
+    .pre-esc-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 520px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+    }
+    .pre-esc-accent {
+      height: 4px;
+      background: linear-gradient(90deg, #38BDF8, #7C3AED);
+      border-radius: 4px 4px 0 0;
+      margin: -32px -32px 24px -32px;
+    }
+    .pre-esc-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .pre-esc-optional {
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: #9CA3AF;
+      background: rgba(0,0,0,0.05);
+      border-radius: 4px;
+      padding: 2px 5px;
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    .pre-esc-input {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      box-sizing: border-box;
+      color: #0F172A;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .pre-esc-input:focus {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 3px rgba(56,189,248,0.12);
+    }
+    .pre-esc-input.error {
+      border-color: #F87171;
+      box-shadow: 0 0 0 3px rgba(248,113,113,0.12);
     }
   </style>
 </head>
@@ -1733,6 +1968,8 @@
   </div>
 
   <div id="modal" aria-hidden="true"></div>
+  <div id="agent-perf-modal" aria-hidden="true"></div>
+  <div id="pre-esc-modal" aria-hidden="true"></div>
   <div id="toast" class="toast"></div>
 
   <script>
@@ -1775,12 +2012,22 @@
       feedbackSubmitted: false,
       perfMetrics: null,
       csatMetrics: null,
+      observability: null,
       showResult: false,
       feedbackDone: null,
       customerName: '',
       customerEmail: '',
       customerPhone: '',
       privacyAccepted: false,
+      routingAction: null,
+      missingInfo: [],
+      awaitingReferenceId: null,
+      originalInquiry: '',
+      showAwaitingForm: false,
+      uploadedFile: null,
+      uploadedFileBase64: null,
+      preEscalationOpen: false,
+      _preEscKeyHandler: null,
     };
 
     function render() {
@@ -1799,7 +2046,7 @@
         <div class="sidebar-logo">
           <div class="sidebar-logo-shape">⬡</div>
           <div class="sidebar-logo-text">
-            <strong>SupportAI</strong>
+            <strong>Agentic Support</strong>
             <small>Multi-Agent Platform</small>
           </div>
         </div>
@@ -1914,10 +2161,76 @@
       const submitDisabled = !state.privacyAccepted || state.processing ? 'disabled' : '';
       return `
         <section class="page-header">
-          <div class="hero-card">
-            <div class="hero-badge">⬡ AI-Powered · 5 Specialized Agents</div>
-            <h1 class="hero-title">How can we help you today?</h1>
-            <p class="hero-copy">Describe your issue and our AI agents will analyze and route it to the right solution instantly.</p>
+          <div class="hero-card" style="position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(56,189,248,0.03) 0%,rgba(124,58,237,0.03) 50%,rgba(110,231,183,0.03) 100%);">
+            <!-- Floating particles -->
+            <div style="position:absolute;width:4px;height:4px;border-radius:50%;background:#38BDF8;opacity:0.15;top:18%;left:8%;animation:floatDot 6s ease-in-out infinite;pointer-events:none;"></div>
+            <div style="position:absolute;width:4px;height:4px;border-radius:50%;background:#7C3AED;opacity:0.15;top:65%;left:88%;animation:floatDot 8s ease-in-out infinite;animation-delay:2s;pointer-events:none;"></div>
+            <div style="position:absolute;width:4px;height:4px;border-radius:50%;background:#38BDF8;opacity:0.15;top:78%;left:25%;animation:floatDot 7s ease-in-out infinite;animation-delay:4s;pointer-events:none;"></div>
+            <div style="position:absolute;width:4px;height:4px;border-radius:50%;background:#7C3AED;opacity:0.15;top:12%;left:72%;animation:floatDot 9s ease-in-out infinite;animation-delay:1s;pointer-events:none;"></div>
+
+            <div class="hero-split">
+              <!-- LEFT -->
+              <div class="hero-left">
+                <div class="hero-badge">⬡ AI-POWERED · 5 SPECIALIZED AGENTS</div>
+                <h1 class="hero-title">How can we help you today?</h1>
+                <p class="hero-copy">Describe your issue and our AI agents will analyze and route it to the right solution instantly.</p>
+                <div style="display:flex;flex-direction:column;gap:7px;margin-top:18px;">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#64748B;"><span style="color:#0EA5E9;font-weight:700;font-size:0.9rem;">✓</span> Responses in under 15 seconds</div>
+                  <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#64748B;"><span style="color:#0EA5E9;font-weight:700;font-size:0.9rem;">✓</span> Available 24/7</div>
+                  <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#64748B;"><span style="color:#0EA5E9;font-weight:700;font-size:0.9rem;">✓</span> Human escalation when needed</div>
+                </div>
+              </div>
+
+              <!-- RIGHT — agent network visualization -->
+              <div class="hero-right">
+                <svg viewBox="0 0 280 280" width="260" height="260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <defs>
+                    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.12"/>
+                      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0"/>
+                    </radialGradient>
+                  </defs>
+                  <circle cx="140" cy="140" r="115" fill="url(#bgGlow)"/>
+
+                  <!-- Connection lines -->
+                  <line class="agent-line" x1="140" y1="140" x2="140" y2="60"  stroke="#6EE7B7" stroke-width="1.5" stroke-dasharray="95" fill="none"/>
+                  <line class="agent-line" x1="140" y1="140" x2="216" y2="101" stroke="#A78BFA" stroke-width="1.5" stroke-dasharray="95" fill="none" style="animation-delay:0.5s"/>
+                  <line class="agent-line" x1="140" y1="140" x2="208" y2="203" stroke="#FBBF24" stroke-width="1.5" stroke-dasharray="95" fill="none" style="animation-delay:1s"/>
+                  <line class="agent-line" x1="140" y1="140" x2="72"  y2="203" stroke="#A78BFA" stroke-width="1.5" stroke-dasharray="95" fill="none" style="animation-delay:1.5s"/>
+                  <line class="agent-line" x1="140" y1="140" x2="64"  y2="101" stroke="#F87171" stroke-width="1.5" stroke-dasharray="95" fill="none" style="animation-delay:2s"/>
+
+                  <!-- Central node -->
+                  <circle class="node-pulse" cx="140" cy="140" r="30" fill="rgba(56,189,248,0.14)" stroke="#38BDF8" stroke-width="2"/>
+                  <text x="140" y="135" text-anchor="middle" font-size="7.5" font-family="'DM Mono',monospace" fill="#38BDF8" font-weight="600">YOUR</text>
+                  <text x="140" y="146" text-anchor="middle" font-size="7.5" font-family="'DM Mono',monospace" fill="#38BDF8" font-weight="600">REQUEST</text>
+
+                  <!-- Classifier — top -->
+                  <circle class="node-pulse" cx="140" cy="58" r="20" fill="rgba(110,231,183,0.12)" stroke="#6EE7B7" stroke-width="1.5" style="animation-delay:0.3s"/>
+                  <text x="140" y="53" text-anchor="middle" font-size="10" fill="#6EE7B7">🔍</text>
+                  <text x="140" y="64" text-anchor="middle" font-size="6" font-family="'DM Mono',monospace" fill="#6EE7B7" letter-spacing="0.05em">Classify</text>
+
+                  <!-- Sentiment — upper right -->
+                  <circle class="node-pulse" cx="216" cy="101" r="20" fill="rgba(124,58,237,0.12)" stroke="#A78BFA" stroke-width="1.5" style="animation-delay:0.6s"/>
+                  <text x="216" y="96" text-anchor="middle" font-size="10" fill="#A78BFA">💭</text>
+                  <text x="216" y="107" text-anchor="middle" font-size="6" font-family="'DM Mono',monospace" fill="#A78BFA" letter-spacing="0.05em">Sentiment</text>
+
+                  <!-- Knowledge — lower right -->
+                  <circle class="node-pulse" cx="208" cy="203" r="20" fill="rgba(251,191,36,0.12)" stroke="#FBBF24" stroke-width="1.5" style="animation-delay:0.9s"/>
+                  <text x="208" y="198" text-anchor="middle" font-size="10" fill="#FBBF24">📚</text>
+                  <text x="208" y="209" text-anchor="middle" font-size="6" font-family="'DM Mono',monospace" fill="#FBBF24" letter-spacing="0.05em">Knowledge</text>
+
+                  <!-- Response — lower left -->
+                  <circle class="node-pulse" cx="72" cy="203" r="20" fill="rgba(167,139,250,0.12)" stroke="#A78BFA" stroke-width="1.5" style="animation-delay:1.2s"/>
+                  <text x="72" y="198" text-anchor="middle" font-size="10" fill="#A78BFA">✍️</text>
+                  <text x="72" y="209" text-anchor="middle" font-size="6" font-family="'DM Mono',monospace" fill="#A78BFA" letter-spacing="0.05em">Response</text>
+
+                  <!-- Escalation — upper left -->
+                  <circle class="node-pulse" cx="64" cy="101" r="20" fill="rgba(248,113,113,0.12)" stroke="#F87171" stroke-width="1.5" style="animation-delay:1.5s"/>
+                  <text x="64" y="96" text-anchor="middle" font-size="10" fill="#F87171">🚨</text>
+                  <text x="64" y="107" text-anchor="middle" font-size="6" font-family="'DM Mono',monospace" fill="#F87171" letter-spacing="0.05em">Escalation</text>
+                </svg>
+              </div>
+            </div>
           </div>
         </section>
         <section class="form-card panel-card">
@@ -1935,9 +2248,13 @@
           </div>
           ${state.processing && !state.showResult ? `
             <div class="customer-loading-card">
-              <div class="customer-loading-spinner"></div>
+              <span class="customer-loading-icon">⬡</span>
               <p class="customer-loading-title">Analyzing your request...</p>
-              <p class="customer-loading-sub">Our AI is reviewing your inquiry</p>
+              <div class="customer-loading-bar-wrap">
+                <div class="customer-loading-bar-fill" id="loadingBarFill"></div>
+              </div>
+              <p class="customer-loading-status" id="customerLoadingStatus">Classifying your issue...</p>
+              <p class="customer-loading-hint">Typically ready in 8–15 seconds</p>
             </div>
           ` : ''}
         </section>
@@ -1983,7 +2300,280 @@
       `;
     }
 
+    function renderAwaitingForm(ticket) {
+      const missing = state.missingInfo.length > 0
+        ? state.missingInfo
+        : (ticket.routing_missing_info || []);
+
+      const fieldHtml = (id, label, type, placeholder, helpText, required = true) => `
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+            ${label}${required ? ' <span style="color:#F87171;">*</span>' : ''}
+          </label>
+          <input type="${type}" id="${id}" placeholder="${placeholder}"
+            style="width:100%;padding:11px 14px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.93rem;font-family:inherit;box-sizing:border-box;outline:none;transition:border-color 0.2s,box-shadow 0.2s;background:#fff;color:#0F172A;"
+            onfocus="this.style.borderColor='#38BDF8';this.style.boxShadow='0 0 0 3px rgba(56,189,248,0.12)'"
+            onblur="this.style.borderColor='rgba(0,0,0,0.12)';this.style.boxShadow='none'">
+          ${helpText ? `<div style="font-size:0.72rem;color:#6B7280;margin-top:4px;">${helpText}</div>` : ''}
+        </div>`;
+
+      const textareaHtml = (id, label, placeholder, helpText) => `
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+            ${label} <span style="color:#F87171;">*</span>
+          </label>
+          <textarea id="${id}" rows="3" placeholder="${placeholder}"
+            style="width:100%;padding:11px 14px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.93rem;font-family:inherit;box-sizing:border-box;outline:none;resize:vertical;transition:border-color 0.2s,box-shadow 0.2s;background:#fff;color:#0F172A;"
+            onfocus="this.style.borderColor='#38BDF8';this.style.boxShadow='0 0 0 3px rgba(56,189,248,0.12)'"
+            onblur="this.style.borderColor='rgba(0,0,0,0.12)';this.style.boxShadow='none'">${''}</textarea>
+          ${helpText ? `<div style="font-size:0.72rem;color:#6B7280;margin-top:4px;">${helpText}</div>` : ''}
+        </div>`;
+
+      let fields = '';
+      if (missing.includes('order_number')) {
+        fields += fieldHtml('field-order-number',
+          'Order Number / Número do Pedido', 'text',
+          'e.g. 12345 or #ORD-12345',
+          'You can find this in your confirmation email / Você encontra no e-mail de confirmação da compra');
+      }
+      const emailAlreadyKnown = !!(state.customerEmail);
+      if (missing.includes('email') && !emailAlreadyKnown) {
+        fields += fieldHtml('field-email',
+          'Email Address / E-mail', 'email',
+          'your@email.com',
+          'The email registered on your account');
+      }
+      if (missing.includes('invoice_number')) {
+        fields += fieldHtml('field-invoice',
+          'Invoice / Fatura Number', 'text',
+          'e.g. NF-12345',
+          'Found on your billing statement');
+      }
+      if (missing.includes('screenshot_or_description')) {
+        fields += fieldHtml('field-device',
+          'Browser & Device / Navegador e Dispositivo', 'text',
+          'e.g. Chrome on Windows 10', '');
+        fields += textareaHtml('field-error-desc',
+          'Error Description / Descrição do Erro',
+          'Describe exactly what you see...',
+          'Be as specific as possible — include any error messages');
+        fields += `
+          <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+              Screenshot or Error Image
+              <span style="font-weight:400;color:#6B7280;text-transform:none;"> (optional but helpful)</span>
+            </label>
+            <div id="upload-dropzone" class="upload-dropzone">
+              <div class="upload-icon">📎</div>
+              <div class="upload-text">Drop your screenshot here or <span class="upload-link">browse files</span></div>
+              <div class="upload-subtext">PNG, JPG, GIF up to 5MB &nbsp;·&nbsp; or paste with Ctrl+V</div>
+              <input type="file" id="field-screenshot" accept="image/*,.png,.jpg,.jpeg,.gif,.webp" style="display:none"/>
+            </div>
+            <div id="upload-preview" style="display:none;margin-top:8px;">
+              <img id="preview-img" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);display:block;"/>
+              <div id="preview-name" style="font-size:12px;color:#6B7280;margin-top:4px;"></div>
+              <button id="remove-upload" style="font-size:11px;color:#EF4444;background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remove file</button>
+            </div>
+            <p style="font-size:11px;color:#6B7280;margin-top:6px;margin-bottom:0;">
+              A screenshot helps us diagnose the issue much faster.<br>
+              PT: Um screenshot nos ajuda a diagnosticar mais rápido.
+            </p>
+          </div>`;
+      }
+
+      return `
+        <section class="result-card">
+          <div class="card-stack">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <div style="display:flex;gap:6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#38BDF8;display:inline-block;"></span>
+                <span style="width:8px;height:8px;border-radius:50%;background:#38BDF8;display:inline-block;"></span>
+              </div>
+              <span style="font-size:0.72rem;color:#6B7280;font-weight:500;">Step 2 of 2 — Provide details</span>
+            </div>
+
+            <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;">
+              <div style="font-size:1.8rem;flex-shrink:0;">📋</div>
+              <div>
+                <h2 style="margin:0 0 4px;font-size:1.1rem;color:#0F172A;">We need a little more information</h2>
+                <p style="margin:0;font-size:0.85rem;color:#64748B;line-height:1.5;">${escapeHtml(ticket.response)}</p>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-left:3px solid #38BDF8;border-radius:12px;padding:20px 22px;margin-bottom:16px;">
+              ${fields || '<p style="color:#6B7280;font-size:0.88rem;">Please provide any additional details that may help us assist you.</p>'}
+            </div>
+
+            <div class="button-row">
+              <button class="button-primary" id="submit-missing-info">📤 Submit Information / Enviar Informações</button>
+            </div>
+            <div style="text-align:center;margin-top:10px;">
+              <button id="cancel-awaiting" style="background:none;border:none;color:#94A3B8;font-size:0.82rem;cursor:pointer;text-decoration:underline;font-family:inherit;">
+                Start a new inquiry instead
+              </button>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function linkifyText(text) {
+      return text.replace(/(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener" style="color:#0EA5E9;text-decoration:underline;word-break:break-all;">$1</a>');
+    }
+
+    function renderStepByStepCard(ticket) {
+      const raw = ticket.response || '';
+      // Split into lines and detect numbered steps vs plain text
+      const lines = raw.split('\n');
+      let stepsHtml = '';
+      let preambleLines = [];
+      let postambleLines = [];
+      let inSteps = false;
+      let stepCount = 0;
+
+      for (const line of lines) {
+        const stepMatch = line.match(/^(\d+)\.\s+(.+)/);
+        if (stepMatch) {
+          inSteps = true;
+          stepCount++;
+          stepsHtml += `
+            <div class="step-item">
+              <span class="step-number">${stepMatch[1]}</span>
+              <span class="step-text">${linkifyText(escapeHtml(stepMatch[2]))}</span>
+            </div>`;
+        } else if (!inSteps) {
+          preambleLines.push(line);
+        } else {
+          postambleLines.push(line);
+        }
+      }
+
+      const preamble = preambleLines.join('\n').trim();
+      const postamble = postambleLines.join('\n').trim();
+
+      // If no numbered steps found, render as plain response bubble
+      if (stepCount === 0) {
+        stepsHtml = `<div class="response-bubble" style="margin:0;">${linkifyText(escapeHtml(raw))}</div>`;
+      }
+
+      const feedbackRow = state.feedbackDone === 'helpful'
+        ? `<div class="feedback-inline">Obrigado pelo feedback! 😊</div>
+           <div class="button-row" style="grid-template-columns:1fr;"><button class="button-secondary" id="newInquiry">🔄 New Inquiry</button></div>`
+        : state.feedbackDone === 'not-helpful'
+        ? `<div class="feedback-inline">Vamos melhorar. Tente reformular sua pergunta.</div>
+           <div class="button-row" style="grid-template-columns:1fr;"><button class="button-secondary" id="newInquiry">🔄 New Inquiry</button></div>`
+        : `<div class="button-row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+             <button class="button-secondary" data-feedback="true" data-helpful="true">👍 Helpful</button>
+             <button class="button-secondary" data-feedback="true" data-helpful="false">👎 Not Helpful</button>
+             <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+           </div>`;
+
+      return `
+        <section class="result-card">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;">Here's how to resolve this</h2>
+                <p style="margin:0;font-size:0.8rem;color:#64748B;">Veja como resolver isso</p>
+              </div>
+              <span style="background:rgba(56,189,248,0.12);color:#0EA5E9;border:1px solid rgba(56,189,248,0.25);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">🤖 AI-Guided Solution</span>
+            </div>
+
+            ${preamble ? `<p style="font-size:0.9rem;color:#334155;line-height:1.6;margin:0 0 8px;">${linkifyText(escapeHtml(preamble))}</p>` : ''}
+
+            ${stepCount > 0 ? `<div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-left:3px solid #38BDF8;border-radius:12px;padding:4px 16px;">${stepsHtml}</div>` : stepsHtml}
+
+            ${postamble ? `<p style="font-size:0.85rem;color:#475569;line-height:1.6;margin:8px 0 0;">${linkifyText(escapeHtml(postamble))}</p>` : ''}
+
+            <div style="border-top:1px solid rgba(0,0,0,0.07);padding-top:14px;margin-top:4px;">
+              <p style="margin:0 0 10px;font-size:0.82rem;color:#64748B;">Still having trouble? Our team is here to help.</p>
+              <button class="button-secondary" id="escalate-to-human" style="width:100%;">👤 Talk to a Human Agent</button>
+            </div>
+
+            ${feedbackRow}
+          </div>
+        </section>`;
+    }
+
+    function isPortuguese(text) {
+      const ptWords = ['meu', 'minha', 'não', 'nao', 'quero', 'preciso', 'pedido', 'chegou', 'ajuda', 'olá', 'ola'];
+      const lower = (text || '').toLowerCase();
+      return ptWords.filter(w => lower.includes(w)).length >= 2;
+    }
+
+    function renderOrderIssueEscalationCard(ticket) {
+      const refId = ticket.reference_id || '';
+      const pt = isPortuguese(ticket.inquiry || state.lastInquiry || '');
+      const title = '📦 ' + (pt ? 'Estamos nisso!' : "We're on it!");
+      const body = pt
+        ? 'Recebemos seu caso e nossa equipe especializada já foi notificada. Vamos investigar o status do seu pedido e entrar em contato em até 24 horas com uma atualização.'
+        : "We've received your case and our specialist team has been notified. We'll investigate your order status and contact you within 24 hours with an update.";
+      return `
+        <section class="result-card" style="background:rgba(56,189,248,0.05);border:1px solid rgba(56,189,248,0.25);border-left:3px solid #38BDF8;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;color:#0C4A6E;">${title}</h2>
+              </div>
+              <span style="background:rgba(56,189,248,0.12);color:#0EA5E9;border:1px solid rgba(56,189,248,0.25);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">📦 Under Investigation</span>
+            </div>
+            <p style="font-size:0.9rem;color:#0E4F6A;line-height:1.6;margin:0 0 14px;">${body}</p>
+            ${refId ? `<div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:#0C4A6E;">
+              Reference ID: <span style="font-family:'DM Mono',monospace;font-weight:600;">${escapeHtml(refId)}</span>
+            </div>` : ''}
+            <div class="button-row" style="grid-template-columns:1fr;margin-top:14px;">
+              <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function renderHumanRequestedEscalationCard(ticket) {
+      const refId = ticket.reference_id || '';
+      const _pt = isPortuguese(ticket.inquiry || '');
+      const title = '👤 Connecting you with a specialist';
+      const body = _pt
+        ? 'Entendemos que você gostaria de falar com um atendente. Seu caso foi priorizado e um especialista entrará em contato em até 24 horas.'
+        : 'We understand you\'d like to speak with a human agent. Your case has been prioritized and a specialist will contact you within 24 hours.';
+      return `
+        <section class="result-card" style="background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.25);border-left:3px solid #FBBF24;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;color:#92400E;">${title}</h2>
+              </div>
+              <span style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.3);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">👤 Human Support</span>
+            </div>
+            <p style="font-size:0.9rem;color:#78350F;line-height:1.6;margin:0 0 14px;">${body}</p>
+            ${refId ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:#92400E;">
+              Reference ID: <span style="font-family:'DM Mono',monospace;font-weight:600;">${escapeHtml(refId)}</span>
+            </div>` : ''}
+            <div class="button-row" style="grid-template-columns:1fr;margin-top:14px;">
+              <button class="button-secondary" id="newInquiry">🔄 New Inquiry</button>
+            </div>
+          </div>
+        </section>`;
+    }
+
     function renderCustomerResult(ticket) {
+      // Routing: show awaiting form if missing info needed
+      if (state.showAwaitingForm &&
+          (ticket.routing_action === 'awaiting' ||
+           ticket.status === 'awaiting_customer_info')) {
+        return renderAwaitingForm(ticket);
+      }
+      // Human-requested escalation card (amber, warm tone)
+      if (ticket.tags?.includes('requested_human_support')) {
+        return renderHumanRequestedEscalationCard(ticket);
+      }
+      // Order Issues escalation card (cyan, investigative tone)
+      if (ticket.category === 'Order Issues' && ticket.escalation_required && !ticket.triggered_keyword) {
+        return renderOrderIssueEscalationCard(ticket);
+      }
+      // Routing: show guided steps for step_by_step
+      if (ticket.routing_action === 'step_by_step') {
+        return renderStepByStepCard(ticket);
+      }
       const offlineText = ticket.offline ? '<span class="badge" style="background: rgba(248,113,113,0.1); color: var(--danger); border-color: rgba(248,113,113,0.22);">offline</span>' : '';
       let feedbackSection;
       if (state.feedbackDone === 'helpful') {
@@ -2135,20 +2725,26 @@
       return filtered.map(ticket => {
         const isEscalated = ticket.escalation_required;
         const isAwaiting = ticket.status === 'awaiting_customer_info';
+        const isHumanRequested = (ticket.inquiry || '').includes('[CUSTOMER REQUESTED HUMAN SUPPORT]') || ticket.tags?.includes('requested_human_support');
         const statusLabel = isAwaiting ? 'Awaiting' : isEscalated ? 'Escalated' : 'Resolved';
         const statusPillClass = isAwaiting ? 'yellow' : isEscalated ? 'red' : 'green';
         const fromDb = ticket._source === 'db';
+        const cleanInquiry = (ticket.inquiry || '').replace(/\n?\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim();
+        const humanPill = isHumanRequested
+          ? `<span class="pill" style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.3);">👤 Human Req.</span>`
+          : '';
         return `
           <div class="ticket-row ${isEscalated ? 'escalated' : ''}">
             <div class="ticket-summary">
               <div>
                 <div class="ticket-id">${ticket.reference_id}${fromDb ? ' <span style="font-size:0.65rem;color:var(--muted);font-weight:400;">from DB</span>' : ''}</div>
-                <div class="ticket-preview">${truncate(ticket.inquiry, 78)}</div>
+                <div class="ticket-preview">${truncate(cleanInquiry, 78)}</div>
               </div>
               <div class="ticket-meta">
                 <span class="pill ${isEscalated ? 'red' : 'blue'}">${ticket.category}</span>
                 <span class="pill ${ticket.urgency === 'High' ? 'red' : ticket.urgency === 'Medium' ? 'yellow' : 'green'}">${ticket.urgency}</span>
                 <span class="pill ${statusPillClass}">${statusLabel}</span>
+                ${humanPill}
                 <button class="button-secondary" data-view-ticket="${ticket.reference_id}">View</button>
               </div>
             </div>
@@ -2170,17 +2766,23 @@
       }
       const statusText = ticket.escalation_required ? 'Escalated' : 'Resolved';
       const statusClass = ticket.escalation_required ? 'red' : 'green';
+      const isHumanRequested = (ticket.inquiry || '').includes('[CUSTOMER REQUESTED HUMAN SUPPORT]') || ticket.tags?.includes('requested_human_support');
+      const cleanInquiry = (ticket.inquiry || '').replace(/\n?\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim();
+      const humanPill = isHumanRequested
+        ? `<span class="pill" style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.3);">👤 Requested Human</span>`
+        : '';
       const pills = [
         `<span class="pill blue">${ticket.category}</span>`,
         `<span class="pill ${ticket.sentiment === 'Urgent' ? 'red' : ticket.sentiment === 'Concerned' ? 'yellow' : 'green'}">${ticket.sentiment}</span>`,
         `<span class="pill ${ticket.urgency === 'High' ? 'red' : ticket.urgency === 'Medium' ? 'yellow' : 'green'}">${ticket.urgency}</span>`,
         `<span class="pill gray">${ticket.execution_mode || 'local'}</span>`,
         `<span class="pill gray">${ticket.elapsed || '—'}</span>`,
+        humanPill,
       ].join('');
       return `
         <div class="detail-header">
           <div class="status-pill"><span class="pill ${statusClass}">${statusText}</span></div>
-          <h2 class="detail-title">${truncate(ticket.inquiry, 72)}</h2>
+          <h2 class="detail-title">${truncate(cleanInquiry, 72)}</h2>
           <div class="detail-meta">Reference <span class="ticket-id">${ticket.reference_id}</span> · ${ticket.timestamp}</div>
           ${ticket.customerName ? `<div class="detail-meta" style="margin-top:6px;">👤 ${escapeHtml(ticket.customerName)}${ticket.customerEmail ? ` · ${escapeHtml(ticket.customerEmail)}` : ''}${ticket.customerPhone ? ` · ${escapeHtml(ticket.customerPhone)}` : ''}</div>` : ''}
           <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;">${pills}</div>
@@ -2217,10 +2819,29 @@
     function renderResponseTab(ticket) {
       let confirmAction;
       if (ticket.status === 'awaiting_customer_info') {
+        const missingFields = Array.isArray(ticket.routing_missing_info) ? ticket.routing_missing_info : [];
+        const fieldLabels = {
+          order_number: 'Order number',
+          email: 'Email address',
+          invoice: 'Invoice / NF number',
+          screenshot_or_description: 'Screenshot or detailed error description',
+        };
+        const missingList = missingFields.length > 0
+          ? `<ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 0.88rem; color: var(--text);">
+              ${missingFields.map(f => `<li>${fieldLabels[f] || f}</li>`).join('')}
+             </ul>`
+          : '';
+        const sentMessage = ticket.response
+          ? `<div style="margin-top: 14px;">
+               <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 6px 0;">Message sent to customer:</p>
+               <div class="response-bubble" style="margin: 0;">${ticket.response}</div>
+             </div>`
+          : '';
         confirmAction = `
           <div class="warn-card">
-            <h4>⏳ Waiting for customer response</h4>
-            <p>This ticket is on hold until the customer provides more information.</p>
+            <h4>⏳ Waiting for customer to provide:</h4>
+            ${missingList || '<p>Additional information required.</p>'}
+            ${sentMessage}
           </div>
           <div class="detail-action-row">
             <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Mark as Resolved</button>
@@ -2269,14 +2890,64 @@
         `;
       })();
 
+      // Case Details card — parsed from pre-escalation modal submission
+      const inquiryText = ticket.inquiry || ticket.message || '';
+      let caseDetailsCard = '';
+      if (inquiryText.includes('--- Case Details ---')) {
+        const detailsSection = inquiryText.split('--- Case Details ---')[1] || '';
+        const rows = detailsSection.trim().split('\n')
+          .map(line => line.trim())
+          .filter(line => line.includes(':'))
+          .map(line => {
+            const colonIdx = line.indexOf(':');
+            return [line.slice(0, colonIdx).trim(), line.slice(colonIdx + 1).trim()];
+          })
+          .filter(([, v]) => v);
+        if (rows.length > 0) {
+          caseDetailsCard = `
+            <div style="background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.15);border-radius:8px;padding:16px;margin-bottom:4px;">
+              <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">📋 Case Information Provided</div>
+              ${rows.map(([k, v]) => `
+                <div style="display:flex;gap:12px;margin-bottom:8px;font-size:0.85rem;">
+                  <span style="color:var(--muted);min-width:130px;flex-shrink:0;">${escapeHtml(k)}</span>
+                  <span style="font-family:'DM Mono',monospace;color:var(--text);">${escapeHtml(v)}</span>
+                </div>`).join('')}
+            </div>`;
+        }
+      }
+
+      // Screenshot attachment card (Technical Issue tickets)
+      const screenshotMatch = inquiryText.match(/Screenshot attached:\s*(.+?)\s*\(/);
+      const noScreenshot = inquiryText.includes('No screenshot provided');
+      let attachmentCard = '';
+      if (ticket.category === 'Technical Issue' && (screenshotMatch || noScreenshot)) {
+        if (screenshotMatch) {
+          attachmentCard = `
+            <div style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.2);border-radius:12px;padding:14px 18px;">
+              <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">📎 Customer Attachment</div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text);">
+                <span>📷</span>
+                <span style="font-family:'DM Mono',monospace;">${escapeHtml(screenshotMatch[1])}</span>
+              </div>
+              <p style="margin:6px 0 0;font-size:0.75rem;color:var(--muted);">Customer provided a screenshot with this ticket</p>
+            </div>`;
+        } else {
+          attachmentCard = `
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;">
+              <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">📎 Customer Attachment</div>
+              <p style="margin:0;font-size:0.85rem;color:var(--muted);">No screenshot provided</p>
+            </div>`;
+        }
+      }
+
       return `
         <div class="card-stack">
+          ${caseDetailsCard}
           ${confirmAction}
-          <div class="confidence-row">
-            ${renderConfidenceBar('Response Confidence', ticket.response_confidence)}
-            ${renderConfidenceBar('Category Confidence', ticket.category_confidence)}
-            ${renderConfidenceBar('Sentiment Confidence', ticket.sentiment_confidence)}
-          </div>
+          ${attachmentCard}
+          <p style="margin:6px 0 0;font-size:0.73rem;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.7;line-height:1.5;">
+            Confidence: Response ${Math.round(ticket.response_confidence || 0)}% · Category ${Math.round(ticket.category_confidence || 0)}% · Sentiment ${Math.round(ticket.sentiment_confidence || 0)}%
+          </p>
           ${feedbackCard}
         </div>
       `;
@@ -2329,23 +3000,91 @@
     }
 
     function renderObservabilityTab(ticket) {
-      const m = state.perfMetrics;
-      const avgTime = m && m.wall_time_sec != null ? m.wall_time_sec.toFixed(1) + 's' : '--';
-      const successRate = m && m.success_rate != null ? m.success_rate.toFixed(0) + '%' : '--';
-      const totalRuns = m && m.total_runs != null ? m.total_runs : '--';
-      const escalationRate = m && m.total_runs > 0
-        ? ((m.total_escalated / m.total_runs) * 100).toFixed(0) + '%'
-        : (m ? '0%' : '--');
+      function agentBorderColor(name) {
+        const n = name || '';
+        if (n.includes('Classification')) return '#6EE7B7';
+        if (n.includes('Sentiment'))      return '#38BDF8';
+        if (n.includes('Knowledge'))      return '#FBBF24';
+        if (n.includes('Response'))       return '#A78BFA';
+        if (n.includes('Escalation'))     return '#F87171';
+        if (n.includes('Routing'))        return '#6EE7B7';
+        return '#64748B';
+      }
+      function cleanInput(s) {
+        return escapeHtml((s || '').replace(/^\('+/, '').replace(/'+\)$/, '').trim());
+      }
+      function stepModePill(mode) {
+        if (!mode) return '';
+        const color = mode === 'llm' ? '#A78BFA' : '#6EE7B7';
+        const label = mode === 'llm' ? '🤖 LLM' : '⚙️ Rule';
+        return `<span style="font-size:0.65rem;font-family:'DM Mono',monospace;background:rgba(255,255,255,0.06);color:${color};border:1px solid ${color}55;border-radius:20px;padding:2px 7px;">${label}</span>`;
+      }
 
-      const stepsHtml = ticket.steps.map((step, index) => `
-        <div class="collapsible" data-accordion="step-${index}">
-          <div class="collapsible-header">
-            <div class="collapsible-title">Step ${index + 1}: ${step.agent}</div>
-            <span class="pill gray">details</span>
-          </div>
-          <div class="collapsible-content"><div class="json-block">${syntaxHighlight(JSON.stringify(step, null, 2))}</div></div>
-        </div>
-      `).join('');
+      // Token summary (summed from step details if available)
+      let totalInput = 0, totalOutput = 0, totalCost = 0, hasTokens = false;
+      (ticket.steps || []).forEach(s => {
+        const d = s.details || {};
+        if (d.input_tokens  != null) { totalInput  += Number(d.input_tokens);  hasTokens = true; }
+        if (d.output_tokens != null) { totalOutput += Number(d.output_tokens); hasTokens = true; }
+        if (d.cost_usd      != null) { totalCost   += Number(d.cost_usd);      hasTokens = true; }
+      });
+      const totalTokens = totalInput + totalOutput;
+      const tokenSummaryHtml = `
+        <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:12px 16px;margin-bottom:12px;">
+          <span style="font-size:0.7rem;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;flex-shrink:0;">🔢 Token Usage</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.81rem;">Total: <strong style="color:var(--text);">${hasTokens ? totalTokens : '--'}</strong></span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.81rem;color:var(--muted);">Input: <strong style="color:var(--text);">${hasTokens ? totalInput : '--'}</strong></span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.81rem;color:var(--muted);">Output: <strong style="color:var(--text);">${hasTokens ? totalOutput : '--'}</strong></span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.81rem;color:var(--muted);">Cost: <strong style="color:#6EE7B7;">${hasTokens ? '$' + totalCost.toFixed(6) : '--'}</strong></span>
+        </div>`;
+
+      const stepsHtml = (ticket.steps || []).map((step, index) => {
+        const d = step.details || {};
+        const color = agentBorderColor(step.agent);
+        const elapsed = step.elapsed_ms != null ? step.elapsed_ms + 'ms' : '—';
+        const mode = d.execution_mode || d.mode || null;
+        const modePillHtml = stepModePill(mode);
+        const confRaw = d.confidence != null ? d.confidence : (d.avg_confidence != null ? d.avg_confidence : null);
+        const confVal = confRaw != null ? Math.round(confRaw < 1.5 ? confRaw * 100 : confRaw) + '%' : '--';
+        const inTok  = d.input_tokens  != null ? d.input_tokens  : '--';
+        const outTok = d.output_tokens != null ? d.output_tokens : '--';
+        const totTok = (d.input_tokens != null && d.output_tokens != null) ? d.input_tokens + d.output_tokens : '--';
+        const costVal = d.cost_usd != null ? '$' + Number(d.cost_usd).toFixed(6) : '--';
+        const cachedVal = d.cached === true ? 'yes' : (d.cached === false ? 'no' : '--');
+        const cleanedInput = cleanInput(d.input_summary);
+        return `
+          <div class="collapsible" data-accordion="step-${index}" style="border-left:3px solid ${color};border-radius:0 12px 12px 0;margin-bottom:6px;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.05);border-right:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div class="collapsible-header" style="padding:12px 16px;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 6px ${color}88;"></span>
+                <span style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(step.agent || 'Agent')}</span>
+                <span style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);flex-shrink:0;">${elapsed}</span>
+                ${modePillHtml}
+              </div>
+              <span class="pill gray" style="flex-shrink:0;font-size:0.65rem;">DETAILS</span>
+            </div>
+            <div class="collapsible-content" style="padding:0 16px 16px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;">
+                <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px 14px;">
+                  <div style="font-size:0.65rem;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">INPUT</div>
+                  <div style="font-size:0.8rem;color:var(--text);line-height:1.5;word-break:break-word;font-family:'DM Mono',monospace;">${cleanedInput || '<span style="opacity:0.35;">—</span>'}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px 14px;">
+                  <div style="font-size:0.65rem;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">OUTPUT</div>
+                  <div style="display:grid;gap:5px;font-size:0.79rem;font-family:'DM Mono',monospace;">
+                    <div><span style="color:var(--muted);">confidence:</span> <strong style="color:var(--text);">${confVal}</strong></div>
+                    <div><span style="color:var(--muted);">tokens:</span> <strong style="color:var(--text);">${totTok}</strong> <span style="color:var(--muted);font-size:0.7rem;">(in: ${inTok} + out: ${outTok})</span></div>
+                    <div><span style="color:var(--muted);">cost:</span> <strong style="color:#6EE7B7;">${costVal}</strong></div>
+                    ${mode ? `<div><span style="color:var(--muted);">mode:</span> ${modePillHtml}</div>` : ''}
+                    <div><span style="color:var(--muted);">cached:</span> <strong style="color:${cachedVal === 'yes' ? '#6EE7B7' : 'var(--text)'};">${cachedVal}</strong></div>
+                  </div>
+                </div>
+              </div>
+              <button data-raw-toggle="step-${index}" style="background:none;border:none;color:var(--muted);font-size:0.73rem;font-family:'DM Mono',monospace;cursor:pointer;padding:0;opacity:0.6;">View raw JSON ▾</button>
+              <div data-raw-block="step-${index}" style="display:none;margin-top:8px;"><div class="json-block">${syntaxHighlight(JSON.stringify(step, null, 2))}</div></div>
+            </div>
+          </div>`;
+      }).join('');
 
       return `
         <div class="observability-grid">
@@ -2358,33 +3097,6 @@
             <span style="font-family:'DM Mono',monospace; font-size:0.68rem; font-variant:small-caps; letter-spacing:0.12em; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:3px 8px; white-space:nowrap; flex-shrink:0;">
               TECHNICAL
             </span>
-          </div>
-
-          <!-- 4 performance metric cards -->
-          <div>
-            <p class="perf-section-label">Performance Metrics</p>
-            <div class="perf-metrics-grid">
-              <div class="mini-card">
-                <strong>${avgTime}</strong>
-                <span>API Latency</span>
-                <span style="display:block; font-size:0.72rem; color:var(--muted); margin-top:4px; opacity:0.7;">End-to-end response time</span>
-              </div>
-              <div class="mini-card">
-                <strong>${successRate}</strong>
-                <span>Model Success Rate</span>
-                <span style="display:block; font-size:0.72rem; color:var(--muted); margin-top:4px; opacity:0.7;">LLM calls completed without fallback</span>
-              </div>
-              <div class="mini-card">
-                <strong>${totalRuns}</strong>
-                <span>Executions Tracked</span>
-                <span style="display:block; font-size:0.72rem; color:var(--muted); margin-top:4px; opacity:0.7;">Total API calls this session</span>
-              </div>
-              <div class="mini-card">
-                <strong>${escalationRate}</strong>
-                <span>Auto-Escalation Rate</span>
-                <span style="display:block; font-size:0.72rem; color:var(--muted); margin-top:4px; opacity:0.7;">% escalated by system rules</span>
-              </div>
-            </div>
           </div>
 
           <!-- 3 ticket-level mini cards -->
@@ -2406,25 +3118,13 @@
             </div>
           </div>
 
-          <!-- Confidence bars -->
-          <div>
-            <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:12px;">
-              <p class="perf-section-label" style="margin:0;">Model Confidence Scores</p>
-              <span style="font-size:0.72rem; font-family:'DM Mono',monospace; color:var(--muted); opacity:0.75;">Higher = model more certain about its classification</span>
-            </div>
-            <div class="confidence-row">
-              ${renderConfidenceBar('Response Confidence', ticket.response_confidence)}
-              ${renderConfidenceBar('Category Confidence', ticket.category_confidence)}
-              ${renderConfidenceBar('Sentiment Confidence', ticket.sentiment_confidence)}
-            </div>
-          </div>
-
           <!-- Agent execution trace -->
           <div>
             <div style="margin-bottom:10px;">
               <p class="perf-section-label" style="margin:0 0 2px;">🔍 Agent Execution Trace</p>
               <span style="font-size:0.72rem; font-family:'DM Mono',monospace; color:var(--muted); opacity:0.75;">Raw execution data per agent step</span>
             </div>
+            ${tokenSummaryHtml}
             ${stepsHtml}
           </div>
 
@@ -2469,9 +3169,123 @@
           state.feedbackStatus = null;
           state.showResult = false;
           state.feedbackDone = null;
+          state.showAwaitingForm = false;
+          state.routingAction = null;
+          state.missingInfo = [];
           render();
         });
       }
+
+      const submitMissingInfo = document.getElementById('submit-missing-info');
+      if (submitMissingInfo) {
+        submitMissingInfo.addEventListener('click', handleSubmitMissingInfo);
+      }
+
+      const cancelAwaiting = document.getElementById('cancel-awaiting');
+      if (cancelAwaiting) {
+        cancelAwaiting.addEventListener('click', () => {
+          state.lastInquiry = '';
+          state.showResult = false;
+          state.showAwaitingForm = false;
+          state.routingAction = null;
+          state.missingInfo = [];
+          state.feedbackDone = null;
+          state.uploadedFile = null;
+          state.uploadedFileBase64 = null;
+          render();
+        });
+      }
+
+      document.getElementById('escalate-to-human')
+        ?.addEventListener('click', async () => {
+          const btn = document.getElementById('escalate-to-human');
+          if (btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Connecting you to a human...';
+            btn.style.opacity = '0.6';
+          }
+
+          const originalText = state.lastResult?.inquiry
+            || state.originalInquiry
+            || state.lastInquiry
+            || '';
+          const escalationInquiry = originalText + '\n\n[CUSTOMER REQUESTED HUMAN SUPPORT]';
+
+          try {
+            const res = await fetch(state.backendUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ inquiry: escalationInquiry })
+            });
+            const data = await res.json();
+
+            state.lastResult = data;
+            state.routingAction = 'escalate';
+            data.routing_action = 'escalate';
+            data.escalation_required = true;
+            if (!data.escalation_reason) {
+              data.escalation_reason = 'Customer explicitly requested human support after receiving automated guidance.';
+            }
+
+            const ticket = {
+              ...data,
+              inquiry: escalationInquiry,
+              _timestamp: new Date().toISOString(),
+              _elapsed: null,
+              tags: ['requested_human_support']
+            };
+            state.tickets.unshift(ticket);
+            state.activeTicketId = ticket.reference_id;
+            state.showResult = true;
+            render();
+          } catch (err) {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = '👤 Talk to a Human Agent';
+              btn.style.opacity = '1';
+            }
+            showToast('Could not connect. Please try again.');
+          }
+        });
+
+      // Upload dropzone interactions
+      const dropzone = document.getElementById('upload-dropzone');
+      if (dropzone) {
+        dropzone.addEventListener('click', () => {
+          document.getElementById('field-screenshot')?.click();
+        });
+        dropzone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropzone.classList.add('drag-over');
+        });
+        dropzone.addEventListener('dragleave', () => {
+          dropzone.classList.remove('drag-over');
+        });
+        dropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('drag-over');
+          const file = e.dataTransfer.files[0];
+          if (file) handleFileSelected(file);
+        });
+      }
+      document.querySelector('.upload-link')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('field-screenshot')?.click();
+      });
+      document.getElementById('field-screenshot')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFileSelected(file);
+      });
+      document.getElementById('remove-upload')?.addEventListener('click', () => {
+        state.uploadedFile = null;
+        state.uploadedFileBase64 = null;
+        const previewDiv = document.getElementById('upload-preview');
+        const dz = document.getElementById('upload-dropzone');
+        const input = document.getElementById('field-screenshot');
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (dz) dz.style.display = 'flex';
+        if (input) input.value = '';
+      });
 
       document.querySelectorAll('[data-feedback="true"]').forEach(button => {
         button.addEventListener('click', event => {
@@ -2545,6 +3359,37 @@
         });
       });
 
+      document.querySelectorAll('[data-raw-toggle]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const key = btn.dataset.rawToggle;
+          const block = document.querySelector(`[data-raw-block="${key}"]`);
+          if (!block) return;
+          const open = block.style.display !== 'none';
+          block.style.display = open ? 'none' : 'block';
+          btn.textContent = open ? 'View raw JSON ▾' : 'Hide raw JSON ▴';
+        });
+      });
+
+      document.querySelectorAll('[data-agent-detail]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          showAgentPerfModal(btn.dataset.agentDetail);
+        });
+      });
+
+      // Loading status cycling
+      clearInterval(_loadingInterval);
+      const loadingStatus = document.getElementById('customerLoadingStatus');
+      if (loadingStatus && state.processing) {
+        let msgIdx = 0;
+        _loadingInterval = setInterval(() => {
+          const el = document.getElementById('customerLoadingStatus');
+          if (!el || !state.processing) { clearInterval(_loadingInterval); return; }
+          msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
+          el.textContent = LOADING_MESSAGES[msgIdx];
+        }, 2000);
+      }
+
       const filterStatus = document.getElementById('filterStatus');
       if (filterStatus) {
         filterStatus.addEventListener('change', event => {
@@ -2560,6 +3405,220 @@
           render();
         });
       }
+    }
+
+    function willEscalate(inquiry) {
+      const kws = [
+        'reembolso', 'reemb', 'dinheiro de volta', 'estorno',
+        'cobrado errado', 'cobrança errada', 'nao recebi', 'não recebi',
+        'nunca chegou', 'produto danificado', 'chegou com defeito',
+        'quero cancelar', 'cancelamento', 'falar com atendente',
+        'falar com gerente', 'quero reclamar', 'reclamação',
+        'refund', 'money back', 'charge back', 'never received',
+        'damaged', 'defective', 'wrong order', 'cancel', 'complaint',
+        'speak to someone', 'human agent', 'manager',
+      ];
+      const lower = inquiry.toLowerCase();
+      return kws.some(kw => lower.includes(kw));
+    }
+
+    function likelyBilling(inquiry) {
+      const kws = [
+        'cobrança', 'fatura', 'boleto', 'pagamento',
+        'charge', 'invoice', 'billing', 'payment',
+        'reembolso', 'refund', 'estorno',
+      ];
+      const lower = inquiry.toLowerCase();
+      return kws.some(kw => lower.includes(kw));
+    }
+
+    function closePreEscalationModal() {
+      const el = document.getElementById('pre-esc-modal');
+      el.className = '';
+      el.innerHTML = '';
+      el.setAttribute('aria-hidden', 'true');
+      state.preEscalationOpen = false;
+      if (state._preEscKeyHandler) {
+        document.removeEventListener('keydown', state._preEscKeyHandler);
+        state._preEscKeyHandler = null;
+      }
+    }
+
+    function showPreEscalationModal(rawInquiry) {
+      const billing = likelyBilling(rawInquiry);
+      const pt = isPortuguese(rawInquiry);
+      const el = document.getElementById('pre-esc-modal');
+      state.preEscalationOpen = true;
+
+      const billingFields = billing ? `
+        <div style="margin-bottom:14px;">
+          <label class="pre-esc-label">${pt ? 'Valor da Compra' : 'Purchase Amount'}
+            <span class="pre-esc-optional">optional</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:#374151;font-weight:600;flex-shrink:0;">${pt ? 'R$' : '$'}</span>
+            <input type="number" id="pre-esc-amount" step="0.01" min="0"
+              placeholder="e.g. 150.00" class="pre-esc-input">
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="pre-esc-label">${pt ? 'Motivo' : 'Reason'}
+            <span style="color:#F87171;margin-left:3px;">*</span>
+          </label>
+          <select id="pre-esc-reason" class="pre-esc-input">
+            <option value="" disabled selected>${pt ? 'Selecione o motivo' : 'Select reason'}</option>
+            <option>Item not received / Item não recebido</option>
+            <option>Wrong item / Item errado</option>
+            <option>Damaged item / Item danificado</option>
+            <option>Duplicate charge / Cobrança duplicada</option>
+            <option>Unauthorized charge / Cobrança não autorizada</option>
+            <option>Changed my mind / Mudei de ideia</option>
+            <option>Other / Outro</option>
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="pre-esc-label">${pt ? 'Detalhes adicionais' : 'Additional Details'}
+            <span class="pre-esc-optional">optional</span>
+          </label>
+          <textarea id="pre-esc-details" rows="2" class="pre-esc-input"
+            placeholder="${pt ? 'Qualquer contexto adicional...' : 'Any additional context...'}"></textarea>
+        </div>` : '';
+
+      el.innerHTML = `
+        <div class="pre-esc-card" role="dialog" aria-modal="true">
+          <div class="pre-esc-accent"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+            <div style="font-size:2rem;line-height:1;">⚡</div>
+            <button id="pre-esc-close" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:1.1rem;padding:2px 6px;line-height:1;border-radius:6px;">✕</button>
+          </div>
+          <h2 style="margin:0 0 6px;font-size:1.15rem;color:#0F172A;font-weight:700;">
+            ${pt ? 'Antes de conectar você com um especialista...' : 'Before we connect you with a specialist...'}
+          </h2>
+          <p style="margin:0 0 4px;font-size:0.85rem;color:#6B7280;line-height:1.5;">
+            ${pt ? 'Para agilizar a resolução do seu caso, precisamos de algumas informações.' : 'To speed up your case resolution, please provide a few details.'}
+          </p>
+          <p style="margin:0 0 22px;font-size:0.78rem;color:#0EA5E9;font-weight:500;">
+            ⚡ ${pt ? 'Essas informações ajudam a resolver seu caso mais rapidamente' : 'This information helps us resolve your case faster'}
+          </p>
+
+          <div style="margin-bottom:14px;">
+            <label class="pre-esc-label">${pt ? 'Número do Pedido' : 'Order Number / Número do Pedido'}
+              <span class="pre-esc-optional">optional</span>
+            </label>
+            <input type="text" id="pre-esc-order" placeholder="e.g. 12345" class="pre-esc-input">
+            <div style="font-size:0.72rem;color:#9CA3AF;margin-top:4px;">${pt ? 'Encontrado no e-mail de confirmação' : 'Found in your confirmation email'}</div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label class="pre-esc-label">${pt ? 'Data da Compra' : 'Purchase Date / Data da Compra'}
+              <span class="pre-esc-optional">optional</span>
+            </label>
+            <input type="date" id="pre-esc-date" class="pre-esc-input">
+          </div>
+
+          ${billingFields}
+
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+            <button id="pre-esc-submit" class="button-primary" style="flex:1;min-width:130px;">
+              📤 ${pt ? 'Enviar Caso' : 'Submit Case'}
+            </button>
+            <button id="pre-esc-skip" style="background:none;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:10px 18px;cursor:pointer;color:#6B7280;font-size:0.85rem;font-family:inherit;transition:background 0.15s;">
+              ${pt ? 'Pular' : 'Skip'}
+            </button>
+          </div>
+        </div>`;
+
+      el.className = 'open';
+      el.setAttribute('aria-hidden', 'false');
+
+      const submitHandler = () => {
+        const orderNum = (document.getElementById('pre-esc-order')?.value || '').trim();
+        const date     = (document.getElementById('pre-esc-date')?.value || '').trim();
+        const amount   = (document.getElementById('pre-esc-amount')?.value || '').trim();
+        const reason   = (document.getElementById('pre-esc-reason')?.value || '').trim();
+        const details  = (document.getElementById('pre-esc-details')?.value || '').trim();
+
+        if (billing && !reason) {
+          const sel = document.getElementById('pre-esc-reason');
+          if (sel) { sel.classList.add('error'); sel.focus(); }
+          showToast(pt ? 'Selecione o motivo para continuar.' : 'Please select a reason.');
+          return;
+        }
+
+        let enriched = rawInquiry + '\n\n--- Case Details ---';
+        if (orderNum) enriched += `\nOrder Number: ${orderNum}`;
+        if (date)     enriched += `\nPurchase Date: ${date}`;
+        if (amount)   enriched += `\nPurchase Amount: ${pt ? 'R$' : '$'}${amount}`;
+        if (reason)   enriched += `\nReason: ${reason}`;
+        if (details)  enriched += `\nAdditional Details: ${details}`;
+        if (state.customerEmail) enriched += `\nEmail: ${state.customerEmail.trim()}`;
+        if (state.customerName)  enriched += `\nCustomer Name: ${state.customerName.trim()}`;
+
+        closePreEscalationModal();
+        doSubmitInquiry(rawInquiry, enriched);
+      };
+
+      const skipAndSubmit = () => {
+        closePreEscalationModal();
+        doSubmitInquiry(rawInquiry);
+      };
+
+      document.getElementById('pre-esc-submit').addEventListener('click', submitHandler);
+      document.getElementById('pre-esc-skip').addEventListener('click', skipAndSubmit);
+      document.getElementById('pre-esc-close').addEventListener('click', skipAndSubmit);
+      el.addEventListener('click', e => { if (e.target === el) skipAndSubmit(); });
+
+      state._preEscKeyHandler = e => {
+        if (e.key === 'Escape' && state.preEscalationOpen) skipAndSubmit();
+      };
+      document.addEventListener('keydown', state._preEscKeyHandler);
+    }
+
+    function doSubmitInquiry(rawInquiry, preEnrichedInquiry) {
+      state.processing = true;
+      state.showResult = false;
+      state.feedbackDone = null;
+      state.progressState = AGENTS.map(agent => ({ ...agent, status: 'waiting' }));
+      state.feedbackStatus = null;
+      render();
+      state.lastInquiry = rawInquiry;
+      const startTime = Date.now();
+      simulateProgress();
+      const enrichedInquiry = preEnrichedInquiry
+        ? preEnrichedInquiry
+        : rawInquiry +
+          (state.customerEmail ? `\nEmail: ${state.customerEmail.trim()}` : '') +
+          (state.customerName  ? `\nName: ${state.customerName.trim()}`  : '');
+      callSupportApi(enrichedInquiry).then(ticket => {
+        _animGeneration++;
+        ticket.elapsed = formatElapsed(startTime, new Date());
+        ticket.customerName  = state.customerName.trim();
+        ticket.customerEmail = state.customerEmail.trim();
+        ticket.customerPhone = state.customerPhone.trim();
+        state.tickets.unshift(ticket);
+        state.activeTicketId = ticket.reference_id;
+        state.processing = false;
+        state.showResult = true;
+        state.routingAction = ticket.routing_action;
+        state.missingInfo = ticket.routing_missing_info || [];
+        state.awaitingReferenceId = ticket.reference_id;
+        state.showAwaitingForm = ticket.routing_action === 'awaiting' ||
+                                 ticket.status === 'awaiting_customer_info';
+        if (state.showAwaitingForm) {
+          state.originalInquiry = rawInquiry;
+        }
+        render();
+        showToast(state.showAwaitingForm
+          ? '📋 Precisamos de mais informações para continuar.'
+          : '✅ Sua solicitação foi processada com sucesso!');
+        loadMetrics();
+        fetchObservability();
+      }).catch(() => {
+        _animGeneration++;
+        state.processing = false;
+        showToast('Não foi possível processar o pedido. Verifique o backend ou use o modo offline.');
+        render();
+      });
     }
 
     function handleSubmitInquiry() {
@@ -2581,17 +3640,86 @@
         return;
       }
       if (state.processing) return;
+
+      if (willEscalate(inquiry)) {
+        showPreEscalationModal(inquiry);
+        return;
+      }
+
+      doSubmitInquiry(inquiry);
+    }
+
+    function handleFileSelected(file) {
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showToast('File too large. Maximum size is 5MB.');
+        return;
+      }
+      const validTypes = ['image/png','image/jpeg','image/gif','image/webp','image/jpg'];
+      if (!validTypes.includes(file.type)) {
+        showToast('Invalid file type. Please upload an image.');
+        return;
+      }
+      state.uploadedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.uploadedFileBase64 = e.target.result;
+        const previewImg  = document.getElementById('preview-img');
+        const previewName = document.getElementById('preview-name');
+        const previewDiv  = document.getElementById('upload-preview');
+        const dropzone    = document.getElementById('upload-dropzone');
+        if (previewImg)  previewImg.src = e.target.result;
+        if (previewName) previewName.textContent = `${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+        if (previewDiv)  previewDiv.style.display = 'block';
+        if (dropzone)    dropzone.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleSubmitMissingInfo() {
+      const missing = state.missingInfo;
+      const orderNumber = (document.getElementById('field-order-number') || {}).value || '';
+      const email       = (document.getElementById('field-email')        || {}).value || state.customerEmail || '';
+      const invoice     = (document.getElementById('field-invoice')      || {}).value || '';
+      const device      = (document.getElementById('field-device')       || {}).value || '';
+      const errorDesc   = (document.getElementById('field-error-desc')   || {}).value || '';
+
+      // Validate required fields
+      if (missing.includes('order_number') && !orderNumber.trim()) {
+        showToast('Por favor informe o número do pedido.');
+        return;
+      }
+      if (missing.includes('email') && !email.trim()) {
+        showToast('Por favor informe o e-mail cadastrado.');
+        return;
+      }
+
+      const enrichedInquiry = state.originalInquiry + '\n\n--- Additional Information ---\n' +
+        (orderNumber ? `Order Number: ${orderNumber.trim()}\n` : '') +
+        (email       ? `Email: ${email.trim()}\n`              : '') +
+        (invoice     ? `Invoice: ${invoice.trim()}\n`          : '') +
+        (device      ? `Device: ${device.trim()}\n`            : '') +
+        (errorDesc   ? `Error: ${errorDesc.trim()}\n`          : '') +
+        (state.uploadedFile
+          ? `Screenshot attached: ${state.uploadedFile.name} (${(state.uploadedFile.size/1024).toFixed(1)} KB)\n`
+          : (state.missingInfo.includes('screenshot_or_description') ? 'No screenshot provided\n' : ''));
+
+      // Reset awaiting state and reprocess
+      state.showAwaitingForm = false;
+      state.routingAction = null;
+      state.missingInfo = [];
+      state.uploadedFile = null;
+      state.uploadedFileBase64 = null;
       state.processing = true;
       state.showResult = false;
       state.feedbackDone = null;
       state.progressState = AGENTS.map(agent => ({ ...agent, status: 'waiting' }));
-      state.feedbackStatus = null;
       render();
-      state.lastInquiry = inquiry;
+
       const startTime = Date.now();
-      const progressPromise = simulateProgress();
-      callSupportApi(inquiry).then(ticket => {
-        _animGeneration++;                   // cancel any pending simulateProgress timeouts
+      simulateProgress();
+      callSupportApi(enrichedInquiry).then(ticket => {
+        _animGeneration++;
         ticket.elapsed = formatElapsed(startTime, new Date());
         ticket.customerName = state.customerName.trim();
         ticket.customerEmail = state.customerEmail.trim();
@@ -2600,18 +3728,31 @@
         state.activeTicketId = ticket.reference_id;
         state.processing = false;
         state.showResult = true;
+        state.routingAction = ticket.routing_action;
+        state.missingInfo = ticket.routing_missing_info || [];
+        state.showAwaitingForm = ticket.routing_action === 'awaiting' ||
+                                 ticket.status === 'awaiting_customer_info';
         render();
-        showToast('✅ Sua solicitação foi processada com sucesso!');
+        showToast('✅ Informações recebidas! Sua solicitação foi encaminhada.');
         loadMetrics();
+        fetchObservability();
       }).catch(() => {
         _animGeneration++;
         state.processing = false;
-        showToast('Não foi possível processar o pedido. Verifique o backend ou use o modo offline.');
+        showToast('Não foi possível processar. Verifique o backend.');
         render();
       });
     }
 
     let _animGeneration = 0;
+    let _loadingInterval = null;
+    const LOADING_MESSAGES = [
+      'Classifying your issue...',
+      'Analyzing sentiment...',
+      'Searching knowledge base...',
+      'Generating response...',
+      'Evaluating next steps...',
+    ];
 
     function simulateProgress() {
       const generation = ++_animGeneration;
@@ -2680,6 +3821,10 @@
         steps: Array.isArray(data.steps) ? data.steps : [],
         execution_mode: data.execution_mode || 'backend',
         tools_used: Array.isArray(data.tools_used) ? data.tools_used : [],
+        routing_action: data.routing_action || null,
+        routing_reason: data.routing_reason || null,
+        routing_missing_info: Array.isArray(data.routing_missing_info) ? data.routing_missing_info : [],
+        status: data.status || (data.escalation_required ? 'pending_human_review' : 'completed'),
         offline,
         timestamp: formatTimestamp(timestamp),
         timestampRaw: timestamp.toISOString(),
@@ -2962,6 +4107,7 @@
         <p style="margin:0 0 4px;font-size:0.78rem;color:var(--muted);opacity:0.65;">Technical performance data for engineering teams</p>
 
         ${renderAgentHealth(tickets)}
+        ${renderAgentPerformanceTable()}
         <div style="height: 40px;"></div>
       `;
     }
@@ -3261,6 +4407,407 @@
       `;
     }
 
+    function renderAgentPerformanceTable() {
+      const obs = state.observability;
+      const perf = obs && obs.agent_performance ? obs.agent_performance : null;
+
+      const agents = [
+        { key: 'Classification Tool Agent',     icon: '🎯', label: 'Classification' },
+        { key: 'Sentiment Analysis Tool Agent', icon: '💬', label: 'Sentiment Analysis' },
+        { key: 'Knowledge Retrieval Tool Agent',icon: '📚', label: 'Knowledge Retrieval' },
+        { key: 'Response Generation Tool Agent',icon: '🤖', label: 'Response Generation' },
+        { key: 'Escalation Evaluation Tool Agent',icon:'🚨', label: 'Escalation Evaluation' },
+      ];
+
+      const emptyState = `
+        <div style="text-align:center;padding:36px 20px;color:var(--muted);opacity:0.55;">
+          <div style="font-size:2rem;margin-bottom:10px;">📭</div>
+          <div style="font-size:0.88rem;line-height:1.6;">
+            No observability data yet.<br>
+            Process tickets to see per-agent performance.
+          </div>
+        </div>`;
+
+      const hasData = perf && Object.keys(perf).length > 0;
+
+      function latencyColor(ms) {
+        if (ms < 1000)  return '#6EE7B7';
+        if (ms <= 5000) return '#FBBF24';
+        return '#F87171';
+      }
+
+      const rows = hasData ? agents.map((a, i) => {
+        const d = perf[a.key];
+        const bg = i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent';
+        if (!d || d.calls === 0) {
+          return `
+            <tr style="background:${bg};">
+              <td style="padding:11px 14px;white-space:nowrap;">${a.icon} ${a.label}</td>
+              <td style="padding:11px 14px;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.5;">0</td>
+              <td style="padding:11px 14px;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.5;">—</td>
+              <td style="padding:11px 14px;">—</td>
+              <td style="padding:11px 14px;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.5;">—</td>
+              <td style="padding:11px 14px;"><span style="color:var(--muted);opacity:0.45;font-size:0.8rem;">○ No Data</span></td>
+            </tr>`;
+        }
+        const latColor = latencyColor(d.avg_latency_ms);
+        const mode = d.llm_calls > 0 ? '🤖 LLM' : '⚙️ Rule';
+        const conf = d.avg_confidence > 0 ? d.avg_confidence.toFixed(0) + '%' : '—';
+        return `
+          <tr style="background:${bg};">
+            <td style="padding:11px 14px;font-weight:600;white-space:nowrap;">${a.icon} ${a.label}</td>
+            <td style="padding:11px 14px;font-family:'DM Mono',monospace;">${d.calls}</td>
+            <td style="padding:11px 14px;font-family:'DM Mono',monospace;color:${latColor};font-weight:600;">${d.avg_latency_ms.toFixed(0)}ms</td>
+            <td style="padding:11px 14px;font-size:0.82rem;">${mode}</td>
+            <td style="padding:11px 14px;font-family:'DM Mono',monospace;">${conf}</td>
+            <td style="padding:11px 14px;"><span style="color:#6EE7B7;font-size:0.8rem;">● Operational</span></td>
+          </tr>`;
+      }).join('') : '';
+
+      const totals = hasData ? (() => {
+        const totalLlm = obs.llm_calls || 0;
+        const totalEvents = obs.total_events || 0;
+        const avgMs = obs.avg_latency_ms || 0;
+        const totalTokens = obs.total_estimated_tokens || 0;
+        const totalCost = obs.total_cost_usd || 0;
+        return `
+          <div style="display:flex;gap:28px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.07);">
+            <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);">
+              <span style="opacity:0.55;">Total events</span>
+              <span style="color:#F1F5F9;font-weight:700;margin-left:8px;">${totalEvents}</span>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);">
+              <span style="opacity:0.55;">LLM calls</span>
+              <span style="color:#A78BFA;font-weight:700;margin-left:8px;">${totalLlm}</span>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);">
+              <span style="opacity:0.55;">Avg latency</span>
+              <span style="color:${latencyColor(avgMs)};font-weight:700;margin-left:8px;">${avgMs.toFixed(0)}ms</span>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);">
+              <span style="opacity:0.55;">Est. tokens</span>
+              <span style="color:#F1F5F9;font-weight:700;margin-left:8px;">${totalTokens.toLocaleString()}</span>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);">
+              <span style="opacity:0.55;">Total cost</span>
+              <span style="color:#6EE7B7;font-weight:700;margin-left:8px;">$${totalCost.toFixed(6)}</span>
+            </div>
+          </div>`;
+      })() : '';
+
+      const totalEvents   = obs?.total_events          || 0;
+      const avgLatMs      = obs?.avg_tool_latency_ms   || obs?.avg_latency_ms || 0;
+      const totalLlmCalls = obs?.total_llm_calls        || obs?.llm_calls      || 0;
+      const ruleBasedCalls = Math.max(0, totalEvents - totalLlmCalls);
+      const totalCostUsd  = obs?.total_real_cost_usd   || obs?.total_cost_usd || 0;
+
+      const miniCards = `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;">
+
+          <div class="metric-card" style="padding:18px 20px;gap:6px;">
+            <div style="font-size:1.3rem;">⚡</div>
+            <strong style="font-size:1.6rem;font-family:'DM Mono',monospace;line-height:1;">
+              ${totalEvents > 0 ? totalEvents : '--'}
+            </strong>
+            <span style="font-size:0.75rem;color:var(--muted);">Total Agent Calls</span>
+          </div>
+
+          <div class="metric-card" style="padding:18px 20px;gap:6px;">
+            <div style="font-size:1.3rem;">⏱</div>
+            <strong style="font-size:1.6rem;font-family:'DM Mono',monospace;line-height:1;color:${latencyColor(avgLatMs)};">
+              ${avgLatMs > 0 ? Math.round(avgLatMs) + 'ms' : '--'}
+            </strong>
+            <span style="font-size:0.75rem;color:var(--muted);">Avg Tool Latency</span>
+          </div>
+
+          <div class="metric-card" style="padding:18px 20px;gap:6px;">
+            <div style="font-size:1.3rem;">🤖</div>
+            <div style="display:flex;align-items:baseline;gap:14px;line-height:1;">
+              <div>
+                <strong style="font-size:1.4rem;font-family:'DM Mono',monospace;color:#A78BFA;">${totalLlmCalls}</strong>
+                <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">LLM calls</div>
+              </div>
+              <div style="width:1px;height:28px;background:rgba(255,255,255,0.1);align-self:center;"></div>
+              <div>
+                <strong style="font-size:1.4rem;font-family:'DM Mono',monospace;color:#6EE7B7;">${ruleBasedCalls}</strong>
+                <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">Rule-based</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-card" style="padding:18px 20px;gap:6px;">
+            <div style="font-size:1.3rem;">💰</div>
+            <strong style="font-size:1.35rem;font-family:'DM Mono',monospace;line-height:1;color:#FBBF24;">
+              $${totalCostUsd.toFixed(6)}
+            </strong>
+            <span style="font-size:0.75rem;color:var(--muted);">Real API Cost Tracked</span>
+            <span style="font-size:0.68rem;color:var(--muted);opacity:0.5;">From actual token usage</span>
+          </div>
+
+        </div>`;
+
+      return `
+        <div class="panel-card" style="margin-top:20px;padding:28px 32px;overflow-x:auto;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;">⚡ Agent Performance — Per Agent Breakdown</h3>
+            <span style="font-size:0.68rem;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.6;">Real execution data from observability events</span>
+          </div>
+          <p style="margin:0 0 18px;font-size:0.81rem;color:var(--muted);">Live latency, execution mode, and confidence per pipeline agent</p>
+
+          ${miniCards}
+
+          ${!hasData ? emptyState : (() => {
+            // Token colour thresholds
+            function tokenColor(t) {
+              if (t === 0)   return 'var(--muted)';
+              if (t < 200)   return '#6EE7B7';
+              if (t <= 500)  return '#FBBF24';
+              return '#F87171';
+            }
+            // Recommendation logic
+            function recCell(d, agentKey) {
+              const tkns = d.avg_tokens_per_call || 0;
+              const llm  = d.llm_calls || 0;
+              if (agentKey.includes('Classification') && tkns > 300)
+                return ['💡 Consider deterministic', '#FBBF24'];
+              if (tkns === 0)
+                return ['✅ Already optimized', '#6EE7B7'];
+              if (tkns < 200 && llm > 0)
+                return ['⚠️ High cost for low tokens', '#FBBF24'];
+              return ['✅ Efficient', '#6EE7B7'];
+            }
+
+            const TH = t => `<th style="padding:8px 12px;font-size:0.68rem;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);opacity:0.7;font-weight:600;white-space:nowrap;">${t}</th>`;
+
+            const tableRows = agents.map((a, i) => {
+              const d   = perf[a.key];
+              const bg  = i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent';
+              const td  = (content, extra='') =>
+                `<td style="padding:10px 12px;font-family:'DM Mono',monospace;${extra}">${content}</td>`;
+
+              if (!d || d.calls === 0) {
+                return `<tr style="background:${bg};">
+                  <td style="padding:10px 12px;white-space:nowrap;">${a.icon} ${a.label}</td>
+                  ${td('0')}${td('—')}${td('—')}${td('—')}${td('—')}
+                  <td style="padding:10px 12px;font-size:0.78rem;color:var(--muted);opacity:0.45;">○ No Data</td>
+                  <td style="padding:10px 12px;"></td>
+                </tr>`;
+              }
+
+              const latColor = latencyColor(d.avg_latency_ms);
+              const tkns     = d.avg_tokens_per_call || 0;
+              const tkColor  = tokenColor(tkns);
+              const tkLabel  = tkns > 0 ? tkns.toFixed(0) + ' tkns' : '—';
+              const costLabel= d.avg_cost_per_call > 0 ? '$' + d.avg_cost_per_call.toFixed(6) : '—';
+              const mode     = d.llm_calls > 0 ? '🤖 LLM' : '⚙️ Rule';
+              const [recText, recColor] = recCell(d, a.key);
+
+              return `<tr style="background:${bg};">
+                <td style="padding:10px 12px;font-weight:600;white-space:nowrap;">${a.icon} ${a.label}</td>
+                ${td(d.calls)}
+                ${td(d.avg_latency_ms.toFixed(0) + 'ms', `color:${latColor};font-weight:600;`)}
+                ${td(tkLabel, `color:${tkColor};`)}
+                ${td(costLabel)}
+                <td style="padding:10px 12px;font-size:0.82rem;">${mode}</td>
+                <td style="padding:10px 12px;font-size:0.78rem;color:${recColor};">${recText}</td>
+                <td style="padding:10px 12px;">
+                  <button data-agent-detail="${escapeHtml(a.key)}" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;font-size:0.72rem;font-family:'DM Mono',monospace;border-radius:8px;padding:4px 10px;cursor:pointer;white-space:nowrap;">View Details</button>
+                </td>
+              </tr>`;
+            }).join('');
+
+            // Slowest / fastest highlight
+            const entries = Object.entries(perf)
+              .filter(([, d]) => d.calls > 0 && d.avg_latency_ms > 0);
+            const shortName = n => n.replace(' Tool Agent', '').replace(' Agent', '');
+            let highlight = '';
+            if (entries.length >= 2) {
+              entries.sort((a, b) => b[1].avg_latency_ms - a[1].avg_latency_ms);
+              const [slowName, slowData] = entries[0];
+              const [fastName, fastData] = entries[entries.length - 1];
+              highlight = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;">
+                  <div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:12px;padding:16px 18px;">
+                    <div style="font-size:1.1rem;margin-bottom:6px;">🐢 Slowest Agent</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:1.15rem;font-weight:700;color:#F87171;">${shortName(slowName)}</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:0.9rem;color:#F87171;opacity:0.8;margin-top:2px;">${Math.round(slowData.avg_latency_ms)}ms avg</div>
+                    <div style="font-size:0.75rem;color:var(--muted);opacity:0.6;margin-top:8px;">This agent takes the longest — typically the LLM call</div>
+                  </div>
+                  <div style="background:rgba(110,231,183,0.06);border:1px solid rgba(110,231,183,0.2);border-radius:12px;padding:16px 18px;">
+                    <div style="font-size:1.1rem;margin-bottom:6px;">⚡ Fastest Agent</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:1.15rem;font-weight:700;color:#6EE7B7;">${shortName(fastName)}</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:0.9rem;color:#6EE7B7;opacity:0.8;margin-top:2px;">${Math.round(fastData.avg_latency_ms)}ms avg</div>
+                    <div style="font-size:0.75rem;color:var(--muted);opacity:0.6;margin-top:8px;">Deterministic — no LLM overhead</div>
+                  </div>
+                </div>`;
+            }
+
+            // Cost optimization card (Step 8)
+            const totalRealCost  = obs?.total_real_cost_usd || obs?.total_cost_usd || 0;
+            const classifierCost = perf['Classification Tool Agent']?.total_cost_usd || 0;
+            const sentimentCost  = perf['Sentiment Analysis Tool Agent']?.total_cost_usd || 0;
+            const responseCost   = perf['Response Generation Tool Agent']?.total_cost_usd || 0;
+            const potentialSaving = classifierCost + sentimentCost;
+            const savingPct = totalRealCost > 0
+              ? ((potentialSaving / totalRealCost) * 100).toFixed(1) : 0;
+            const responsePct = totalRealCost > 0
+              ? ((responseCost / totalRealCost) * 100).toFixed(1) : 0;
+            const highOptimization = totalRealCost > 0 && (potentialSaving / totalRealCost) > 0.3;
+            const insightRow = (icon, text) =>
+              `<div style="display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                <span style="flex-shrink:0;">${icon}</span>
+                <span style="font-size:0.83rem;color:var(--muted);line-height:1.5;">${text}</span>
+              </div>`;
+
+            const costCard = `
+              <div style="margin-top:18px;border-left:3px solid #38BDF8;background:rgba(56,189,248,0.04);border-radius:0 12px 12px 0;padding:16px 20px;">
+                <div style="font-size:0.95rem;font-weight:700;margin-bottom:12px;">💡 Cost Optimization Insights</div>
+                ${insightRow('🤖',
+                  `Response Agent: <span style="color:#F1F5F9;font-family:'DM Mono',monospace;">${responsePct}%</span> of total cost
+                   ($<span style="color:#FBBF24;font-family:'DM Mono',monospace;">${responseCost.toFixed(6)}</span>) — usually the biggest consumer`)}
+                ${insightRow('💰',
+                  `Switching Classification + Sentiment to deterministic would save
+                   <span style="color:#6EE7B7;font-family:'DM Mono',monospace;">~$${potentialSaving.toFixed(6)}</span> per session
+                   (<span style="font-family:'DM Mono',monospace;">${savingPct}%</span> cost reduction)`)}
+                ${insightRow(highOptimization ? '⚠️' : '✅',
+                  highOptimization
+                    ? `High optimization potential — consider deterministic mode for classification and sentiment agents`
+                    : `Cost distribution is healthy — Response Agent dominates as expected`)}
+              </div>`;
+
+            return `
+              <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.1);text-align:left;">
+                    ${TH('Agent')}${TH('Calls')}${TH('Avg Latency')}${TH('Avg Tokens')}${TH('Cost/Call')}${TH('Mode')}${TH('Rec')}${TH('')}
+                  </tr>
+                </thead>
+                <tbody style="color:var(--text);">${tableRows}</tbody>
+              </table>
+              ${totals}
+              ${highlight}
+              ${costCard}`;
+          })()}
+        </div>`;
+    }
+
+    function showAgentPerfModal(agentKey) {
+      const obs = state.observability;
+      const perf = obs && obs.agent_performance ? obs.agent_performance : null;
+      const d = perf && perf[agentKey] ? perf[agentKey] : null;
+
+      const shortLabel = agentKey.replace(' Tool Agent', '').replace(' Agent', '');
+      const agentEmoji = { Classification: '🎯', Sentiment: '💬', Knowledge: '📚', Response: '🤖', Escalation: '🚨' };
+      const icon = Object.entries(agentEmoji).find(([k]) => agentKey.includes(k))?.[1] || '⚡';
+
+      // Section 1 — Aggregates
+      const aggHtml = d ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${[
+            ['Total calls', d.calls],
+            ['Avg latency', d.avg_latency_ms != null ? Math.round(d.avg_latency_ms) + 'ms' : '—'],
+            ['Avg tokens', d.avg_tokens_per_call != null ? Math.round(d.avg_tokens_per_call) : '—'],
+            ['Total cost', d.total_cost_usd > 0 ? '$' + d.total_cost_usd.toFixed(6) : '—'],
+            ['LLM calls', d.llm_calls || 0],
+            ['Deterministic', Math.max(0, (d.calls || 0) - (d.llm_calls || 0))],
+          ].map(([label, val]) => `
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:10px 14px;">
+              <div style="font-size:0.65rem;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:4px;">${label}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--text);">${val}</div>
+            </div>`).join('')}
+        </div>` : `<p style="color:var(--muted);font-size:0.85rem;">No observability data collected for this agent yet.</p>`;
+
+      // Section 2 — Recent executions (last 5 from tickets steps)
+      const recentExecs = [];
+      state.tickets.forEach(ticket => {
+        (ticket.steps || []).forEach(step => {
+          if ((step.agent || '').includes(shortLabel) || step.agent === agentKey) {
+            recentExecs.push({ ts: ticket.created_at || ticket.timestampRaw || '', elapsed: step.elapsed_ms, ticket_id: ticket.reference_id });
+          }
+        });
+      });
+      recentExecs.sort((a, b) => (b.ts > a.ts ? 1 : -1));
+      const last5 = recentExecs.slice(0, 5);
+      const execHtml = last5.length > 0 ? `
+        <div style="display:grid;gap:6px;">
+          ${last5.map(e => {
+            const ts = e.ts ? new Date(e.ts).toLocaleTimeString() : '—';
+            const lat = e.elapsed != null ? e.elapsed + 'ms' : '—';
+            const id = (e.ticket_id || '').slice(0, 8);
+            return `<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.025);border-radius:7px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:0.79rem;">
+              <span style="color:var(--muted);flex-shrink:0;">${ts}</span>
+              <span style="color:#6EE7B7;flex-shrink:0;">${lat}</span>
+              <span style="color:var(--muted);font-size:0.7rem;flex-shrink:0;">#${id}</span>
+              <span style="margin-left:auto;color:#6EE7B7;font-size:0.7rem;">● completed</span>
+            </div>`;
+          }).join('')}
+        </div>` : `<p style="color:var(--muted);font-size:0.82rem;">No recent executions found in current session.</p>`;
+
+      // Section 3 — Token breakdown
+      const totalIn  = d?.avg_input_tokens  > 0 ? d.avg_input_tokens  : (d?.avg_tokens_per_call > 0 ? Math.round(d.avg_tokens_per_call * 0.75) : 0);
+      const totalOut = d?.avg_output_tokens > 0 ? d.avg_output_tokens : (d?.avg_tokens_per_call > 0 ? Math.round(d.avg_tokens_per_call * 0.25) : 0);
+      const tokenTotal = totalIn + totalOut;
+      const inPct  = tokenTotal > 0 ? Math.round((totalIn  / tokenTotal) * 100) : 0;
+      const outPct = tokenTotal > 0 ? Math.round((totalOut / tokenTotal) * 100) : 0;
+      const tokenHtml = tokenTotal > 0 ? `
+        <div style="display:grid;gap:10px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:'DM Mono',monospace;margin-bottom:5px;">
+              <span style="color:var(--muted);">Input</span>
+              <span style="color:var(--text);">${totalIn} (${inPct}%)</span>
+            </div>
+            <div style="height:10px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${inPct}%;background:#38BDF8;border-radius:4px;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:'DM Mono',monospace;margin-bottom:5px;">
+              <span style="color:var(--muted);">Output</span>
+              <span style="color:var(--text);">${totalOut} (${outPct}%)</span>
+            </div>
+            <div style="height:10px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${outPct}%;background:#A78BFA;border-radius:4px;"></div>
+            </div>
+          </div>
+        </div>` : `<p style="color:var(--muted);font-size:0.82rem;">Token breakdown not available for this agent.</p>`;
+
+      const modalEl = document.getElementById('agent-perf-modal');
+      modalEl.className = 'open';
+      modalEl.setAttribute('aria-hidden', 'false');
+      modalEl.innerHTML = `
+        <div class="agent-perf-modal-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <h3 style="margin:0;font-size:1.1rem;font-weight:700;">${icon} ${shortLabel} — Performance Detail</h3>
+            <button id="apmClose" class="modal-close" aria-label="Close">✕</button>
+          </div>
+
+          <div>
+            <p class="apm-section-title">Aggregates</p>
+            ${aggHtml}
+          </div>
+
+          <div>
+            <p class="apm-section-title">Recent Executions (last 5)</p>
+            ${execHtml}
+          </div>
+
+          <div>
+            <p class="apm-section-title">Token Breakdown (avg per call)</p>
+            ${tokenHtml}
+          </div>
+        </div>`;
+
+      document.getElementById('apmClose').addEventListener('click', closeAgentPerfModal);
+      modalEl.addEventListener('click', e => { if (e.target === modalEl) closeAgentPerfModal(); });
+    }
+
+    function closeAgentPerfModal() {
+      const modalEl = document.getElementById('agent-perf-modal');
+      modalEl.className = '';
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.innerHTML = '';
+    }
+
     function renderAnalyticsCategoryChart(tickets) {
       const CATS = [
         { key: 'Order Issues',    emoji: '📦', color: '#38BDF8' },
@@ -3459,6 +5006,23 @@
       } catch (e) {}
     }
 
+    async function fetchObservability() {
+      try {
+        const baseUrl = state.backendUrl.replace('/api/support', '');
+        const res = await fetch(`${baseUrl}/api/observability/summary`, {
+          headers: {
+            'X-API-Key': state.apiKey || 'dev-key-change-in-production'
+          }
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        state.observability = data;
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
     async function loadHistoricalTickets() {
       if (!state.useBackend) return;
       try {
@@ -3519,15 +5083,35 @@
               state.tickets = [...state.tickets, ...newTickets];
             }
             lastRefreshTime = new Date().toLocaleTimeString();
-            if (state.view === 'analytics') render();
+            fetchObservability().then(() => {
+              if (state.view === 'analytics') render();
+            });
           })
           .catch(() => {});
       }, 30000);
     }
 
+    // Clipboard paste support for screenshot upload
+    document.addEventListener('paste', (e) => {
+      if (!state.showAwaitingForm) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            handleFileSelected(file);
+            showToast('📋 Screenshot pasted from clipboard!');
+            break;
+          }
+        }
+      }
+    });
+
     render();
     loadHistoricalTickets();
     loadMetrics();
+    fetchObservability();
     startAnalyticsRefresh();
   </script>
 </body>

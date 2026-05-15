@@ -192,3 +192,4 @@ def normalize_text(text: str) -> str:
     text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
     # Trim whitespace
     return text.strip()
+

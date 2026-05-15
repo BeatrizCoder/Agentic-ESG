@@ -2,116 +2,143 @@
 
 import json
 import os
+import re
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import glob
-import yaml
 
 from .config import ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, ENABLE_PROMPT_TEMPLATES, KNOWLEDGE_DIR, PROMPTS_DIR, MEMORY_FILE, SKILLS_DIR
 
 
 class KnowledgeService:
-    """Service for managing knowledge base with local file support."""
-
     def __init__(self):
-        self.knowledge_dir = KNOWLEDGE_DIR
-        self.knowledge_data: Dict[str, str] = {}
-        self._load_knowledge()
-        self._articles: List[Dict[str, Any]] = []
-        self._load_yaml_articles()
+        self.knowledge_dir = Path("knowledge")
+        self.documents = {}
+        self.max_snippets = int(os.environ.get("MAX_KNOWLEDGE_SNIPPETS", "3"))
+        self.max_snippet_chars = int(os.environ.get("MAX_SNIPPET_CHARS", "800"))
+        self._load_documents()
 
-    def _load_knowledge(self) -> None:
-        """Load knowledge from local files."""
-        if not os.path.exists(self.knowledge_dir):
+    def _load_documents(self):
+        if not self.knowledge_dir.exists():
+            print("Warning: knowledge/ directory not found")
             return
 
-        # Load markdown files
-        for md_file in glob.glob(os.path.join(self.knowledge_dir, "*.md")):
-            filename = os.path.basename(md_file)
-            with open(md_file, 'r', encoding='utf-8') as f:
-                self.knowledge_data[filename] = f.read()
+        for md_file in self.knowledge_dir.glob("*.md"):
+            category = md_file.stem.replace("_", " ").title()
+            content = md_file.read_text(encoding="utf-8")
+            sections = self._parse_sections(content)
+            self.documents[md_file.stem] = {
+                "file": md_file.name,
+                "category": category,
+                "sections": sections,
+                "full_content": content
+            }
 
-        # Load JSON files
-        for json_file in glob.glob(os.path.join(self.knowledge_dir, "*.json")):
-            filename = os.path.basename(json_file)
-            with open(json_file, 'r', encoding='utf-8') as f:
-                try:
-                    data = json.load(f)
-                    self.knowledge_data[filename] = json.dumps(data, indent=2)
-                except json.JSONDecodeError:
-                    continue
+        print(f"KnowledgeService: loaded {len(self.documents)} knowledge documents")
 
-    def _load_yaml_articles(self) -> None:
-        """Load structured articles from config/knowledge_base.yaml."""
-        yaml_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'knowledge_base.yaml')
-        yaml_path = os.path.normpath(yaml_path)
-        if not os.path.exists(yaml_path):
-            return
-        with open(yaml_path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        self._articles = data.get('articles', [])
+    def _parse_sections(self, content: str) -> list[dict]:
+        sections = []
+        current_title = "General"
+        current_content = []
 
-    def get_articles(self, category: str, inquiry: str) -> List[str]:
-        """Return titles of articles in category whose keywords match the inquiry."""
+        for line in content.split("\n"):
+            if line.startswith("## "):
+                if current_content:
+                    sections.append({
+                        "title": current_title,
+                        "content": "\n".join(current_content).strip()
+                    })
+                current_title = line[3:].strip()
+                current_content = []
+            elif not line.startswith("# "):
+                current_content.append(line)
+
+        if current_content:
+            sections.append({
+                "title": current_title,
+                "content": "\n".join(current_content).strip()
+            })
+
+        return sections
+
+    def _relevance_score(self, text: str, inquiry: str, keywords: list[str]) -> float:
+        text_lower = text.lower()
         inquiry_lower = inquiry.lower()
-        matched = []
-        for article in self._articles:
-            if article.get('category') != category:
-                continue
-            for kw in article.get('keywords', []):
-                if kw.lower() in inquiry_lower:
-                    matched.append(article['title'])
-                    break
-        return matched
+        score = 0.0
 
-    def should_escalate(self, category: str, inquiry: str) -> bool:
-        """Return True if any matched article for this inquiry requires always escalating."""
-        inquiry_lower = inquiry.lower()
-        for article in self._articles:
-            if article.get('category') != category:
-                continue
-            for kw in article.get('keywords', []):
-                if kw.lower() in inquiry_lower:
-                    if 'always escalate' in str(article.get('escalate_if', '')):
-                        return True
-                    break
-        return False
+        for kw in keywords:
+            if kw.lower() in text_lower:
+                score += 2.0
 
-    def search_knowledge(self, query: str, category: Optional[str] = None) -> Dict[str, Any]:
-        """Search knowledge base using keyword matching."""
-        query_lower = query.lower()
-        query_words = query_lower.split()
-        matches = []
+        inquiry_words = [w for w in inquiry_lower.split() if len(w) > 3]
+        for word in inquiry_words:
+            if word in text_lower:
+                score += 1.0
 
-        for filename, content in self.knowledge_data.items():
-            content_lower = content.lower()
-            # Check if any query word appears in the content
-            if any(word in content_lower for word in query_words):
-                # Extract snippet around the first match
-                lines = content.split('\n')
-                relevant_lines = []
-                for i, line in enumerate(lines):
-                    line_lower = line.lower()
-                    if any(word in line_lower for word in query_words):
-                        # Get context around the match
-                        start = max(0, i - 2)
-                        end = min(len(lines), i + 3)
-                        snippet = '\n'.join(lines[start:end])
-                        relevant_lines.append(snippet.strip())
-                        break  # Take first match
+        return score
 
-                if relevant_lines:
-                    matches.append({
-                        "title": filename,
-                        "snippet": relevant_lines[0][:200] + "..." if len(relevant_lines[0]) > 200 else relevant_lines[0]
+    def get_articles(self, category: str, inquiry: str = "") -> list[str]:
+        snippets = self.get_snippets(category, inquiry)
+        return [s["title"] for s in snippets]
+
+    def get_snippets(self, category: str, inquiry: str = "") -> list[dict]:
+        category_map = {
+            "Order Issues": "order_issues",
+            "Billing": "billing",
+            "Account Access": "account_access",
+            "Technical Issue": "technical_issues",
+            "General Support": "general_support",
+        }
+
+        file_key = category_map.get(category, "general_support")
+        keywords = [w for w in inquiry.lower().split() if len(w) > 3]
+        scored_sections = []
+
+        if file_key in self.documents:
+            doc = self.documents[file_key]
+            for section in doc["sections"]:
+                combined = f"{section['title']} {section['content']}"
+                score = self._relevance_score(combined, inquiry, keywords)
+                if score > 0 or not inquiry:
+                    scored_sections.append({
+                        "title": section["title"],
+                        "content": section["content"][:self.max_snippet_chars],
+                        "source": doc["file"],
+                        "relevance_score": round(score, 2)
                     })
 
-        return {
-            "articles": [match["title"] for match in matches],
-            "snippets": [match["snippet"] for match in matches],
-            "count": len(matches),
-            "source": "local_files"
-        }
+        if "escalation_policy" in self.documents:
+            doc = self.documents["escalation_policy"]
+            for section in doc["sections"]:
+                combined = f"{section['title']} {section['content']}"
+                score = self._relevance_score(combined, inquiry, keywords)
+                if score > 0:
+                    scored_sections.append({
+                        "title": section["title"],
+                        "content": section["content"][:self.max_snippet_chars],
+                        "source": doc["file"],
+                        "relevance_score": round(score, 2)
+                    })
+
+        scored_sections.sort(key=lambda x: x["relevance_score"], reverse=True)
+        return scored_sections[:self.max_snippets]
+
+    def should_escalate(self, category: str, inquiry: str) -> bool:
+        if "escalation_policy" not in self.documents:
+            return False
+
+        doc = self.documents["escalation_policy"]
+        full_text = doc["full_content"].lower()
+        inquiry_lower = inquiry.lower()
+
+        for line in full_text.split("\n"):
+            if "," in line and len(line) < 200:
+                keywords = [k.strip() for k in line.split(",")]
+                for kw in keywords:
+                    if len(kw) > 3 and kw in inquiry_lower:
+                        return True
+        return False
 
 
 class MemoryService:

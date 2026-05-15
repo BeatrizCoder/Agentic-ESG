@@ -14,29 +14,35 @@ class KnowledgeTool(BaseSupportTool):
         super().__init__()
         self.knowledge_service = knowledge_service
 
-    def _run(self, category: str, inquiry: Optional[str] = None) -> Dict[str, Any]:
-        """Retrieve relevant articles for a category."""
-        import sys
-        import os
-        sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-        from aamad.config import ENABLE_CREWAI_KNOWLEDGE, KNOWLEDGE_BASE
+    def _run(self, category: str, inquiry: str = "") -> dict:
+        if hasattr(self, 'knowledge_service') and self.knowledge_service:
+            snippets = self.knowledge_service.get_snippets(category, inquiry)
+            articles = [s["title"] for s in snippets]
 
-        if ENABLE_CREWAI_KNOWLEDGE and inquiry and self.knowledge_service:
-            # Use new knowledge service with search
-            search_result = self.knowledge_service.search_knowledge(inquiry, category)
-            return {
-                "articles": search_result["articles"],
-                "count": len(search_result["articles"]),
-                "category": category,
-                "source": search_result["source"],
-                "snippets": search_result["snippets"]
-            }
-        else:
-            # Fallback to hardcoded knowledge
-            articles = KNOWLEDGE_BASE.get(category, KNOWLEDGE_BASE["General Support"])
+            context_parts = []
+            for s in snippets:
+                context_parts.append(
+                    f"[{s['source']}] {s['title']}:\n{s['content']}"
+                )
+            context_string = "\n\n---\n\n".join(context_parts)
+            estimated_tokens = len(context_string) // 4
+
             return {
                 "articles": articles,
+                "snippets": snippets,
+                "context_string": context_string,
                 "count": len(articles),
-                "category": category,
-                "source": "hardcoded"
+                "source": "documents",
+                "estimated_context_tokens": estimated_tokens,
+                "sources_used": list(set(s["source"] for s in snippets))
             }
+
+        return {
+            "articles": [],
+            "snippets": [],
+            "context_string": "",
+            "count": 0,
+            "source": "none",
+            "estimated_context_tokens": 0,
+            "sources_used": []
+        }
