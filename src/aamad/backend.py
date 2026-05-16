@@ -43,6 +43,8 @@ from tools.rest_api_tool import RESTApiTool
 from tools.graphql_api_tool import GraphQLApiTool
 from tools.weather_tool import WeatherTool
 from tools.github_tool import GitHubTool
+from tools.address_validation_tool import AddressValidationTool
+from tools.weather_check_tool import WeatherCheckTool
 
 # Load environment variables
 load_dotenv()
@@ -186,6 +188,9 @@ class SupportState(BaseModel):
     routing_reason: str = ""
     routing_missing_info: list[str] = []
     routing_confidence: float = 0.0
+    external_context: str = ""
+    logistics_alert: dict = {}
+    weather_delay: dict = {}
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -380,7 +385,12 @@ class SupportFlow(Flow[SupportState]):
             "input_summary": str(args)[:300],
             "output_summary": str(result)[:300],
             "cached": result.get("cached", False),
-            "execution_time": result.get("execution_time", 0)
+            "execution_time": result.get("execution_time", 0),
+            "execution_mode": result.get("execution_mode"),
+            "input_tokens": result.get("input_tokens"),
+            "output_tokens": result.get("output_tokens"),
+            "total_tokens": result.get("total_tokens"),
+            "cost_usd": result.get("cost_usd"),
         })
         observability_service.record_tool_execution(
             reference_id=self.state.run_id,
@@ -488,6 +498,93 @@ class SupportFlow(Flow[SupportState]):
         return f"Retrieved {len(self.state.articles)} knowledge articles from {self.state.knowledge_source}"
 
     @listen(retrieve_knowledge)
+    async def enrich_with_external_data(self):
+        import re
+        from .routing_engine import check_logistics_alert, check_weather_delay
+        print(f"DEBUG enrich_with_external_data: inquiry={self.state.inquiry[:50]}")
+        print(f"DEBUG external_context before: '{self.state.external_context}'")
+
+        if not ENABLE_EXTERNAL_APIS:
+            print("DEBUG enrich_with_external_data: ENABLE_EXTERNAL_APIS=False, skipping")
+            return "Skipped (external APIs disabled)"
+
+        context_parts = []
+
+        # ── CEP → address validation + logistics alert ──
+        cep_match = re.search(r'\b(\d{5}-?\d{3})\b', self.state.inquiry)
+        if cep_match:
+            cep = cep_match.group(1)
+            addr_result = await self.execute_tool("Address Validation Tool", cep)
+            self.state.tools_used.append("Address Validation Tool")
+            if addr_result.get("valid"):
+                state_code = addr_result.get("state", "")
+                formatted = addr_result.get("formatted") or (
+                    f"{addr_result.get('street')}, {addr_result.get('neighborhood')}, "
+                    f"{addr_result.get('city')} - {addr_result.get('state')}"
+                )
+                alert = check_logistics_alert(state_code)
+                if alert:
+                    self.state.logistics_alert = alert
+                    context_parts.append(
+                        f"Validated address: {formatted}"
+                        f"\nLOGISTICS ALERT ACTIVE for {state_code}: "
+                        f"Fleet maintenance causing 3-day delay in this region."
+                    )
+                    self.log_step("Address Validation Agent", {
+                        "cep_valid": True,
+                        "address": formatted,
+                        "state": state_code,
+                        "logistics_alert": True,
+                        "alert_key": alert["alert_key"],
+                    })
+                else:
+                    context_parts.append(
+                        f"Validated address: {formatted}"
+                        f"\nNo logistics alerts for {state_code}."
+                    )
+                    self.log_step("Address Validation Agent", {
+                        "cep_valid": True,
+                        "address": formatted,
+                        "state": state_code,
+                        "logistics_alert": False,
+                    })
+            elif addr_result.get("fallback"):
+                context_parts.append(f"Address validation: {addr_result.get('fallback')}")
+
+        # ── City → weather check + weather delay ──
+        city_match = re.search(
+            r'\b(São Paulo|Rio de Janeiro|Belo Horizonte|Curitiba|Porto Alegre|'
+            r'Florianópolis|Florianopolis|Joinville|Blumenau|Caxias do Sul|'
+            r'Salvador|Fortaleza|Recife|Manaus|Brasília|Brasilia|Goiânia|Goiania|Belém|Belem)\b',
+            self.state.inquiry, re.IGNORECASE
+        )
+        if city_match:
+            detected_city = city_match.group(1)
+            weather_result = await self.execute_tool("Weather Check Tool", detected_city)
+            self.state.tools_used.append("Weather Check Tool")
+            if weather_result.get("available"):
+                weather_delay = check_weather_delay(detected_city, weather_result)
+                if weather_delay:
+                    self.state.weather_delay = weather_delay
+                    context_parts.append(
+                        f"WEATHER DELAY ALERT: "
+                        f"{weather_result['conditions']} in {detected_city} "
+                        f"({weather_result['temperature_c']}°C). "
+                        f"Adverse conditions affecting deliveries."
+                    )
+                else:
+                    context_parts.append(
+                        f"Weather in {detected_city}: "
+                        f"{weather_result.get('conditions', 'normal')}, "
+                        f"{weather_result.get('temperature_c', '')}°C. "
+                        f"No weather delays."
+                    )
+
+        self.state.external_context = "\n".join(context_parts)
+        print(f"DEBUG external_context after: '{self.state.external_context}'")
+        return f"External enrichment done: {len(context_parts)} data point(s)"
+
+    @listen(enrich_with_external_data)
     async def generate_response(self):
         # Simulate agent collaboration
         self.log_step("Response Generation Agent", {
@@ -497,6 +594,9 @@ class SupportFlow(Flow[SupportState]):
             "context": {"current_category": self.state.category},
         })
 
+        print(f"DEBUG knowledge_context: {bool(self.state.knowledge_context)}")
+        print(f"DEBUG external_context: '{self.state.external_context}'")
+
         result = await self.execute_tool(
             "Response Generation Tool",
             self.state.category,
@@ -505,6 +605,7 @@ class SupportFlow(Flow[SupportState]):
             self.state.inquiry,
             self.state.knowledge_context,
             self.state.routing_action,
+            self.state.external_context,
         )
         self.state.response = result["response"]
         self.state.response_confidence = result["confidence"]
@@ -523,6 +624,10 @@ class SupportFlow(Flow[SupportState]):
             "response_length": len(result.get("response", "")),
             "confidence": result.get("confidence", 0),
             "execution_mode": result.get("execution_mode", "unknown"),
+            "input_tokens": result.get("input_tokens"),
+            "output_tokens": result.get("output_tokens"),
+            "total_tokens": result.get("total_tokens"),
+            "cost_usd": result.get("cost_usd"),
         })
 
         # Validate response with skills
@@ -623,6 +728,33 @@ class SupportFlow(Flow[SupportState]):
         elif self.state.routing_action in ("step_by_step", "resolve"):
             self.state.escalation_required = False
 
+        # ── Alert overrides: logistics and weather take priority ──
+        if self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
+            alert = self.state.logistics_alert
+            is_pt = self._is_portuguese(self.state.inquiry)
+            self.state.escalation_required = False
+            self.state.response = alert["message_pt"] if is_pt else alert["message_en"]
+            self.state.routing_action = "resolve"
+            self.log_step("Routing Engine", {
+                "override": "logistics_alert",
+                "reason": "Active logistics delay in customer region",
+                "auto_resolved": True,
+                "logistics_alert": True,
+            })
+
+        elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
+            delay = self.state.weather_delay
+            is_pt = self._is_portuguese(self.state.inquiry)
+            self.state.escalation_required = False
+            self.state.response = delay["message_pt"] if is_pt else delay["message_en"]
+            self.state.routing_action = "resolve"
+            self.log_step("Routing Engine", {
+                "override": "weather_delay",
+                "reason": "Adverse weather affecting deliveries",
+                "auto_resolved": True,
+                "weather_delay": True,
+            })
+
         # ── Append escalation notice to response ──
         if self.state.escalation_required and self.state.routing_action != "awaiting":
             if _is_portuguese(self.state.inquiry):
@@ -721,6 +853,8 @@ tool_registry.register_tool(RESTApiTool, "REST API Tool")
 tool_registry.register_tool(GraphQLApiTool, "GraphQL API Tool")
 tool_registry.register_tool(WeatherTool)
 tool_registry.register_tool(GitHubTool)
+tool_registry.register_tool(AddressValidationTool, "Address Validation Tool")
+tool_registry.register_tool(WeatherCheckTool, "Weather Check Tool")
 
 # Inject services into tools that need them
 tool_registry.tools["Knowledge Retrieval Tool"].knowledge_service = knowledge_service

@@ -156,6 +156,21 @@ The system now includes generic and specialized API integration tools ready for 
 ##### Specialized API Tools
 - **`WeatherTool`**: Weather data integration (OpenWeatherMap, etc.)
 - **`GitHubTool`**: GitHub repository and user data integration
+- **`AddressValidationTool`**: Brazilian CEP validation via ViaCEP (real API, no key required)
+- **`WeatherCheckTool`**: Live weather for delivery delay detection via OpenWeatherMap
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| ANTHROPIC_API_KEY | Yes | Claude AI API key |
+| INTERNAL_API_KEY | Yes | Operator dashboard auth |
+| OPENWEATHER_API_KEY | Yes | Weather check tool (free tier: 1000 calls/day) |
+| ALLOWED_ORIGINS | No | CORS origins (default: localhost) |
+| MAX_KNOWLEDGE_SNIPPETS | No | RAG snippet limit (default: 3) |
+| MAX_SNIPPET_CHARS | No | Snippet size limit (default: 800) |
+| USE_LLM | No | Enable LLM mode (default: True) |
+| CREWAI_VERBOSE | No | Verbose agent logs (default: false) |
 
 ##### Configuration
 ```bash

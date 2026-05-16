@@ -23,12 +23,16 @@ class ResponseTool(BaseSupportTool):
 
     def _run(self, category: str, urgency: str, article_count: int,
              inquiry: str = "", knowledge_context: str = "",
-             routing_action: str = "resolve") -> Dict[str, Any]:
+             routing_action: str = "resolve",
+             external_context: str = "") -> Dict[str, Any]:
         """Generate response using LLM when USE_LLM=True, otherwise use templates."""
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
         from aamad.config import RESPONSE_TEMPLATES, USE_LLM, DEFAULT_MODEL
+
+        print(f"DEBUG ResponseTool external_context: '{external_context}'")
+        print(f"DEBUG ResponseTool knowledge_context: '{knowledge_context[:100] if knowledge_context else None}'")
 
         if USE_LLM:
             try:
@@ -41,6 +45,19 @@ class ResponseTool(BaseSupportTool):
                     else "Use general knowledge."
                 )
 
+                external_section = ""
+                if external_context and external_context.strip():
+                    external_section = f"""
+IMPORTANT — Real-time data retrieved for this inquiry:
+{external_context}
+
+You MUST reference this real data in your response.
+For example:
+- If address was validated: mention the exact address found
+- If weather data available: mention the weather conditions
+This makes your response more accurate and personalized.
+"""
+
                 is_direct_answer = (
                     routing_action == "resolve" or category == "General Support"
                 )
@@ -50,7 +67,7 @@ class ResponseTool(BaseSupportTool):
 
 Customer inquiry: {inquiry}
 Category: {category}
-
+{external_section}
 {knowledge_section}
 
 Instructions for your response:
@@ -59,6 +76,7 @@ Instructions for your response:
 - Include the relevant links from the knowledge base as plain text URLs
 - Be warm and reassuring
 - Keep response under 200 words
+- Reference the real-time data above if available
 - End with: "Let me know if you need help with any of these steps!" (PT: "Me diga se precisar de ajuda com algum desses passos!")
 - Do not use markdown ** or # formatting
 - Write links as plain text URLs"""
@@ -85,7 +103,7 @@ Example:
 Customer inquiry: {inquiry}
 Category: {category}
 Urgency: {urgency}
-
+{external_section}
 {knowledge_section}
 {direct_answer_block}
 Instructions:
@@ -93,6 +111,7 @@ Instructions:
 - If customer wrote in Portuguese, respond in Portuguese
 - Be warm, empathetic and solution-focused
 - Use the knowledge base information to give accurate answers
+- Reference the real-time data above if available
 - Keep response concise — under 150 words
 - Do not mention internal systems, agent names, or tools
 - Do not use markdown formatting (no **, no #, no bullet hyphens)

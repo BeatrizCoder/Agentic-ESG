@@ -61,6 +61,101 @@ HOW_TO_PATTERNS = [
 ]
 
 
+LOGISTICS_ALERTS = {
+    "sul_sudeste": {
+        "active": True,
+        "states": ["SP", "RJ", "MG", "ES", "PR", "SC", "RS"],
+        "message_pt": (
+            "Identificamos que sua região está sendo afetada "
+            "por um atraso em nossa frota logística local. "
+            "Nossos caminhões estão operando com capacidade "
+            "reduzida devido a manutenção programada da frota. "
+            "Seu pedido chegará em até 3 dias úteis adicionais "
+            "além do prazo original. Pedimos desculpas pelo "
+            "transtorno."
+        ),
+        "message_en": (
+            "We've identified that your region is affected by "
+            "a logistics delay in our local fleet. Our trucks "
+            "are operating at reduced capacity due to scheduled "
+            "fleet maintenance. Your order will arrive up to "
+            "3 additional business days beyond the original "
+            "estimated delivery date. We apologize for the "
+            "inconvenience."
+        ),
+        "eta_additional_days": 3,
+    }
+}
+
+WEATHER_DELAY_REGIONS = {
+    "sul": {
+        "active": True,
+        "cities": [
+            "Curitiba", "Porto Alegre", "Florianópolis", "Florianopolis",
+            "Joinville", "Blumenau", "Caxias do Sul",
+        ],
+        "message_pt": (
+            "Identificamos condições climáticas adversas "
+            "em sua região ({city}: {conditions}, {temp}°C). "
+            "As fortes chuvas no Sul do Brasil estão causando "
+            "atrasos nas operações logísticas. Sua entrega "
+            "pode ter um atraso adicional de 1-2 dias úteis. "
+            "Assim que as condições melhorarem, sua entrega "
+            "será priorizada."
+        ),
+        "message_en": (
+            "We've detected adverse weather conditions in "
+            "your region ({city}: {conditions}, {temp}°C). "
+            "Heavy rainfall in Southern Brazil is causing "
+            "logistics delays. Your delivery may have an "
+            "additional delay of 1-2 business days."
+        ),
+    }
+}
+
+
+def check_logistics_alert(state_code: str) -> dict | None:
+    for alert_key, alert in LOGISTICS_ALERTS.items():
+        if (alert.get("active") and
+                state_code.upper() in alert.get("states", [])):
+            return {
+                "alert_active": True,
+                "alert_key": alert_key,
+                "message_pt": alert["message_pt"],
+                "message_en": alert["message_en"],
+                "eta_additional_days": alert["eta_additional_days"],
+            }
+    return None
+
+
+def check_weather_delay(city: str, weather_result: dict) -> dict | None:
+    if not weather_result.get("available"):
+        return None
+    if not weather_result.get("adverse_conditions"):
+        return None
+    city_lower = city.lower()
+    for region, config in WEATHER_DELAY_REGIONS.items():
+        if config.get("active") and any(
+            c.lower() in city_lower or city_lower in c.lower()
+            for c in config["cities"]
+        ):
+            return {
+                "delay_active": True,
+                "region": region,
+                "message_pt": config["message_pt"].format(
+                    city=city,
+                    conditions=weather_result.get("conditions", ""),
+                    temp=weather_result.get("temperature_c", ""),
+                ),
+                "message_en": config["message_en"].format(
+                    city=city,
+                    conditions=weather_result.get("conditions", ""),
+                    temp=weather_result.get("temperature_c", ""),
+                ),
+            }
+    return None
+
+
 def _is_how_to_question(text: str) -> bool:
     """Returns True if the inquiry is an informational HOW-TO question."""
     norm = normalize(text)
