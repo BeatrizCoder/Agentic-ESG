@@ -2163,6 +2163,7 @@
       _preEscKeyHandler: null,
       connectionStatus: 'connected',
       refundDetailSubmitted: false,
+      datasetMode: 'live',
     };
 
     function render() {
@@ -2330,52 +2331,12 @@
           }
         });
 
-        document.getElementById('btn-load-209')?.addEventListener('click', async () => {
-          if (!confirm('Load dev data with 209 tickets?\nCurrent tickets will be replaced.')) return;
-          try {
-            const res = await fetch(
-              state.backendUrl.replace('/api/support', '/api/tickets/backups'),
-              { headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
-            );
-            const data = await res.json();
-            const backup209 = data.backups?.find(b => b.filename.includes('209'));
-            if (!backup209) {
-              alert('Dev data backup not found.\nLook for a file with "209" in the name.');
-              return;
-            }
-            const restoreRes = await fetch(
-              state.backendUrl.replace('/api/support', '/api/tickets/restore'),
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-API-Key': state.apiKey || 'dev-key-change-in-production' },
-                body: JSON.stringify({ backup_file: backup209.filename })
-              }
-            );
-            const result = await restoreRes.json();
-            if (result.success) {
-              showToast('✅ Dev data loaded! Refreshing...');
-              setTimeout(() => location.reload(), 1500);
-            }
-          } catch {
-            showToast('❌ Error loading dev data');
-          }
+        document.getElementById('btn-load-209')?.addEventListener('click', () => {
+          switchDataset('historical');
         });
 
-        document.getElementById('btn-load-clean')?.addEventListener('click', async () => {
-          if (!confirm('✨ Switch to clean demo state?\nCurrent tickets will be cleared.\nA backup will be created first.')) return;
-          try {
-            const res = await fetch(
-              state.backendUrl.replace('/api/support', '/api/tickets/clear'),
-              { method: 'DELETE', headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
-            );
-            const data = await res.json();
-            showToast('✨ Clean demo state loaded!');
-            state.tickets = [];
-            render();
-            loadMetrics();
-          } catch {
-            showToast('❌ Error switching state');
-          }
+        document.getElementById('btn-load-clean')?.addEventListener('click', () => {
+          switchDataset('live');
         });
       }
     }
@@ -3116,6 +3077,24 @@
             <p class="hero-copy">Monitor ticket throughput, escalations, and agent timelines in a single control plane.</p>
           </div>
         </section>
+
+        <div id="dataset-toggle-bar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;color:var(--muted);">📊 Dataset:</span>
+            <div style="display:flex;background:rgba(0,0,0,0.2);border-radius:8px;padding:3px;gap:3px;">
+              <button id="btn-mode-live" onclick="switchDataset('live')" style="padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.2s;background:${state.datasetMode==='live'?'#10B981':'transparent'};color:${state.datasetMode==='live'?'white':'var(--muted)'};font-weight:${state.datasetMode==='live'?'600':'normal'};">● Live Demo</button>
+              <button id="btn-mode-historical" onclick="switchDataset('historical')" style="padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.2s;background:${state.datasetMode==='historical'?'#7C3AED':'transparent'};color:${state.datasetMode==='historical'?'white':'var(--muted)'};font-weight:${state.datasetMode==='historical'?'600':'normal'};">📂 Historical Data</button>
+            </div>
+          </div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted);">
+            <span id="dataset-mode-label">${state.datasetMode==='live'?'🟢 Live database':'📂 Historical dataset (read-only)'}</span>
+          </div>
+        </div>
+
+        ${state.datasetMode === 'historical' ? `
+        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:8px 16px;margin-bottom:12px;font-size:12px;color:#A78BFA;font-family:var(--mono);display:flex;align-items:center;gap:8px;">
+          📂 Viewing historical dataset — Live database is unchanged and still accepting tickets
+        </div>` : ''}
 
         <section class="metrics-row">
           ${renderMetricCard(metrics.total, 'Total Tickets')}
@@ -6490,6 +6469,56 @@
       }).replace(/\b(true|false|null)\b/g, '<span class="json-boolean">$1</span>').replace(/(\b\d+\.?\d*\b)/g, '<span class="json-number">$1</span>');
     }
 
+    async function switchDataset(mode) {
+      try {
+        const res = await fetch(
+          state.backendUrl.replace('/api/support', '/api/dataset/mode'),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': state.apiKey || 'dev-key-change-in-production' },
+            body: JSON.stringify({ mode })
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(`❌ ${err.detail}`);
+          return;
+        }
+        const data = await res.json();
+        state.datasetMode = mode;
+        const label = document.getElementById('dataset-mode-label');
+        if (label) {
+          label.textContent = mode === 'live'
+            ? `🟢 Live database · ${data.live_tickets} tickets`
+            : `📂 Historical dataset · ${data.historical_tickets} tickets`;
+        }
+        showToast(mode === 'live' ? '🟢 Switched to Live Demo mode' : '📂 Switched to Historical Dataset');
+        state.tickets = [];
+        await loadHistoricalTickets();
+        await loadMetrics();
+        render();
+      } catch (e) {
+        showToast('❌ Error switching dataset');
+        console.error(e);
+      }
+    }
+
+    async function initDatasetMode() {
+      try {
+        const res = await fetch(state.backendUrl.replace('/api/support', '/api/dataset/mode'));
+        if (res.ok) {
+          const data = await res.json();
+          state.datasetMode = data.mode;
+          const label = document.getElementById('dataset-mode-label');
+          if (label) {
+            label.textContent = data.mode === 'live'
+              ? `🟢 Live database · ${data.live_tickets} tickets`
+              : `📂 Historical dataset · ${data.historical_tickets} tickets`;
+          }
+        }
+      } catch {}
+    }
+
     function showToast(message, duration = 3200) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
@@ -6623,6 +6652,7 @@
     });
 
     render();
+    initDatasetMode();
     loadHistoricalTickets();
     loadMetrics();
     fetchObservability();

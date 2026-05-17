@@ -26,7 +26,7 @@ from .services import KnowledgeService, MemoryService, PromptService, SkillServi
 from .observability import ObservabilityService, ObservabilityEvent
 from .routing_engine import route_ticket, RoutingDecision
 from .tool_registry import ToolRegistry
-from .data_store import data_store, SupportTicketData
+from .data_store import data_store, SupportTicketData, SupportTicketDB
 from .integrations.ticketing_client import TicketingClient
 from .integrations.crm_client import CRMClient
 from .integrations.notification_client import NotificationClient
@@ -999,6 +999,54 @@ prompt_service = PromptService()
 skill_service = SkillService()
 observability_service = ObservabilityService()
 
+# Dataset mode: "live" reads from tickets.db, "historical" reads from demo_dataset.db (read-only)
+_dataset_mode = "live"
+
+
+def _get_demo_tickets() -> List[SupportTicketData]:
+    """Read tickets from demo_dataset.db without touching the live database."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from pathlib import Path as _Path
+
+    demo_db = _Path("src/aamad/data/demo_dataset.db")
+    if not demo_db.exists():
+        return []
+    try:
+        engine = create_engine(f"sqlite:///{demo_db}")
+        DemoSession = sessionmaker(bind=engine)
+        session = DemoSession()
+        try:
+            rows = session.query(SupportTicketDB).order_by(SupportTicketDB.created_at.desc()).all()
+            return [data_store._db_to_pydantic(r) for r in rows]
+        finally:
+            session.close()
+    except Exception as _e:
+        logger.error(f"Error reading demo dataset: {_e}")
+        return []
+
+
+def _get_ticket_count(mode: str) -> int:
+    """Get ticket count for a given mode without side effects."""
+    from sqlalchemy import create_engine, text as _text
+    from pathlib import Path as _Path
+
+    try:
+        if mode == "historical":
+            demo_db = _Path("src/aamad/data/demo_dataset.db")
+            if not demo_db.exists():
+                return 0
+            engine = create_engine(f"sqlite:///{demo_db}")
+            with engine.connect() as conn:
+                return conn.execute(_text("SELECT COUNT(*) FROM support_tickets")).scalar() or 0
+        else:
+            with data_store.SessionLocal() as session:
+                from sqlalchemy import text as _text2
+                return session.execute(_text2("SELECT COUNT(*) FROM support_tickets")).scalar() or 0
+    except Exception:
+        return 0
+
+
 # Initialize integration clients (mock)
 ticketing_client = TicketingClient()
 crm_client = CRMClient()
@@ -1236,8 +1284,8 @@ async def get_ticket_trace(reference_id: str, _=Depends(verify_api_key)) -> Trac
 
 @app.get("/api/metrics/summary")
 async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
-    """Aggregate performance metrics across all tickets."""
-    tickets = data_store.get_all_tickets()
+    """Aggregate performance metrics across all tickets in current dataset mode."""
+    tickets = _get_demo_tickets() if _dataset_mode == "historical" else data_store.get_all_tickets()
     if not tickets:
         return {
             "total_runs": 0,
@@ -1435,10 +1483,48 @@ async def await_customer_info(reference_id: str, _=Depends(verify_api_key)):
 
 @app.get("/api/tickets")
 async def get_all_tickets_endpoint(_=Depends(verify_api_key)):
-    """Get all tickets ordered by created_at descending."""
-    tickets = data_store.get_all_tickets()
-    sorted_tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)
-    return [ticket.model_dump() for ticket in sorted_tickets]
+    """Get all tickets from the current dataset mode."""
+    if _dataset_mode == "historical":
+        tickets = _get_demo_tickets()
+    else:
+        tickets = data_store.get_all_tickets()
+        tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)
+    return [ticket.model_dump() for ticket in tickets]
+
+
+@app.get("/api/dataset/mode")
+async def get_dataset_mode():
+    """Get current dataset mode and ticket counts for both modes."""
+    from pathlib import Path as _Path
+    return {
+        "mode": _dataset_mode,
+        "live_tickets": _get_ticket_count("live"),
+        "historical_tickets": _get_ticket_count("historical"),
+        "demo_dataset_exists": _Path("src/aamad/data/demo_dataset.db").exists(),
+    }
+
+
+@app.post("/api/dataset/mode")
+async def set_dataset_mode(payload: dict, _=Depends(verify_api_key)):
+    """Switch dataset mode. Historical mode reads demo_dataset.db (read-only)."""
+    global _dataset_mode
+    from pathlib import Path as _Path
+
+    mode = payload.get("mode", "live")
+    if mode not in ("live", "historical"):
+        raise HTTPException(status_code=400, detail="Mode must be 'live' or 'historical'")
+
+    if mode == "historical" and not _Path("src/aamad/data/demo_dataset.db").exists():
+        raise HTTPException(status_code=404, detail="Demo dataset not found. Create demo_dataset.db first.")
+
+    _dataset_mode = mode
+    return {
+        "success": True,
+        "mode": _dataset_mode,
+        "live_tickets": _get_ticket_count("live"),
+        "historical_tickets": _get_ticket_count("historical"),
+        "message": f"Switched to {mode} mode",
+    }
 
 
 @app.delete("/api/tickets/clear")
