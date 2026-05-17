@@ -4393,47 +4393,79 @@
     };
 
     function willEscalate(inquiry) {
-      if (!inquiry) return false;
+      if (!inquiry || !inquiry.trim()) return false;
       const lower = inquiry.toLowerCase();
 
-      // EXCEPTION 1: Refund WITH order number → let RefundLookupTool handle it
-      const hasRefundKeyword = [
-        'reembolso', 'refund', 'reemb',
-        'dinheiro de volta', 'estorno',
-        'meu reembolso', 'my refund',
+      // Exception 1: Has CEP → ViaCEP handles it
+      if (/\b\d{5}-?\d{3}\b/.test(inquiry)) {
+        console.log('willEscalate: CEP detected → skip modal');
+        return false;
+      }
+
+      // Exception 2: Has city name → weather handles it
+      const cities = [
+        'curitiba', 'porto alegre', 'florianópolis', 'florianopolis',
+        'blumenau', 'joinville', 'são paulo', 'sao paulo',
+        'rio de janeiro', 'belo horizonte', 'salvador', 'recife',
+        'fortaleza', 'manaus', 'brasília', 'brasilia',
+      ];
+      if (cities.some(c => lower.includes(c))) {
+        console.log('willEscalate: city detected → skip modal');
+        return false;
+      }
+
+      // Exception 3: Refund + order number → DB handles it
+      const hasRefund = [
+        'reembolso', 'refund', 'reemb', 'dinheiro de volta', 'estorno',
       ].some(kw => lower.includes(kw));
-      const hasOrderNumber = /\b\d{4,6}\b/.test(inquiry);
-      if (hasRefundKeyword && hasOrderNumber) {
+      const hasOrderNumber = /\bpedido\s*\d{4,8}\b|\border\s*\d{4,8}\b|#\d{4,8}/.test(lower);
+      if (hasRefund && hasOrderNumber) {
         console.log('willEscalate: refund+order → skip modal');
         return false;
       }
 
-      // EXCEPTION 2: Policy/information questions → never escalate
+      // Exception 4: Policy/info questions → auto-resolve
       const isPolicyQuestion = [
         'política', 'politica', 'policy',
         'como funciona', 'how does', 'what is',
         'qual a', 'quais são', 'prazo',
-        'quanto tempo', 'how long',
+        'quanto tempo', 'how long', 'how do i',
+        'como faço', 'como faco', 'como rastrear',
+        'como cancelar',
       ].some(kw => lower.includes(kw));
       if (isPolicyQuestion) {
         console.log('willEscalate: policy question → skip modal');
         return false;
       }
 
-      // Normal escalation keywords
+      // Exception 5: Account access → step-by-step handles it
+      const isAccountAccess = [
+        'senha', 'password', 'login', 'conta bloqueada',
+        'account locked', 'esqueci', 'forgot',
+        'não consigo entrar', 'cannot login',
+      ].some(kw => lower.includes(kw));
+      if (isAccountAccess) {
+        console.log('willEscalate: account access → skip modal');
+        return false;
+      }
+
+      // Trigger modal only when we truly need info before escalating
       const escalationKeywords = [
-        'reembolso', 'refund', 'dinheiro de volta',
-        'estorno', 'cobrado errado', 'cobrança errada',
-        'nao recebi', 'não recebi', 'nunca chegou',
-        'produto danificado', 'chegou com defeito',
-        'quero cancelar', 'cancelamento',
-        'falar com atendente', 'falar com gerente',
-        'quero reclamar', 'reclamação',
-        'speak to someone', 'human agent', 'manager',
-        'gerente', 'supervisor', 'absurdo',
-        'inaceitável', 'inaceitavel', 'procon',
+        // Refund without order number (refund+order already excepted above)
+        'reembolso', 'refund', 'reemb', 'dinheiro de volta', 'estorno',
+        // Explicit escalation
+        'gerente', 'supervisor', 'procon', 'reclame aqui',
+        'advogado', 'processo', 'absurdo', 'inaceitável', 'inaceitavel',
+        'manager', 'lawsuit', 'worst service', 'i demand',
+        // Billing
+        'cobrança errada', 'cobrado errado', 'fatura',
+        'não reconheço essa cobrança', 'unauthorized charge',
       ];
-      return escalationKeywords.some(kw => lower.includes(kw));
+      const shouldEscalate = escalationKeywords.some(kw => lower.includes(kw));
+      if (shouldEscalate) {
+        console.log('willEscalate: keyword match → show modal');
+      }
+      return shouldEscalate;
     }
 
     function likelyBilling(inquiry) {
