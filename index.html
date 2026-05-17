@@ -2264,6 +2264,8 @@
           <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
             <button id="btn-clear-tickets" style="padding:8px 12px;font-size:11px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#F87171;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">🗑️ Clear All Tickets</button>
             <button id="btn-list-backups" style="padding:8px 12px;font-size:11px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);color:#38BDF8;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">📦 View Backups</button>
+            <button id="btn-load-209" style="padding:8px 12px;font-size:11px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">📂 Load Dev Data (209 tickets)</button>
+            <button id="btn-load-clean" style="padding:8px 12px;font-size:11px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">✨ Load Clean Demo State</button>
           </div>
         </details>
         ` : ''}
@@ -2325,6 +2327,54 @@
             alert('Available backups:\n\n' + list);
           } catch {
             showToast('❌ Error loading backups');
+          }
+        });
+
+        document.getElementById('btn-load-209')?.addEventListener('click', async () => {
+          if (!confirm('Load dev data with 209 tickets?\nCurrent tickets will be replaced.')) return;
+          try {
+            const res = await fetch(
+              state.backendUrl.replace('/api/support', '/api/tickets/backups'),
+              { headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+            );
+            const data = await res.json();
+            const backup209 = data.backups?.find(b => b.filename.includes('209'));
+            if (!backup209) {
+              alert('Dev data backup not found.\nLook for a file with "209" in the name.');
+              return;
+            }
+            const restoreRes = await fetch(
+              state.backendUrl.replace('/api/support', '/api/tickets/restore'),
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': state.apiKey || 'dev-key-change-in-production' },
+                body: JSON.stringify({ backup_file: backup209.filename })
+              }
+            );
+            const result = await restoreRes.json();
+            if (result.success) {
+              showToast('✅ Dev data loaded! Refreshing...');
+              setTimeout(() => location.reload(), 1500);
+            }
+          } catch {
+            showToast('❌ Error loading dev data');
+          }
+        });
+
+        document.getElementById('btn-load-clean')?.addEventListener('click', async () => {
+          if (!confirm('✨ Switch to clean demo state?\nCurrent tickets will be cleared.\nA backup will be created first.')) return;
+          try {
+            const res = await fetch(
+              state.backendUrl.replace('/api/support', '/api/tickets/clear'),
+              { method: 'DELETE', headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+            );
+            const data = await res.json();
+            showToast('✨ Clean demo state loaded!');
+            state.tickets = [];
+            render();
+            loadMetrics();
+          } catch {
+            showToast('❌ Error switching state');
           }
         });
       }
@@ -2392,6 +2442,55 @@
         <section class="form-card panel-card">
           ${renderIntakeForm()}
           <hr class="intake-divider">
+          <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+            <label for="demo-scenario-picker" style="font-size:11px;font-family:var(--mono);color:#94A3B8;white-space:nowrap;">⚡ Quick Demo:</label>
+            <select id="demo-scenario-picker" style="flex:1;padding:6px 10px;font-size:12px;font-family:var(--mono);background:rgba(255,255,255,0.05);border:1px solid rgba(139,92,246,0.2);border-radius:6px;color:#6B7280;cursor:pointer;">
+              <option value="">— Select demo scenario —</option>
+              <optgroup label="🌐 General Support">
+                <option value="general_pt">🇧🇷 Política de devolução (PT)</option>
+                <option value="general_en">🇺🇸 Return policy (EN)</option>
+                <option value="tracking_pt">📦 Rastrear pedido (PT)</option>
+              </optgroup>
+              <optgroup label="🔑 Account Access">
+                <option value="password_pt">🔒 Esqueci minha senha (PT)</option>
+                <option value="password_en">🔒 Forgot password (EN)</option>
+                <option value="locked_en">🔐 Account locked (EN)</option>
+                <option value="hacked_pt">🚨 Conta hackeada → escala</option>
+              </optgroup>
+              <optgroup label="📦 Order Issues">
+                <option value="order_no_number">❓ Pedido sem número → awaiting</option>
+                <option value="order_with_number">✅ Pedido 12345 → escala</option>
+                <option value="order_en">❓ Order not arrived (EN)</option>
+              </optgroup>
+              <optgroup label="📍 ViaCEP + Logistics">
+                <option value="cep_sp">🚛 CEP SP → logistics alert</option>
+                <option value="cep_rj">🚛 CEP RJ → logistics alert</option>
+                <option value="cep_norte">✅ CEP Manaus → sem alerta</option>
+              </optgroup>
+              <optgroup label="🌤️ Weather">
+                <option value="weather_curitiba">⛈️ Curitiba → clima real</option>
+                <option value="weather_poa">⛈️ Porto Alegre → clima real</option>
+                <option value="weather_floripa">⛈️ Florianópolis → clima real</option>
+              </optgroup>
+              <optgroup label="💰 Reembolso (DB)">
+                <option value="refund_11111">✅ Pedido 11111 — aprovado R$150</option>
+                <option value="refund_44444">✅ Pedido 44444 — processado R$299</option>
+                <option value="refund_22222">⏳ Pedido 22222 — pendente R$89,90</option>
+                <option value="refund_33333">❌ Pedido 33333 — negado → escala</option>
+                <option value="refund_not_found">🔍 Pedido 99888 — não encontrado</option>
+              </optgroup>
+              <optgroup label="🚨 Escalação">
+                <option value="escalation_pt">😡 Quero falar com gerente (PT)</option>
+                <option value="escalation_en">😡 I demand a refund (EN)</option>
+                <option value="procon">⚖️ Vou no Procon</option>
+                <option value="billing">💳 Cobrança não reconhecida</option>
+              </optgroup>
+              <optgroup label="🔧 Technical">
+                <option value="technical_site">💻 Site não carrega</option>
+                <option value="technical_payment">💳 Erro no pagamento</option>
+              </optgroup>
+            </select>
+          </div>
           <div class="field-group">
             <textarea id="inquiryInput" placeholder="e.g. My order hasn't arrived and it's been 7 days. I'm really frustrated and need help urgently.">${escapeHtml(state.lastInquiry)}</textarea>
           </div>
@@ -4236,10 +4335,72 @@
         render();
       });
 
+      const demoPicker = document.getElementById('demo-scenario-picker');
+      if (demoPicker) {
+        demoPicker.addEventListener('change', (e) => {
+          const key = e.target.value;
+          if (!key) return;
+          const s = DEMO_SCENARIOS[key];
+          if (!s) return;
+          const fields = {
+            name: document.querySelector('input[id*="name"], input[placeholder*="name" i], input[placeholder*="nome" i]'),
+            email: document.querySelector('input[type="email"], input[id*="email"]'),
+            phone: document.querySelector('input[id*="phone"], input[placeholder*="phone" i], input[placeholder*="telefone" i]'),
+            inquiry: document.querySelector('textarea#inquiryInput')
+          };
+          if (fields.name) fields.name.value = s.name;
+          if (fields.email) fields.email.value = s.email;
+          if (fields.phone) fields.phone.value = s.phone || '';
+          if (fields.inquiry) {
+            fields.inquiry.value = s.inquiry;
+            fields.inquiry.dispatchEvent(new Event('input'));
+          }
+          const checkbox = document.querySelector('input[type="checkbox"]#privacyCheckbox');
+          if (checkbox) checkbox.checked = true;
+          state.customerName = s.name;
+          state.customerEmail = s.email;
+          state.privacyAccepted = true;
+          state.lastInquiry = s.inquiry;
+          const label = e.target.options[e.target.selectedIndex].text;
+          showToast(`⚡ Loaded: ${label.trim()}`);
+          setTimeout(() => { e.target.value = ''; }, 500);
+        });
+      }
+
       if (state.view === 'customer') {
         initOrbitAnimation();
       }
     }
+
+    const DEMO_SCENARIOS = {
+      general_pt: { name:'beatriz costa', email:'beatriz@demo.com', phone:'11999999999', inquiry:'Qual é a política de devolução?' },
+      general_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'What is the return policy?' },
+      tracking_pt: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Como faço para rastrear meu pedido?' },
+      password_pt: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Esqueci minha senha, não consigo entrar na plataforma' },
+      password_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'I forgot my password and cannot login to my account' },
+      locked_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'My account has been locked and I cannot login' },
+      hacked_pt: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Minha conta foi hackeada, acesso não autorizado' },
+      order_no_number: { name:'beatriz costa', email:'beatriz@demo.com', phone:'11999999999', inquiry:'Meu pedido não chegou e já faz 10 dias' },
+      order_with_number: { name:'beatriz costa', email:'beatriz@demo.com', phone:'11999999999', inquiry:'Meu pedido 12345 não chegou, email: beatriz@demo.com' },
+      order_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'My order has not arrived and it has been 7 days' },
+      cep_sp: { name:'beatriz costa', email:'beatriz@demo.com', phone:'11999999999', inquiry:'Meu pedido não chegou, CEP 01310-100' },
+      cep_rj: { name:'Carlos Silva', email:'carlos@demo.com', phone:'21999999999', inquiry:'Meu pedido não chegou, CEP 20040-020' },
+      cep_norte: { name:'Ana Souza', email:'ana@demo.com', phone:'92999999999', inquiry:'Meu pedido não chegou, CEP 69000-000' },
+      weather_curitiba: { name:'beatriz costa', email:'beatriz@demo.com', phone:'41999999999', inquiry:'Meu pedido atrasou, sou de Curitiba' },
+      weather_poa: { name:'Roberto Gomes', email:'roberto@demo.com', phone:'51999999999', inquiry:'Meu pedido atrasou, moro em Porto Alegre' },
+      weather_floripa: { name:'Marina Costa', email:'marina@demo.com', phone:'48999999999', inquiry:'Meu pedido atrasou, sou de Florianópolis' },
+      refund_11111: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Meu reembolso do pedido 11111 não chegou' },
+      refund_44444: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Quando chega meu reembolso pedido 44444' },
+      refund_22222: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Quero saber do reembolso pedido 22222' },
+      refund_33333: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Meu reembolso do pedido 33333 foi negado, quero contestar' },
+      refund_not_found: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Reembolso pedido 99888' },
+      escalation_pt: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Quero falar com um gerente agora, isso é um absurdo' },
+      escalation_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'I demand a refund immediately, worst service ever' },
+      procon: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Vou no Procon se não resolverem meu problema hoje' },
+      billing: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Não reconheço essa cobrança na minha fatura' },
+      technical_site: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'O site não está carregando, dá erro toda vez' },
+      technical_payment: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Erro ao tentar pagar, meu cartão foi recusado' }
+    };
 
     function willEscalate(inquiry) {
       if (!inquiry) return false;
