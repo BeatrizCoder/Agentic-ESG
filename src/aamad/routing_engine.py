@@ -11,10 +11,11 @@ def normalize(text: str) -> str:
 
 
 ORDER_NUMBER_PATTERNS = [
-    r'\b\d{5,12}\b',
-    r'pedido\s*[:#]?\s*\d+',
-    r'order\s*[:#]?\s*\d+',
-    r'#\d{4,}',
+    r'pedido\s*[:#]?\s*(\d{4,10})',    # "pedido 12345"
+    r'order\s*[:#]?\s*(\d{4,10})',     # "order 12345"
+    r'n[uú]mero\s*[:#]?\s*(\d{4,10})', # "número 12345"
+    r'#(\d{4,8})',                      # "#12345"
+    r'\border\s+#?(\d{4,8})\b',        # "order #12345"
 ]
 
 EMAIL_PATTERNS = [
@@ -187,6 +188,17 @@ class RoutingDecision:
     confidence: float     # 0-1
 
 
+def _clean_for_routing(inquiry: str) -> str:
+    """Strip intake metadata (Phone/Email/Name lines) before pattern matching."""
+    clean = inquiry
+    clean = re.sub(r'\nPhone:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nEmail:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nName:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\n---.*$', '', clean, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r"',\)$", '', clean)
+    return clean.strip()
+
+
 def _has_pattern(text: str, patterns: list[str]) -> bool:
     for p in patterns:
         if re.search(p, text, re.IGNORECASE):
@@ -208,13 +220,14 @@ def route_ticket(
     sentiment: str,
     urgency: str,
 ) -> RoutingDecision:
-    norm_inquiry = normalize(inquiry)
+    norm_inquiry  = normalize(inquiry)
+    clean_inquiry = _clean_for_routing(inquiry)
 
-    has_order   = _has_pattern(inquiry, ORDER_NUMBER_PATTERNS)
-    has_email   = _has_pattern(inquiry, EMAIL_PATTERNS)
-    has_invoice = _has_pattern(inquiry, INVOICE_PATTERNS)
+    has_order   = _has_pattern(clean_inquiry, ORDER_NUMBER_PATTERNS)
+    has_email   = _has_pattern(clean_inquiry, EMAIL_PATTERNS)
+    has_invoice = _has_pattern(clean_inquiry, INVOICE_PATTERNS)
 
-    esc_keyword = _find_explicit_escalation(inquiry)
+    esc_keyword = _find_explicit_escalation(clean_inquiry)
 
     missing = []
 

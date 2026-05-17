@@ -52,11 +52,22 @@ _REFUND_KEYWORDS = re.compile(
 )
 
 _ORDER_PATTERNS = [
-    re.compile(r'pedido\s+(\d+)', re.IGNORECASE),
-    re.compile(r'reembolso\s+(\d+)', re.IGNORECASE),
-    re.compile(r'pedido\s*[:#]?\s*(\d+)', re.IGNORECASE),
-    re.compile(r'\b(\d{5,12})\b'),
+    re.compile(r'pedido\s+(\d{4,8})', re.IGNORECASE),
+    re.compile(r'reembolso\s+(\d{4,8})', re.IGNORECASE),
+    re.compile(r'pedido\s*[:#]?\s*(\d{4,8})', re.IGNORECASE),
+    re.compile(r'order\s*[:#]?\s*(\d{4,8})', re.IGNORECASE),
+    re.compile(r'#(\d{4,8})'),
 ]
+
+
+def _clean_inquiry(text: str) -> str:
+    """Strip appended intake metadata before searching for order numbers."""
+    clean = re.sub(r'\nPhone:.*', '', text, flags=re.IGNORECASE)
+    clean = re.sub(r'\nEmail:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nName:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\n---.*$', '', clean, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r"',\)$", '', clean)
+    return clean.strip()
 
 
 def is_refund_inquiry(text: str) -> bool:
@@ -64,14 +75,11 @@ def is_refund_inquiry(text: str) -> bool:
 
 
 def extract_order_number(text: str) -> str | None:
-    print(f"DEBUG extract_order: input='{text}'")
+    clean = _clean_inquiry(text)
     for pattern in _ORDER_PATTERNS:
-        m = pattern.search(text)
+        m = pattern.search(clean)
         if m:
-            found = m.group(1)
-            print(f"DEBUG extract_order: pattern='{pattern.pattern}' found='{found}'")
-            return found
-    print(f"DEBUG extract_order: no match found")
+            return m.group(1)
     return None
 
 
