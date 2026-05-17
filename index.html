@@ -2847,80 +2847,101 @@
 
     function _isRefundNotFound(ticket) {
       const reason = (ticket.escalation_reason || '').toLowerCase();
-      const isNotFound = reason.includes('not found') || reason.includes('não localizado');
+      const isNotFound = reason.includes('not found') || reason.includes('não localizado') || reason.includes('nao localizado');
       const inq = (ticket.inquiry || state.lastInquiry || '').toLowerCase();
       const hasRefund = ['reembolso', 'refund', 'reemb', 'estorno', 'dinheiro de volta']
         .some(kw => inq.includes(kw));
       return ticket.escalation_required && isNotFound && hasRefund;
     }
 
-    function renderRefundDetailForm(ticket) {
-      if (state.refundDetailSubmitted) {
-        const pt = isPortuguese(ticket.inquiry || state.lastInquiry || '');
-        return `
-          <section class="result-card" style="margin-top:12px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-left:3px solid #10B981;">
-            <div class="card-stack">
-              <p style="margin:14px 0;font-size:0.9rem;color:#065F46;">
-                ✅ ${pt ? 'Detalhes enviados! Nossa equipe terá mais contexto para resolver seu caso.' : 'Details submitted! Our team will have more context to resolve your case.'}
-              </p>
-            </div>
-          </section>`;
-      }
-
+    // FIX 1: Full replacement form — no skip, all fields required except details
+    function renderRefundNotFoundForm(ticket) {
       const inq = ticket.inquiry || state.lastInquiry || '';
       const pt = isPortuguese(inq);
-      const detectedOrder = (/\b(\d{4,12})\b/.exec(inq) || [])[1] || '';
+      const orderMatch = /(?:pedido|order|#)\s*[:#]?\s*(\d{4,8})/i.exec(inq);
+      const detectedOrder = orderMatch ? orderMatch[1] : '';
 
       const reasons = pt
         ? ['Item não recebido', 'Item errado', 'Item danificado', 'Mudei de ideia', 'Outro']
         : ['Item not received', 'Wrong item', 'Damaged item', 'Changed my mind', 'Other'];
 
-      const inputStyle = 'width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.88rem;font-family:inherit;box-sizing:border-box;outline:none;background:#fff;color:#0F172A;';
+      const inputBase = 'width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.88rem;font-family:inherit;box-sizing:border-box;outline:none;background:#fff;color:#0F172A;transition:border-color 0.15s;';
       const labelStyle = 'display:block;font-size:0.75rem;font-weight:600;color:#374151;margin-bottom:5px;letter-spacing:0.03em;text-transform:uppercase;';
 
       return `
-        <section class="result-card" style="margin-top:12px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.18);border-left:3px solid #6366F1;">
+        <section class="result-card" style="background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.18);border-left:3px solid #6366F1;">
           <div class="card-stack">
             <div class="result-header">
               <div>
-                <h2 style="margin:14px 0 4px;font-size:1rem;color:#1E1B4B;">📋 ${pt ? 'Ajude-nos a localizar seu reembolso' : 'Help us locate your refund'}</h2>
+                <h2 style="margin:14px 0 4px;font-size:1rem;color:#1E1B4B;">🔍 ${pt ? 'Não localizamos seu reembolso' : 'We could not locate your refund'}</h2>
               </div>
-              <span style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">📋 ${pt ? 'Detalhes' : 'Details'}</span>
+              <span style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">🔍 ${pt ? 'Investigação' : 'Investigation'}</span>
             </div>
             <p style="font-size:0.85rem;color:#4B5563;margin:0 0 16px;line-height:1.5;">
               ${pt
-                ? 'Forneça informações adicionais para que nossa equipe possa investigar mais rapidamente:'
-                : 'Please provide additional details so our team can investigate faster:'}
+                ? 'Para que nossa equipe possa investigar, preencha os campos abaixo:'
+                : 'To help our team investigate, please fill in all fields below:'}
             </p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
               <div>
-                <label for="rdf-order" style="${labelStyle}">${pt ? 'Número do Pedido' : 'Order Number'}</label>
-                <input type="text" id="rdf-order" value="${escapeHtml(detectedOrder)}" placeholder="e.g. 12345" style="${inputStyle}">
+                <label for="rdf-order" style="${labelStyle}">${pt ? 'Número do Pedido *' : 'Order Number *'}</label>
+                <input type="text" id="rdf-order" value="${escapeHtml(detectedOrder)}" placeholder="${pt ? 'ex: 12345' : 'e.g. 12345'}" style="${inputBase}">
               </div>
               <div>
-                <label for="rdf-date" style="${labelStyle}">${pt ? 'Data da Compra' : 'Purchase Date'}</label>
-                <input type="date" id="rdf-date" style="${inputStyle}">
+                <label for="rdf-date" style="${labelStyle}">${pt ? 'Data da Compra *' : 'Purchase Date *'}</label>
+                <input type="date" id="rdf-date" style="${inputBase}">
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
               <div>
-                <label for="rdf-amount" style="${labelStyle}">${pt ? 'Valor (R$)' : 'Amount (R$)'}</label>
-                <input type="number" id="rdf-amount" step="0.01" min="0" placeholder="e.g. 150.00" style="${inputStyle}">
+                <label for="rdf-amount" style="${labelStyle}">${pt ? 'Valor (R$) *' : 'Amount (R$) *'}</label>
+                <input type="number" id="rdf-amount" step="0.01" min="0" placeholder="${pt ? 'ex: 150.00' : 'e.g. 150.00'}" style="${inputBase}">
               </div>
               <div>
-                <label for="rdf-reason" style="${labelStyle}">${pt ? 'Motivo do Reembolso' : 'Reason for Refund'}</label>
-                <select id="rdf-reason" style="${inputStyle}">
+                <label for="rdf-reason" style="${labelStyle}">${pt ? 'Motivo do Reembolso *' : 'Reason for Refund *'}</label>
+                <select id="rdf-reason" style="${inputBase}">
                   <option value="" disabled selected>${pt ? 'Selecione...' : 'Select...'}</option>
                   ${reasons.map(r => `<option>${escapeHtml(r)}</option>`).join('')}
                 </select>
               </div>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button id="rdf-submit" class="button-primary" style="flex:1;min-width:140px;">
-                📤 ${pt ? 'Adicionar Detalhes' : 'Add Details'}
+            <div style="margin-bottom:16px;">
+              <label for="rdf-details" style="${labelStyle}">${pt ? 'Detalhes Adicionais' : 'Additional Details'}</label>
+              <textarea id="rdf-details" rows="3" placeholder="${pt ? 'Descreva qualquer informação adicional sobre seu pedido...' : 'Describe any additional information about your order...'}" style="${inputBase}resize:vertical;min-height:72px;"></textarea>
+            </div>
+            <p style="font-size:0.73rem;color:#9CA3AF;margin:0 0 12px;">* ${pt ? 'Campos obrigatórios' : 'Required fields'}</p>
+            <button id="rdf-submit" class="button-primary" style="width:100%;">
+              📤 ${pt ? 'Enviar Detalhes para Investigação' : 'Submit Details for Investigation'}
+            </button>
+          </div>
+        </section>`;
+    }
+
+    // FIX 4: Refund denied card with three action buttons
+    function renderRefundDeniedCard(ticket) {
+      const pt = isPortuguese(ticket.inquiry || state.lastInquiry || '');
+      return `
+        <section class="result-card" style="background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.18);border-left:3px solid #EF4444;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;font-size:1rem;color:#7F1D1D;">❌ ${pt ? 'Reembolso Negado' : 'Refund Denied'}</h2>
+              </div>
+              <span style="background:rgba(239,68,68,0.1);color:#EF4444;border:1px solid rgba(239,68,68,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">❌ ${pt ? 'Negado' : 'Denied'}</span>
+            </div>
+            <div class="response-bubble">${ticket.response}</div>
+            <p style="font-size:0.85rem;color:#4B5563;margin:14px 0 10px;line-height:1.5;">
+              ${pt ? 'O que você gostaria de fazer?' : 'What would you like to do?'}
+            </p>
+            <div class="button-row" style="grid-template-columns:repeat(3,1fr);gap:10px;">
+              <button id="rdf-denied-accept" class="button-secondary" style="border-color:rgba(16,185,129,0.35);color:#059669;">
+                👍 ${pt ? 'Aceitar decisão' : 'Accept decision'}
               </button>
-              <button id="rdf-skip" style="background:none;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:10px 18px;cursor:pointer;color:#6B7280;font-size:0.85rem;font-family:inherit;flex:1;min-width:120px;">
-                ${pt ? 'Continuar sem detalhes' : 'Continue without details'}
+              <button id="rdf-denied-dispute" class="button-secondary" style="border-color:rgba(245,158,11,0.35);color:#D97706;">
+                👎 ${pt ? 'Contestar' : 'Dispute'}
+              </button>
+              <button id="rdf-denied-human" class="button-secondary" style="border-color:rgba(99,102,241,0.35);color:#6366F1;">
+                👤 ${pt ? 'Falar com humano' : 'Talk to human'}
               </button>
             </div>
           </div>
@@ -2929,9 +2950,22 @@
 
     function renderCustomerResult(ticket) {
       // Detect external-API auto-resolve (logistics, weather, refund)
+      // Note: denied refund has override="refund_status" but auto_resolved=false — exclude it
       const autoResolvedByAPI =
-        ticket.steps?.some(s => ['logistics_alert', 'weather_delay', 'refund_status'].includes(s.details?.override)) ||
+        ticket.steps?.some(s =>
+          ['logistics_alert', 'weather_delay'].includes(s.details?.override) ||
+          (s.details?.override === 'refund_status' && s.details?.auto_resolved === true)
+        ) ||
         ticket.routing_action === 'resolve';
+
+      // FIX 5: Detect refund denied (must check before the generic escalation branches)
+      const isRefundDenied =
+        (ticket.api_tags || []).includes('refund_denied') ||
+        (ticket.escalation_reason || '').toLowerCase().includes('denied') ||
+        (ticket.escalation_reason || '').toLowerCase().includes('negado');
+
+      // FIX 1: Detect refund not found
+      const isRefundNotFound = _isRefundNotFound(ticket);
 
       // Routing: show awaiting form if missing info needed
       if (state.showAwaitingForm &&
@@ -2942,6 +2976,14 @@
       // Human-requested escalation card (not for auto-resolved)
       if (!autoResolvedByAPI && ticket.tags?.includes('requested_human_support')) {
         return renderHumanRequestedEscalationCard(ticket);
+      }
+      // FIX 4: Refund denied → choice card instead of generic escalation
+      if (isRefundDenied && !autoResolvedByAPI) {
+        return renderRefundDeniedCard(ticket);
+      }
+      // FIX 1: Refund not found → investigation form (replaces response card)
+      if (isRefundNotFound) {
+        return renderRefundNotFoundForm(ticket);
       }
       // Order Issues escalation card (not for auto-resolved)
       if (!autoResolvedByAPI && ticket.category === 'Order Issues' && ticket.escalation_required && !ticket.triggered_keyword) {
@@ -2995,9 +3037,6 @@
           </div>
         `;
       }
-      const refundDetailCard = _isRefundNotFound(ticket)
-        ? renderRefundDetailForm(ticket)
-        : '';
       return `
         <section class="result-card">
           <div class="card-stack">
@@ -3011,7 +3050,6 @@
             ${feedbackSection}
           </div>
         </section>
-        ${refundDetailCard}
       `;
     }
 
@@ -3460,6 +3498,31 @@
         }
       }
 
+      // FIX 3: Refund Investigation Details card — amber, parsed from form submission
+      let refundInvestigationCard = '';
+      if (inquiryText.includes('--- Refund Investigation Details ---')) {
+        const detailsSection = inquiryText.split('--- Refund Investigation Details ---')[1] || '';
+        const rows = detailsSection.trim().split('\n')
+          .map(line => line.trim())
+          .filter(line => line.includes(':'))
+          .map(line => {
+            const colonIdx = line.indexOf(':');
+            return [line.slice(0, colonIdx).trim(), line.slice(colonIdx + 1).trim()];
+          })
+          .filter(([, v]) => v && v !== '-');
+        if (rows.length > 0) {
+          refundInvestigationCard = `
+            <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:16px;margin-bottom:4px;">
+              <div style="font-size:0.72rem;color:#D97706;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">🔍 Refund Investigation Details</div>
+              ${rows.map(([k, v]) => `
+                <div style="display:flex;gap:12px;margin-bottom:8px;font-size:0.85rem;">
+                  <span style="color:var(--muted);min-width:140px;flex-shrink:0;">${escapeHtml(k)}</span>
+                  <span style="font-family:'DM Mono',monospace;color:var(--text);">${escapeHtml(v)}</span>
+                </div>`).join('')}
+            </div>`;
+        }
+      }
+
       // Screenshot attachment card (Technical Issue tickets)
       const screenshotMatch = inquiryText.match(/Screenshot attached:\s*(.+?)\s*\(/);
       const noScreenshot = inquiryText.includes('No screenshot provided');
@@ -3487,6 +3550,7 @@
       return `
         <div class="card-stack">
           ${caseDetailsCard}
+          ${refundInvestigationCard}
           ${confirmAction}
           ${attachmentCard}
           <p style="margin:6px 0 0;font-size:0.73rem;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.7;line-height:1.5;">
@@ -4052,22 +4116,114 @@
         });
       }
 
+      // FIX 2: Refund not-found form submit — validate, build enriched inquiry, re-submit
       document.getElementById('rdf-submit')?.addEventListener('click', () => {
-        const order  = document.getElementById('rdf-order')?.value.trim() || '';
-        const date   = document.getElementById('rdf-date')?.value || '';
-        const amount = document.getElementById('rdf-amount')?.value.trim() || '';
-        const reason = document.getElementById('rdf-reason')?.value || '';
-        const ticket = state.tickets.find(t => !t._source) || state.tickets[0];
-        if (ticket) {
-          ticket._refundDetails = { order, date, amount, reason, submittedAt: new Date().toISOString() };
-        }
-        state.refundDetailSubmitted = true;
+        const orderEl  = document.getElementById('rdf-order');
+        const dateEl   = document.getElementById('rdf-date');
+        const amountEl = document.getElementById('rdf-amount');
+        const reasonEl = document.getElementById('rdf-reason');
+        const detailsEl = document.getElementById('rdf-details');
+
+        const errorBorder = '1px solid #EF4444';
+        const normalBorder = '1px solid rgba(0,0,0,0.12)';
+        let valid = true;
+
+        [orderEl, dateEl, amountEl, reasonEl].forEach(el => {
+          if (!el) return;
+          const empty = !el.value || !el.value.trim();
+          el.style.border = empty ? errorBorder : normalBorder;
+          if (empty) valid = false;
+        });
+
+        if (!valid) return;
+
+        const order   = orderEl.value.trim();
+        const date    = dateEl.value;
+        const amount  = amountEl.value.trim();
+        const reason  = reasonEl.value;
+        const details = detailsEl?.value.trim() || '';
+
+        const originalInquiry = state.lastResult?.inquiry || state.lastInquiry || '';
+        const baseInquiry = originalInquiry
+          .replace(/\n---\s*Refund Investigation Details\s*---[\s\S]*/i, '')
+          .trim();
+
+        const enriched = baseInquiry +
+          '\n\n--- Refund Investigation Details ---' +
+          `\nOrder Number: ${order}` +
+          `\nPurchase Date: ${date}` +
+          `\nAmount: R$${amount}` +
+          `\nReason: ${reason}` +
+          (details ? `\nAdditional Details: ${details}` : '\nAdditional Details: -') +
+          (state.customerEmail ? `\nEmail: ${state.customerEmail}` : '') +
+          (state.customerName  ? `\nName: ${state.customerName}`   : '');
+
+        const btn = document.getElementById('rdf-submit');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Submitting...'; }
+
+        // rawInquiry = base for display/state; preEnrichedInquiry = full payload for backend
+        doSubmitInquiry(baseInquiry, enriched);
+      });
+
+      // FIX 4: Refund denied choice buttons
+      document.getElementById('rdf-denied-accept')?.addEventListener('click', () => {
+        const ticket = state.tickets.find(t => t.reference_id === state.activeTicketId) || state.tickets[0];
+        const pt = isPortuguese(ticket?.inquiry || state.lastInquiry || '');
+        showToast(pt ? '✅ Decisão aceita. Obrigado pelo contato.' : '✅ Decision accepted. Thank you for contacting us.');
+        state.showResult = false;
+        state.lastInquiry = '';
+        state.lastResult = null;
         render();
       });
 
-      document.getElementById('rdf-skip')?.addEventListener('click', () => {
-        state.refundDetailSubmitted = true;
-        render();
+      document.getElementById('rdf-denied-dispute')?.addEventListener('click', () => {
+        const ticket = state.tickets.find(t => t.reference_id === state.activeTicketId) || state.tickets[0];
+        const inq = (ticket?.inquiry || state.lastInquiry || '').replace(/\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim();
+        const disputeInquiry = inq +
+          '\n\n[CUSTOMER DISPUTES REFUND DENIAL — REQUESTS REVIEW]' +
+          (state.customerEmail ? `\nEmail: ${state.customerEmail}` : '') +
+          (state.customerName  ? `\nName: ${state.customerName}`   : '');
+        doSubmitInquiry(inq, disputeInquiry);
+      });
+
+      document.getElementById('rdf-denied-human')?.addEventListener('click', async () => {
+        const btn = document.getElementById('rdf-denied-human');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Connecting...'; btn.style.opacity = '0.6'; }
+        const originalText = state.lastResult?.inquiry || state.lastInquiry || '';
+        const escalationInquiry = originalText.replace(/\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim() +
+          '\n\n[CUSTOMER REQUESTED HUMAN SUPPORT]';
+        try {
+          const res = await fetch(state.backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inquiry: escalationInquiry })
+          });
+          const data = await res.json();
+          state.lastResult = data;
+          data.routing_action = 'escalate';
+          data.escalation_required = true;
+          if (!data.tags) data.tags = [];
+          if (!data.tags.includes('requested_human_support')) data.tags.push('requested_human_support');
+          if (!data.escalation_reason) data.escalation_reason = 'Customer requested human review of denied refund.';
+          const updatedTicket = {
+            reference_id: data.reference_id || state.activeTicketId,
+            routing_action: 'escalate',
+            escalation_required: true,
+            escalation_reason: data.escalation_reason,
+            tags: data.tags,
+            response: data.response,
+            category: data.category || 'Billing',
+            inquiry: escalationInquiry,
+          };
+          const existingIdx = state.tickets.findIndex(t => t.reference_id === updatedTicket.reference_id);
+          if (existingIdx >= 0) state.tickets[existingIdx] = { ...state.tickets[existingIdx], ...updatedTicket };
+          else state.tickets.unshift(updatedTicket);
+          state.activeTicketId = updatedTicket.reference_id;
+          render();
+        } catch (e) {
+          showToast('❌ Failed to connect. Please try again.');
+          if (btn) { btn.disabled = false; btn.textContent = '👤 Talk to human'; btn.style.opacity = '1'; }
+        }
       });
 
       document.getElementById('escalate-to-human')
