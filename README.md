@@ -1,787 +1,518 @@
-# AAMAD – AI-Assisted Multi-Agent Application Development Framework
+# 🤖 Agentic Support Platform
 
-**AAMAD** is an open, production-grade framework for building, deploying, and evolving multi-agent applications using best context engineering practices.
-It systematizes research-driven planning, modular AI agent workflows, and rapid MVP/devops pipelines for enterprise-ready AI solutions.
-
----
-
-## Architecture Highlights
-
-- **Multi-agent orchestration with CrewAI** — specialized agents (Classifier, Sentiment, Knowledge, Response, Escalation) coordinated by a Manager agent via hierarchical process
-- **Hybrid deterministic + LLM execution pipeline** — runs zero-cost in deterministic mode by default; flip `USE_LLM=true` to enable full Claude-powered inference
-- **Structured observability and tracing** — every tool call, LLM invocation, and agent step is recorded with latency, token counts, cost, and execution mode
-- **Human-in-the-loop escalation workflows** — operator dashboard with approve / reject / await-customer actions and full audit trail
-- **RAG with contextual document retrieval** — local keyword search across `knowledge/` files; upgradable to vector-based retrieval via `ENABLE_CREWAI_KNOWLEDGE=true`
-- **Real-time analytics and KPI dashboard** — CSAT, ticket volume, sentiment distribution, urgency breakdown, timeline, and agent performance metrics
-- **External API enrichment** — live address validation (ViaCEP, no key required) and weather-based delivery delay detection (OpenWeatherMap)
-- **Token and cost tracking** — per-ticket input/output token counts and USD cost estimates surfaced in observability events and the analytics dashboard
-- **Response caching and fallback handling** — tool-level caching via `ToolRegistry`; graceful degradation when APIs are unavailable
-- **SQLite persistence layer** — full SQLAlchemy ORM with automatic schema creation; PostgreSQL-ready via `DATABASE_PROVIDER=postgres`
-- **Operator review dashboard** — dedicated view for escalated tickets with inline detail, timeline, knowledge sources, and one-click resolution actions
+> Multi-agent AI customer support platform built with FastAPI, CrewAI Flow, Claude Haiku 4.5, and vanilla JS.
+> Capstone project — "Become An Agentic Architect" course by Carmelo Iaria.
 
 ---
 
-## Quick Start: CrewAI Support System
+## 📋 Table of Contents
 
-AAMAD includes a complete customer support system powered by CrewAI with hierarchical agent orchestration. The system uses multiple specialized agents working together under a manager agent to handle customer inquiries.
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Agent Pipeline](#agent-pipeline)
+- [LLM vs Deterministic — Decision Matrix](#llm-vs-deterministic)
+- [External API Integrations](#external-api-integrations)
+- [Knowledge Base (RAG)](#knowledge-base-rag)
+- [Routing Engine](#routing-engine)
+- [HITL — Human in the Loop](#hitl)
+- [Observability & Metrics](#observability--metrics)
+- [Frontend](#frontend)
+- [Setup & Installation](#setup--installation)
+- [Environment Variables](#environment-variables)
+- [Running the Project](#running-the-project)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
 
-### Running the Support System
+---
 
-1. **Install dependencies:**
-   ```bash
-   pip install -e .
-   ```
+## Overview
 
-2. **Set up environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your GOOGLE_API_KEY (optional, system works deterministically without it)
-   ```
+The Agentic Support Platform is a production-grade multi-agent customer support system that combines LLM intelligence with deterministic business rules to handle customer inquiries automatically — and escalate to humans when needed.
 
-3. **Configure feature flags (optional):**
-   ```bash
-   # In .env or environment variables
-   USE_LLM=false                    # Keep deterministic (default)
-   ENABLE_MEMORY=false              # Enable conversation memory (default: false)
-   ENABLE_CREWAI_KNOWLEDGE=false    # Use local knowledge files (default: false)
-   ENABLE_PROMPT_TEMPLATES=true     # Use prompt templates (default: true)
-   ```
+**Key capabilities:**
+- 5 specialized AI agents running in a CrewAI Flow pipeline
+- Intelligent routing by category, sentiment, and available information
+- Real-time external API integration (address validation + weather)
+- SQLite-backed refund lookup system
+- Human-in-the-loop (HITL) review with approve/reject/await
+- Full observability with token tracking and cost per agent
+- Dual-view: Customer Portal + Operator Dashboard
 
-4. **Start the backend:**
-   ```bash
-   python -m src.aamad.backend
-   ```
+---
 
-5. **Launch the frontend:**
-   ```bash
-   streamlit run src/aamad/streamlit_app.py
-   ```
+## Architecture
 
-### Architecture: CrewAI-Inspired Multi-Agent System
-
-The support system implements a **CrewAI-inspired architecture** with modular components:
-
-#### Core Components
-
-- **`tools/` folder**: Modular tool implementations replacing inline tool classes
-  - `ClassificationTool`: Categorizes customer inquiries
-  - `SentimentTool`: Analyzes emotional tone and urgency
-  - `KnowledgeTool`: Retrieves relevant support articles
-  - `ResponseTool`: Generates contextual responses
-  - `EscalationTool`: Determines escalation needs
-  - `MemoryTool`: Manages conversation memory
-  - `PromptTool`: Handles prompt template management
-
-- **`skills/` folder**: Reusable skill definitions for agent capabilities
-  - `customer_support_analysis.md`: Core support skills
-  - `escalation_decision.md`: Escalation guidelines
-  - `empathetic_response.md`: Response quality standards
-  - `safety_validation.md`: Content safety checks
-  - `multilingual_support.md`: Language handling
-  - `safety_validation.md`: Content safety checks
-
-- **`tool_registry.py`**: Central tool execution governance
-  - Tool registration and discovery
-  - Execution caching and performance monitoring
-  - Governance checks (allowlist/blocklist)
-  - Error handling and logging
-
-- **`services/` folder**: Service layer for cross-cutting concerns
-  - `KnowledgeService`: Local knowledge base management
-  - `MemoryService`: Conversation persistence
-  - `PromptService`: Template management
-  - `SkillService`: Agent skill validation
-
-#### New Response Fields (Week 4)
-
-The API now returns additional observability and integration fields:
-
-```json
-{
-  "tools_used": ["Classification Tool", "Sentiment Analysis Tool", ...],
-  "skills_used": ["customer_support_analysis", "empathetic_response"],
-  "cache_used": true,
-  "execution_mode": "deterministic"
-}
+```
+Customer Inquiry
+      │
+      ▼
+┌─────────────────────────────────────────────┐
+│              FastAPI Backend                │
+│                                             │
+│  ┌──────────┐    ┌──────────────────────┐  │
+│  │ CrewAI   │    │   Routing Engine     │  │
+│  │  Flow    │───▶│  (Business Rules)    │  │
+│  └──────────┘    └──────────────────────┘  │
+│       │                                     │
+│  ┌────▼─────────────────────────────────┐  │
+│  │         5 Specialized Agents         │  │
+│  │                                      │  │
+│  │  Classifier ──┐                      │  │
+│  │               ├── (parallel)         │  │
+│  │  Sentiment  ──┘                      │  │
+│  │       │                              │  │
+│  │  Knowledge RAG                       │  │
+│  │       │                              │  │
+│  │  External APIs ──▶ ViaCEP            │  │
+│  │                ──▶ OpenWeatherMap    │  │
+│  │                ──▶ Refund DB         │  │
+│  │       │                              │  │
+│  │  Response Generator (LLM)            │  │
+│  │       │                              │  │
+│  │  Escalation Evaluator                │  │
+│  └──────────────────────────────────────┘  │
+│                    │                        │
+│              SQLite (tickets + refunds)     │
+└─────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────┐     ┌──────────────────────┐
+│  Customer   │     │  Operator Dashboard  │
+│   Portal    │     │  HITL + Analytics    │
+└─────────────┘     └──────────────────────┘
 ```
 
-#### Feature Flags (Week 4)
+---
 
-Control system behavior with environment variables:
+## Agent Pipeline
+
+The platform runs **5 specialized agents** in a CrewAI Flow:
+
+| Step | Agent | Type | Description |
+|------|-------|------|-------------|
+| 1 | **Classification Agent** | 🤖 LLM | Categorizes inquiry + detects language |
+| 2 | **Sentiment Analysis Agent** | 🤖 LLM | Detects sentiment + urgency level |
+| 3 | **Routing Engine** | ⚙️ Rules | Decides routing action per category |
+| 4 | **Knowledge Retrieval Agent** | ⚙️ Local | RAG search in markdown documents |
+| 5 | **External Data Enrichment** | 🌐 APIs | ViaCEP + OpenWeather + Refund DB |
+| 6 | **Response Generation Agent** | 🤖 LLM | Generates contextual response |
+| 7 | **Summary Agent** | 🤖 LLM | Creates 2-line operator summary |
+| 8 | **Escalation Evaluation Agent** | ⚙️ Rules | Decides escalate/resolve/await |
+
+**Steps 1 and 2 run in parallel** to reduce latency.
+
+---
+
+## LLM vs Deterministic
+
+Strategic decision matrix for every component:
+
+### 🤖 Uses LLM
+
+| Component | Why LLM | Avg Tokens | Cost/Call |
+|-----------|---------|-----------|-----------|
+| Classification Tool | Linguistic nuance, language detection | ~170 | ~$0.000200 |
+| Sentiment Analysis | Detects irony, sarcasm, cultural context | ~145 | ~$0.000178 |
+| Response Generation | Natural language, empathy, context-aware | ~620 | ~$0.001199 |
+| Summary Generation | Concise operator summary | ~200 | ~$0.000250 |
+| Alert Messages | Personalized logistics/weather responses | ~180 | ~$0.000220 |
+| Step-by-step Guidance | Dynamic instructions with links | ~350 | ~$0.000430 |
+
+### ⚙️ Uses Deterministic Rules (no LLM)
+
+| Component | Why Deterministic | Latency |
+|-----------|------------------|---------|
+| Routing Engine | Business rules must be predictable + auditable | ~2ms |
+| Escalation Evaluator | Compliance + reliability critical | ~2ms |
+| Knowledge Retrieval | Local search is instant and free | ~45ms |
+| CEP Validation | External API, no LLM needed | ~420ms |
+| Weather Check | External API, no LLM needed | ~380ms |
+| Refund DB Lookup | SQLite query, instant | ~12ms |
+| Keyword Detection | Regex is faster and more reliable | <1ms |
+
+### 💡 Cost Optimization Insight
+
+Switching Classification + Sentiment to deterministic would save **~27.9% per session** while maintaining response quality — since the Response Agent (which uses the most tokens) would still use LLM where it matters most.
+
+---
+
+## External API Integrations
+
+### 📍 ViaCEP (Address Validation)
+- **URL:** `https://viacep.com.br/ws/{cep}/json/`
+- **Auth:** None required
+- **Usage:** Validates Brazilian postal codes, detects delivery region
+- **Business rule:** CEPs from Sul/Sudeste (SP, RJ, MG, ES, PR, SC, RS) trigger logistics alert
+- **Resilience:** 2 retries, 5s timeout, graceful fallback
+- **Env var:** None needed
+
+### 🌤️ OpenWeatherMap (Weather Check)
+- **URL:** `https://api.openweathermap.org/data/2.5/weather`
+- **Auth:** `OPENWEATHER_API_KEY`
+- **Usage:** Real-time weather for customer's city
+- **Business rule:** Adverse conditions in Sul cities trigger weather delay alert
+- **Resilience:** 2 retries, 5s timeout, rate limit handling (429), graceful fallback
+- **Env var:** `OPENWEATHER_API_KEY`
+
+### 🗄️ Refund Database (SQLite)
+- **Type:** Local SQLite table (`refunds`)
+- **Auth:** Internal only
+- **Usage:** Lookup refund status by order number
+- **Business rules:**
+  - `aprovado` / `processado` / `pendente` / `em_analise` → auto-resolve
+  - `negado` → customer can accept, dispute, or request human
+- **Seed data:** 10 realistic records (orders 10000–99999)
+
+### API Business Rules
+
+```
+Customer mentions CEP in Sul/Sudeste
+  → ViaCEP validates address
+  → Logistics alert detected
+  → LLM generates personalized response
+  → Auto-resolved (no escalation needed)
+
+Customer mentions city + delivery delay
+  → OpenWeatherMap checks real-time conditions
+  → If adverse: weather delay alert
+  → LLM generates response with real temp/conditions
+  → Auto-resolved
+
+Customer asks about refund with order number
+  → Refund DB lookup
+  → If found: LLM generates status-specific response
+  → If denied: customer gets 3 options (accept/dispute/human)
+  → Auto-resolved or escalated based on status
+```
+
+---
+
+## Knowledge Base (RAG)
+
+Token-controlled retrieval from local markdown documents.
+
+**Documents:**
+```
+knowledge/
+  order_issues.md       ← tracking, wrong items, damaged
+  billing.md            ← refunds, charges, invoices
+  account_access.md     ← password reset, locked accounts, 2FA
+  technical_issues.md   ← site errors, payment failures
+  general_support.md    ← return policy, cancellation, contact
+  escalation_policy.md  ← when to escalate, keywords (PT + EN)
+```
+
+**Token control:**
+```python
+MAX_KNOWLEDGE_SNIPPETS = 3    # max snippets per query
+MAX_SNIPPET_CHARS = 800       # max chars per snippet
+# Result: max ~600 tokens of context sent to LLM
+# vs ~5,000+ tokens if full documents were sent
+```
+
+**Retrieval:**
+1. Matches document by category
+2. Scores sections by keyword relevance
+3. Returns top N snippets only
+4. Never sends full documents to LLM
+
+---
+
+## Routing Engine
+
+Intelligent routing decision matrix:
+
+| Category | Condition | Action |
+|----------|-----------|--------|
+| Any | Explicit escalation keyword | 🚨 Escalate immediately |
+| Any | CEP in Sul/Sudeste | ✅ Auto-resolve (logistics alert) |
+| Any | City + adverse weather | ✅ Auto-resolve (weather delay) |
+| Any | Refund + order number found | ✅ Auto-resolve (DB lookup) |
+| Any | Refund denied | 🚨 Escalate (options shown) |
+| Billing | Always | 🚨 Escalate |
+| Order Issues | With order number | 🚨 Escalate (has info) |
+| Order Issues | Without order number | ⏳ Awaiting (request info) |
+| Account Access | Security issue (hacked) | 🚨 Escalate |
+| Account Access | Normal (forgot password) | 📋 Step-by-step |
+| Technical Issue | With screenshot/details | 📋 Step-by-step |
+| Technical Issue | Without details | ⏳ Awaiting (request info) |
+| General Support | Any | ✅ Auto-resolve |
+
+**Priority order in evaluation:**
+```
+1. Logistics alert    → always auto-resolve
+2. Weather delay      → always auto-resolve
+3. Refund found       → auto-resolve by status
+4. Refund denied      → escalate with options
+5. Routing decision   → apply matrix above
+```
+
+---
+
+## HITL
+
+Human-in-the-Loop review in the Operator Dashboard:
+
+```
+Escalated ticket → Operator reviews →
+
+  [✅ Approve & Resolve]  → closes ticket
+  [⏳ Awaiting Customer]  → marks as waiting
+  [❌ Reject]             → returns for revision
+```
+
+**Pre-escalation modal:** Collects structured info before escalating:
+- Order number, purchase date, amount, reason
+
+**Awaiting form:** Dynamic fields based on missing info:
+- Order number, email, screenshot (with drag & drop)
+
+---
+
+## Observability & Metrics
+
+### Per-ticket (Observability tab):
+- Token usage per agent (input + output + cost)
+- Wall time per execution
+- Execution mode (LLM vs deterministic)
+- Knowledge snippets used
+- External API calls and results
+
+### Aggregated (Analytics tab):
+
+**Customer Metrics:**
+- CSAT Score (from feedback buttons)
+- Not Helpful top reasons (from questionnaire)
+- Tickets by category, sentiment, urgency
+- Ticket timeline (last 7 days)
+
+**System Metrics (Agent Health Dashboard):**
+
+| Row | Metrics |
+|-----|---------|
+| Quality | Classification Accuracy, Avg Response Time, Model Confidence |
+| Operational | Cost per Ticket, Fallback Rate, Pipeline Depth |
+| Pipeline | KB Coverage, Fallback Rate, Throughput |
+| External APIs | ViaCEP Latency, OpenWeather Latency, Refund DB Latency, API Resilience |
+
+**Agent Performance Table:**
+- Calls, avg latency, avg tokens, cost/call per agent
+- Cost optimization recommendations
+- Slowest/fastest agent highlights
+
+---
+
+## Frontend
+
+Dual-view single-page application (vanilla JS, no framework):
+
+### Customer Portal
+- Light violet/lavender theme
+- Intake form (name, email, phone)
+- Quick Demo dropdown (25+ pre-filled scenarios)
+- Dynamic response cards:
+  - Auto-resolve (with 👍 👎 feedback)
+  - Step-by-step (numbered steps + clickable links)
+  - Awaiting (dynamic fields for missing info)
+  - Escalation (with reference ID)
+  - Refund denied (accept / dispute / talk to human)
+- Not Helpful questionnaire (5 reasons + optional text)
+
+### Operator Dashboard
+- Dark glassmorphism theme
+- Dataset toggle: Live Demo ↔ Historical Data
+- Ticket queue with filters (status, category, API tags)
+- Ticket detail tabs:
+  - **Response**: AI response + HITL buttons + feedback + AI summary
+  - **Agent Timeline**: colored dots per agent, collab badges
+  - **Knowledge**: expandable accordion with snippets sent to LLM
+  - **Observability**: token table per agent + cost breakdown
+- Analytics tab (full metrics)
+- Demo Controls (clear tickets, manage backups)
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+- Python 3.11+
+- Node.js (not required — vanilla JS)
+- Git
+
+### Installation
 
 ```bash
-USE_LLM=false                    # Deterministic mode (default)
-ENABLE_MEMORY=false              # Conversation memory (default: false)
-ENABLE_CREWAI_KNOWLEDGE=false    # Local knowledge files (default: false)
-ENABLE_PROMPT_TEMPLATES=true     # Template-based responses (default: true)
-ENABLE_MCP=false                 # Model Context Protocol (future)
-ENABLE_EXTERNAL_APIS=false       # Real external APIs (default: false)
-ENABLE_MOCK_INTEGRATIONS=true    # Mock integrations (default: true)
+# Clone the repository
+git clone https://github.com/your-username/agentic-support-platform.git
+cd agentic-support-platform
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment file
+cp .env.example .env
+# Edit .env with your API keys
 ```
 
-### Full-Stack Integration (Week 4)
-
-The system now provides complete HTTP API integration between Streamlit frontend and FastAPI backend:
-
-#### API Endpoints
-
-- `POST /api/support` → Submit inquiry and process request
-- `GET /api/support/{reference_id}/status` → Return processing/escalation status
-- `GET /api/support/{reference_id}/steps` → Return agent/tool execution steps
-- `POST /api/support/{reference_id}/feedback` → Submit user feedback
-- `POST /api/support/{reference_id}/approve` → Approve escalated ticket
-- `POST /api/support/{reference_id}/reject` → Reject ticket (request revision)
-- `GET /api/health` → Health check
-
-#### Human-in-the-Loop Feedback
-
-The frontend now includes feedback mechanisms:
-- 👍 Helpful / 👎 Not Helpful buttons
-- 🔄 Request Revision for automated responses
-- Approve/Reject actions for escalated tickets
-- Audit trail showing submission → processing → escalation/automation → feedback
-
-#### Mock External Integrations (Week 4)
-
-Created `integrations/` folder with mock clients ready for real API integration:
-
-- **`ticketing_client.py`**: External support ticket system
-- **`crm_client.py`**: Customer Relationship Management
-- **`notification_client.py`**: Email/SMS notifications
-
-All integrations include:
-- REST client patterns with timeout/retry placeholders
-- Secure auth placeholders for API keys
-- Rate limiting placeholders
-- Error handling and logging
-
-Enable real integrations by setting:
-```bash
-ENABLE_EXTERNAL_APIS=true
-ENABLE_MOCK_INTEGRATIONS=false
-```
-
-#### External API Integration Tools (Week 4 Enhancement)
-
-The system now includes generic and specialized API integration tools ready for production use:
-
-##### Generic API Tools
-- **`RESTApiTool`**: Generic REST API client with retry, timeout, and rate limiting
-- **`GraphQLApiTool`**: GraphQL API client with query/mutation support
-
-##### Specialized API Tools
-- **`WeatherTool`**: Weather data integration (OpenWeatherMap, etc.)
-- **`GitHubTool`**: GitHub repository and user data integration
-- **`AddressValidationTool`**: Brazilian CEP validation via ViaCEP (real API, no key required)
-- **`WeatherCheckTool`**: Live weather for delivery delay detection via OpenWeatherMap
+---
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| ANTHROPIC_API_KEY | Yes | Claude AI API key |
-| INTERNAL_API_KEY | Yes | Operator dashboard auth |
-| OPENWEATHER_API_KEY | Yes | Weather check tool (free tier: 1000 calls/day) |
-| ALLOWED_ORIGINS | No | CORS origins (default: localhost) |
-| MAX_KNOWLEDGE_SNIPPETS | No | RAG snippet limit (default: 3) |
-| MAX_SNIPPET_CHARS | No | Snippet size limit (default: 800) |
-| USE_LLM | No | Enable LLM mode (default: True) |
-| CREWAI_VERBOSE | No | Verbose agent logs (default: false) |
-
-##### Configuration
-```bash
-# Database (PostgreSQL-ready with SQLite fallback)
-DATABASE_PROVIDER=sqlite  # or postgres
-DATABASE_URL=sqlite:///src/aamad/data/tickets.db
-
-# Redis (optional caching)
-ENABLE_REDIS_CACHE=false
-REDIS_URL=redis://localhost:6379
-
-# API Authentication (secure placeholders)
-EXTERNAL_API_KEY=your_api_key_here
-GITHUB_TOKEN=your_github_token_here
-WEATHER_API_KEY=your_weather_api_key_here
-OAUTH_CLIENT_ID=your_oauth_client_id
-OAUTH_CLIENT_SECRET=your_oauth_client_secret
-
-# Integration Settings
-INTEGRATION_RETRY_COUNT=3
-INTEGRATION_TIMEOUT_SECONDS=30
-INTEGRATION_RATE_LIMIT_PER_MINUTE=60
-```
-
-##### Integration Logging
-All API integrations log attempts with structured data:
-```json
-{
-  "integration_name": "weather_api",
-  "mode": "mock",
-  "latency": 0.234,
-  "status": "success",
-  "error": null
-}
-```
-
-##### Database Abstraction
-- **SQLite fallback**: JSON file-based storage (default)
-- **PostgreSQL ready**: Full SQLAlchemy ORM support
-- **Automatic migration**: Schema created on startup
-- **Zero breaking changes**: Existing JSON storage preserved
-
-#### Data Persistence
-
-Lightweight JSON-based persistence for:
-- Support tickets with full audit trail
-- Feedback and approval status
-- Timestamps and execution metadata
-- Located in `src/aamad/data/tickets.json`
-
-### How It Works
-
-The system uses **hierarchical process** with these agents:
-
-- **Manager Agent**: Coordinates the entire support process, delegates tasks, and ensures quality
-- **Classifier Agent**: Categorizes inquiries (Order Issues, Billing, Account Access, Technical Issues, General Support)
-- **Sentiment Agent**: Analyzes emotional tone and urgency levels
-- **Knowledge Agent**: Retrieves relevant support articles from local knowledge base
-- **Response Agent**: Generates helpful, contextual responses
-- **Escalation Agent**: Determines when human intervention is needed
-
-Tasks run in a coordinated workflow where the manager oversees execution and can dynamically adjust based on results.
-
-#### Current Mode: Deterministic (Zero-Cost)
-
-The system currently operates in **deterministic mode** with no LLM calls required:
-- **Knowledge**: Local keyword search in `knowledge/` folder files
-- **Memory**: Optional local storage in JSON format
-- **Prompts**: Template-based responses ready for future LLM integration
-- **No API keys required** for basic functionality
-
-#### Future-Ready Architecture
-
-The system is designed to seamlessly transition to LLM-powered mode:
-- Set `USE_LLM=true` to enable CrewAI LLM agents
-- Set `ENABLE_CREWAI_KNOWLEDGE=true` for vector-based knowledge retrieval
-- Set `ENABLE_MEMORY=true` for persistent conversation memory
-- All prompt templates are prepared in the `prompts/` folder
-
-### Testing New Features
-
-#### Test Knowledge Retrieval
-```bash
-# Test local knowledge search
-curl -X POST "http://localhost:8000/api/support" \
-  -H "Content-Type: application/json" \
-  -d '{"inquiry": "How do I get a refund for my order?"}'
-```
-Check response for `knowledge_source: "local_files"` and relevant articles.
-
-#### Test Memory (when enabled)
-```bash
-# Enable memory in environment
-export ENABLE_MEMORY=true
-
-# Make a request
-curl -X POST "http://localhost:8000/api/support" \
-  -H "Content-Type: application/json" \
-  -d '{"inquiry": "My order is delayed"}'
-
-# Check memory.json file is created/updated
-cat memory.json
-```
-
-#### Test Prompt Templates
-Prompt templates are loaded from `prompts/` folder and can be inspected in logs.
-
-#### Verify Deterministic Mode
-- No API keys required
-- System responds instantly
-- Check `execution_mode: "deterministic"` in response
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | ✅ Yes | — | Claude AI API key |
+| `OPENWEATHER_API_KEY` | ✅ Yes | — | OpenWeatherMap API key (free tier) |
+| `INTERNAL_API_KEY` | ✅ Yes | `dev-key-change-in-production` | Operator dashboard authentication |
+| `ALLOWED_ORIGINS` | No | `localhost` | CORS allowed origins |
+| `MAX_KNOWLEDGE_SNIPPETS` | No | `3` | Max RAG snippets per query |
+| `MAX_SNIPPET_CHARS` | No | `800` | Max characters per snippet |
+| `USE_LLM` | No | `True` | Enable/disable LLM calls |
+| `CREWAI_VERBOSE` | No | `false` | Verbose agent logs |
+| `CREWAI_TRACING_ENABLED` | No | `true` | Enable CrewAI tracing |
 
 ---
 
-## Table of Contents
+## Running the Project
 
-- [What is AAMAD?](#what-is-aamad)
-- [AAMAD phases at a glance](#aamad-phases-at-a-glance)
-- [Installation](#installation)
-- [Using AAMAD in your IDE](#using-aamad-in-your-ide)
-- [Repository Structure](#repository-structure)
-- [How to Use the Framework](#how-to-use-the-framework)
-- [Phase 1: Define Workflow (Product Manager)](#phase-1-define-workflow-product-manager)
-- [Phase 2: Build Workflow (Multi-Agent)](#phase-2-build-workflow-multi-agent)
-- [Core Concepts](#core-concepts)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## Repository Structure
-
-```
-AAMAD/
-├── CHANGELOG.md
-├── CHECKLIST.md
-├── LICENSE
-├── main.py
-├── pyproject.toml
-├── README.md
-├── .env.example              # Environment variables template
-├── config/
-│   ├── agents.yaml          # Agent configurations
-│   └── tasks.yaml           # Task definitions
-├── knowledge/               # Local knowledge base files
-├── memory.json              # Conversation memory (when enabled)
-├── prompts/                 # Prompt templates
-├── project-context/         # AAMAD framework artifacts
-│   ├── 1.define/
-│   │   ├── mrd.md          # Market Research Document
-│   │   └── prd.md          # Product Requirements Document
-│   ├── 2.build/
-│   │   └── sad.md          # System Architecture Document
-│   └── 3.deliver/
-├── scripts/
-│   └── update_bundle.py     # Bundle update script
-├── skills/                  # Agent skill definitions
-│   ├── customer_support_analysis.md
-│   ├── escalation_decision.md
-│   ├── empathetic_response.md
-│   ├── multilingual_support.md
-│   └── safety_validation.md
-├── src/aamad/
-│   ├── __init__.py
-│   ├── backend.py           # FastAPI backend with CrewAI flow
-│   ├── cli.py               # Command-line interface
-│   ├── claude_code.py       # Claude Code integration
-│   ├── config.py            # Configuration and constants
-│   ├── data_store.py        # Data persistence layer
-│   ├── frontend.py          # Streamlit frontend
-│   ├── installer.py         # Installation utilities
-│   ├── services.py          # Service layer (knowledge, memory, prompts, skills)
-│   ├── streamlit_app.py     # Streamlit UI application
-│   ├── tool_registry.py     # Tool execution governance
-│   ├── vscode_copilot.py    # VS Code + Copilot integration
-│   ├── data/                # Data storage directory
-│   │   └── tickets.json     # JSON ticket storage
-│   └── integrations/        # External API integrations
-│       ├── ticketing_client.py
-│       ├── crm_client.py
-│       └── notification_client.py
-├── tools/                   # Modular tool implementations
-│   ├── __init__.py
-│   ├── classification_tool.py
-│   ├── escalation_tool.py
-│   ├── github_tool.py       # GitHub API integration
-│   ├── graphql_api_tool.py  # GraphQL API client
-│   ├── knowledge_tool.py
-│   ├── memory_tool.py
-│   ├── prompt_tool.py
-│   ├── response_tool.py
-│   ├── rest_api_tool.py     # REST API client
-│   ├── sentiment_tool.py
-│   └── weather_tool.py      # Weather API integration
-├── tests/
-│   ├── test_backend.py      # Backend unit tests
-│   ├── test_claude_code.py
-│   ├── test_frontend.py
-│   ├── test_streamlit_app.py
-│   └── test_vscode_copilot.py
-└── aamad.egg-info/
-```
-
-AAMAD is a context engineering framework based on best practices in AI-assisted coding and multi-agent system development methodologies.  
-It enables teams to:
-
-- Launch projects with autonomous or collaborative AI agents
-- Rapidly prototype MVPs with clear context boundaries
-- Use production-ready architecture/design patterns
-- Accelerate delivery, reduce manual overhead, and enable continuous iteration
-
----
-
-## AAMAD phases at a glance
-
-AAMAD organizes work into three phases: Define, Build, and Deliver, each with clear artifacts, personas, and rules to keep development auditable and reusable. 
-The flow begins by defining context and templates, proceeds through multi‑agent build execution, and finishes with operational delivery.
-
-```mermaid
-flowchart LR
-  %% AAMAD phases overview
-  subgraph P1[DEFINE]
-    D1H[ PERSONA ]:::hdr --> D1L["• Product Manager<br/>(@product-mgr)"]:::list
-    D2H[TEMPLATES]:::hdr --> D2L["• Market Research<br/>• PRD"]:::list
-  end
-
-  subgraph P2[BUILD]
-    B1H[AGENTS]:::hdr --> B1L["• Project Mgr<br/>• System Architect<br/>• Frontend Eng<br/>• Backend Eng<br/>• Integration Eng<br/>• QA Eng"]:::list
-    B2H[RULES]:::hdr --> B2L["• core<br/>• development‑workflow<br/>• adapter‑crewai"]:::list
-  end
-
-  subgraph P3[DELIVER]
-    L1H[AGENTS]:::hdr --> L1L["• DevOps Eng"]:::list
-    L2H[RULES]:::hdr --> L2L["• continuous‑deploy<br/>• hosting‑environment<br/>• access‑control"]:::list
-  end
-
-  P1 --> P2 --> P3
-
-  classDef hdr fill:#111,stroke:#555,color:#fff;
-  classDef list fill:#222,stroke:#555,color:#fff;
-``` 
-
-- **Phase 1 (Define):** Product Manager persona (`@product-mgr`) conducts prompt-driven discovery and context setup, supported by templates for Market Research Document (MRD) and Product Requirements Document (PRD), to standardize project scoping.
-
-- **Phase 2 (Build):** Multi‑agent execution by Project Manager, System Architect, Frontend Engineer, Backend Engineer, Integration Engineer, and QA Engineer, governed by core, development‑workflow, and CrewAI‑specific rules.
-
-- **Phase 3 (Deliver):** DevOps Engineer focuses on release and runtime concerns using rules for continuous deployment, hosting environment definitions, and access control.
-
----
-
-## Installation
-
-Install AAMAD from PyPI and initialize the framework for your IDE:
+### Start everything:
 
 ```bash
-pip install aamad
-# or
-uv pip install aamad
-```
+# Option 1: Use the start script
+chmod +x start_demo.sh
+./start_demo.sh
 
-### Multi-IDE support
-
-AAMAD supports **Cursor**, **Claude Code**, and **VS Code + GitHub Copilot**. Choose your IDE with the `--ide` flag:
-
-```bash
-aamad init --ide cursor        # Default: Cursor
-aamad init --ide claude-code  # Claude Code
-aamad init --ide vscode       # VS Code + GitHub Copilot
-```
-
-### Frontend CLI Demo
-
-You can also run a simple customer support frontend from the package:
-
-```bash
-python -m aamad.frontend
-# or, if installed as a script:
-aamad-support
-```
-
-### Web UI Demo (Streamlit)
-
-If you want to see the UI in the browser, install Streamlit and run:
-
-```bash
-pip install streamlit
-PYTHONPATH=src python -m streamlit run src/aamad/streamlit_app.py
-# or, if installed as a script:
-aamad-ui
-```
-
-### Backend API (FastAPI)
-
-To run the backend support crew, install the backend dependencies and start the server:
-
-```bash
-pip install fastapi uvicorn
-PYTHONPATH=src python -m aamad.backend
-# or, if installed as a script:
-aamad-backend
-```
-
-The Streamlit UI will attempt to call the backend at `http://127.0.0.1:8000/api/support`; if the backend is not available, it falls back to local processing.
-
-
-#### Framework feature implementation by IDE
-
-| Feature | Cursor | Claude Code | VS Code + Copilot |
-| :------ | :----- | :---------- | :---------------- |
-| **Rules / instructions** | `.cursor/rules/*.mdc` with `alwaysApply: true` | `.claude/CLAUDE.md` + `.claude/rules/*.md` | `.github/instructions/*.instructions.md` |
-| **Rule format** | `.mdc` (YAML frontmatter + markdown body) | `.md` (plain markdown) | `.instructions.md` (`applyTo`, `name`, `description`) |
-| **Glob-based scoping** | ✅ `globs:` in frontmatter | ❌ Not supported (all rules loaded) | ✅ `applyTo:` in frontmatter |
-| **Agent definitions** | `.cursor/agents/*.md` | `.claude/agents/*.md` | `.github/agents/*.agent.md` |
-| **Agent invocation** | `@agent-name` in chat | Delegation via `description`; explicit request | Agent dropdown; `@agent-name`; handoff buttons |
-| **Tool enforcement** | Instructions-based | ✅ Hard allowlist/denylist | ✅ Tool allowlist in frontmatter |
-| **Phase 1 prompt** | `.cursor/prompts/prompt-phase-1` | `.claude/commands/phase-1-define.md` (slash command) | `.github/prompts/phase-1-define.prompt.md` |
-| **Templates** | `.cursor/templates/` (shared) | `.cursor/templates/` (shared) | `.cursor/templates/` (shared) |
-| **Project context** | `project-context/` (shared) | `project-context/` (shared) | `project-context/` (shared) |
-| **Bridge file** | `AGENTS.md` (root) | `AGENTS.md` (root) | `AGENTS.md` (root) |
-
----
-
-### Cursor
-
-**Install and initialize:**
-
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install aamad
-aamad init --ide cursor --dest .
-```
-
-Or with uv:
-
-```bash
-uv venv
-uv pip install aamad
-uv run aamad init --ide cursor --dest .
-```
-
-**Folder structure after init:**
-
-```
-your-project/
-├── .cursor/
-│   ├── agents/          # Persona definitions (@product-mgr, @backend.eng, etc.)
-│   ├── prompts/         # Phase-specific prompts (e.g. prompt-phase-1)
-│   ├── rules/           # Always-on rules (*.mdc)
-│   └── templates/      # PRD, SAD, MR templates
-├── project-context/
-│   ├── 1.define/        # MRD, PRD, SAD outputs
-│   ├── 2.build/         # setup.md, frontend.md, backend.md, etc.
-│   └── 3.deliver/       # QA logs, deploy configs
-├── AGENTS.md            # Bridge file (IDE discoverability)
-├── CHECKLIST.md
-└── README.md
-```
-
----
-
-### Claude Code
-
-**Install and initialize:**
-
-```bash
-python -m venv .venv
+# Option 2: Manual start
+# Terminal 1 — Backend
 source .venv/bin/activate
-pip install aamad
-aamad init --ide claude-code --dest .
+uvicorn aamad.backend:app --reload --port 8000
+
+# Terminal 2 — Frontend
+python3 -m http.server 5500
 ```
 
-### Frontend CLI Demo
+### Access:
+- **Customer Portal:** http://localhost:5500/index.html
+- **Operator Dashboard:** same URL → click "Operator View"
+- **API Docs:** http://127.0.0.1:8000/docs
+- **Health Check:** http://127.0.0.1:8000/health
 
-After installing the package, you can run the sample customer support frontend directly:
+---
 
+## Testing
+
+### Run external API tests:
 ```bash
-python -m aamad.frontend
-# or, if installed with scripts:
-aamad-support
+python tests/test_external_tools.py
 ```
 
-Or with uv:
-
-```bash
-uv venv
-uv pip install aamad
-uv run aamad init --ide claude-code --dest .
+**Test coverage:**
+```
+✅ CEP valid (Av. Paulista, São Paulo)
+✅ CEP invalid (error handled cleanly)
+✅ CEP timeout (fallback returned)
+✅ Weather check (São Paulo)
+✅ Weather city not found (fallback)
 ```
 
-**Folder structure after init:**
+### Manual test scenarios (Quick Demo dropdown):
+
+| Scenario | Expected |
+|----------|----------|
+| Política de devolução | Auto-resolve, PT response |
+| Return policy | Auto-resolve, EN response |
+| Esqueci minha senha | Step-by-step with links |
+| CEP 01310-100 (SP) | Logistics alert, auto-resolve |
+| Curitiba + atraso | Weather data, auto-resolve |
+| Reembolso pedido 11111 | DB lookup, R$150 approved |
+| Reembolso pedido 33333 | Denied → 3 options |
+| QUERO REEMBOLSO URGENTE | Pre-escalation modal |
+| Conta hackeada | Immediate escalation |
+
+---
+
+## Project Structure
 
 ```
-your-project/
-├── .claude/
-│   ├── CLAUDE.md        # Rules summary + cross-references
-│   ├── agents/          # Persona definitions (Claude Code format)
-│   ├── commands/        # Slash commands (e.g. phase-1-define)
-│   ├── rules/           # Individual rule files (*.md)
-│   └── settings.json    # Permissions, AAMAD_ADAPTER env
-├── .cursor/
-│   └── templates/       # PRD, SAD, MR templates (shared)
-├── project-context/
-│   ├── 1.define/
-│   ├── 2.build/
-│   └── 3.deliver/
-├── AGENTS.md
-├── CHECKLIST.md
+agentic-support-platform/
+│
+├── src/aamad/
+│   ├── backend.py              # FastAPI + CrewAI SupportFlow
+│   ├── routing_engine.py       # Intelligent routing by category
+│   ├── observability.py        # Structured event tracking
+│   ├── services.py             # KnowledgeService (RAG)
+│   └── data_store.py           # SQLite via SQLAlchemy
+│
+├── tools/
+│   ├── utils.py                # Shared: clean_inquiry, detect_language
+│   ├── classification_tool.py  # LLM: category + language detection
+│   ├── sentiment_tool.py       # LLM: sentiment + urgency
+│   ├── knowledge_tool.py       # Local: RAG retrieval
+│   ├── response_tool.py        # LLM: response generation
+│   ├── escalation_tool.py      # Rules: keyword matching
+│   ├── address_validation_tool.py  # ViaCEP API
+│   ├── weather_check_tool.py       # OpenWeatherMap API
+│   └── refund_lookup_tool.py       # SQLite refunds table
+│
+├── knowledge/
+│   ├── order_issues.md
+│   ├── billing.md
+│   ├── account_access.md
+│   ├── technical_issues.md
+│   ├── general_support.md
+│   └── escalation_policy.md
+│
+├── tests/
+│   └── test_external_tools.py  # 5/5 passing
+│
+├── index.html                  # Complete frontend (vanilla JS)
+├── start_demo.sh               # Demo startup script
+├── requirements.txt
+├── .env.example
+├── .gitignore
 └── README.md
 ```
 
 ---
 
-### VS Code + GitHub Copilot
+## Tech Stack
 
-**Install and initialize:**
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI (Python) |
+| AI Orchestration | CrewAI Flow |
+| LLM | Claude Haiku 4.5 (Anthropic) |
+| Database | SQLite via SQLAlchemy |
+| External APIs | ViaCEP, OpenWeatherMap |
+| Frontend | Vanilla JS, HTML, CSS |
+| Observability | Custom ObservabilityService |
 
-```bash
-pip install aamad
-aamad init --ide vscode --dest .
-```
+---
 
-Or with uv:
-
-```bash
-uv pip install aamad
-uv run aamad init --ide vscode --dest .
-```
-
-**Folder structure after init:**
+## Next Steps (Roadmap)
 
 ```
-your-project/
-├── .github/
-│   ├── instructions/   # Copilot instructions (*.instructions.md)
-│   ├── agents/         # Custom agents (*.agent.md) with optional handoffs
-│   └── prompts/        # Phase 1 prompt (phase-1-define.prompt.md)
-├── .vscode/
-│   └── settings.json   # chat.instructionsFilesLocations, chat.agentFilesLocations
-├── .cursor/
-│   └── templates/      # PRD, SAD, MR templates (shared)
-├── project-context/
-│   ├── 1.define/
-│   ├── 2.build/
-│   └── 3.deliver/
-├── AGENTS.md
-├── CHECKLIST.md
-└── README.md
+🔮 Near term:
+  - Vector DB for advanced RAG (ChromaDB/Pinecone)
+  - Streaming responses (SSE/WebSocket)
+  - Authentication (JWT)
+  - Deploy to cloud (Railway/Render)
+
+🧪 LLM quality:
+  - Hallucination detection (DeepEval/Ragas)
+  - Faithfulness scoring
+  - Answer relevance metrics
+  - A/B testing prompts
+
+📊 Analytics:
+  - NPS tracking
+  - Resolution time by category
+  - Agent efficiency trends
+  - Cost forecasting
 ```
 
-**Required extensions:** GitHub Copilot, GitHub Copilot Chat. Recommended: Python (ms-python), YAML (redhat).
-
 ---
-
-### Using AAMAD in your IDE
-
-How you interact with AAMAD depends on your IDE. The framework produces the same artifacts (`project-context/`, templates, Phase 1 prompt); only rules and agent scaffolding differ.
-
-#### Workflow and context (per IDE)
-
-| What you do | Cursor | Claude Code | VS Code + Copilot |
-| :---------- | :----- | :---------- | :---------------- |
-| **Start a fresh context** (e.g. new module) | `Cmd+Shift+P` → **New Chat** | `/clear` or start a new session | Start a new chat session |
-| **Invoke a persona** | Type `@backend.eng` (or other agent) in chat | Ask to use the subagent by name, or refer to its description | Pick the agent from the dropdown, or use `@agent-name` |
-| **Reference a file** | `@path/to/file` in chat | `@path/to/file` in the prompt | `#file:path/to/file` or drag-and-drop the file |
-| **Phase transitions** (Define → Build → Deliver) | Switch persona manually in chat | Use subagent chaining or explicit instructions | Use **handoff** buttons in the chat UI (when configured) |
-
-#### Capability comparison
-
-| Capability | Cursor | Claude Code | VS Code + Copilot |
-| :--------- | :----- | :---------- | :---------------- |
-| **AAMAD support** | Native (default) | Via `aamad init --ide claude-code` | Via `aamad init --ide vscode` |
-| **Glob-based rule scoping** | Yes | No (all rules loaded) | Yes (`applyTo:` in instructions) |
-| **Tool enforcement** | Instructions only | Hard allowlist/denylist | Tool allowlist in agent frontmatter |
-| **Agent handoffs** | Manual | Manual or subagent chaining | Native UI buttons (Define → Build → Deliver) |
-| **Parallel work** | Multiple chat tabs | Subagents / Agent Teams | Subagents |
-| **Model choice** | Multi-model | Claude models | Multi-model (GPT, Claude, Gemini, etc.) |
-| **Best for** | AAMAD as designed | CLI-first, solo use | Teams, enterprise, model diversity |
-
-#### What is the same in all IDEs
-
-These are **IDE-agnostic** — no change when you switch:
-
-- **`project-context/`** — Directory layout and all Phase 1/2/3 outputs (MRD, PRD, SAD, setup.md, frontend.md, backend.md, integration.md, qa.md).
-- **Templates** — PRD, SAD, MR templates (in `.cursor/templates/`; shared across IDEs).
-- **Phase 1 prompt** — Usable in any AI chat; same content in Cursor prompts, Claude Code commands, or VS Code prompts.
-- **CrewAI code, YAML configs, Python** — All build and runtime logic.
-- **Git and dependency setup** — Same repo and `pyproject.toml` workflow.
-
-What **does** change per IDE: where rules and agents live (`.cursor/`, `.claude/`, or `.github/`) and how you invoke personas and reference files (see table above).
-
----
-
-**CLI flags:**
-
-- `--dest PATH` — Output directory (default: current directory)
-- `--ide {cursor,claude-code,vscode}` — Target IDE (default: cursor)
-- `--overwrite` — Allow replacing existing files
-- `--dry-run` — Preview what would be written
-
-Inspect bundle contents: `aamad bundle-info --verbose` or `aamad bundle-info --ide claude-code`. For `--ide vscode`, artifacts are generated from the Cursor bundle (no separate bundle).
-
----
-
-## Repository Structure
-
-    aamad/
-    ├─ .cursor/
-    │   ├─ agents/       # Agent persona definitions
-    │   ├─ prompts/      # Phase-specific prompts
-    │   ├─ rules/        # Architecture, workflow, epics rules
-    │   └─ templates/    # PRD, SAD, MR templates
-    ├─ project-context/
-    │   ├─ 1.define/     # PRD, SAD, research reports
-    │   ├─ 2.build/      # Setup, frontend, backend, integration, QA
-    │   └─ 3.deliver/    # QA logs, deploy configs
-    ├─ docs/
-    ├─ CHECKLIST.md
-    └─ README.md
-
-**Framework artifacts** in `.cursor/` are the source for both Cursor and Claude Code bundles.  
-**Project-context** is IDE-agnostic and shared across all IDEs.
-
----
-
-## How to Use the Framework
-
-1. **Install** (recommended): `pip install aamad` then `aamad init --ide <cursor|claude-code>`
-2. **Or clone** this repository and copy `.cursor/` and `project-context/` into your project.
-3. Confirm your IDE has the full agent, prompt, and rule set.
-4. Follow `CHECKLIST.md` for the Define → Build → Deliver workflow.
-5. Each agent persona executes its epic(s), producing markdown artifacts and code.
-6. Review, test, and launch the MVP, then iterate.
-
----
-
-## Phase 1: Define Stage (Product Manager)
-
-The Product Manager persona (`@product-mgr`) conducts prompt-driven discovery and context setup to standardize project scoping:
-
-- **Market Research:** Generate Market Research Document (MRD) using `.cursor/templates/mr-template.md`
-- **Requirements:** Generate Product Requirements Document (PRD) using `.cursor/templates/prd-template.md`
-- **Context Summary:** Create comprehensive context handoff artifacts for technical teams
-- **Validation:** Ensure completeness of market analysis, user personas, feature requirements, and success metrics
-
-Phase 1 outputs are stored in `project-context/1.define/` and provide the foundation for all subsequent development phases.
-
----
-
-## Phase 2: Build Stage (Multi-Agent)
-
-Each role is embodied by an agent persona, defined in `.cursor/agents/` (Cursor) or `.claude/agents/` (Claude Code).  
-Phase 2 is executed by running each epic in sequence after completing Phase 1:
-
-- **Architecture:** Generate solution architecture document (`sad.md`)
-- **Setup:** Scaffold environment, install dependencies, and document (`setup.md`)
-- **Frontend:** Build UI + placeholders, document (`frontend.md`)
-- **Backend:** Implement backend, document (`backend.md`)
-- **Integration:** Wire up chat flow, verify, document (`integration.md`)
-- **Quality Assurance:** Test end-to-end, log results and limitations (`qa.md`)
-
-Artifacts are versioned and stored in `project-context/2.build` for traceability.
-
----
-
-## Core Concepts
-
-- **Persona-driven development:** Each workflow is owned and documented by a clear AI agent persona with a single responsibility principle.
-- **Context artifacts:** All major actions, decisions, and documentation are stored as markdown artifacts, ensuring explainability and reproducibility.
-- **Parallelizable epics:** Big tasks are broken into epics, making development faster and more autonomous while retaining control over quality.
-- **Reusability:** Framework reusable for any project—simply drop in your PRD/SAD and let the agents execute.
-- **Open, transparent, and community-driven:** All patterns and artifacts are readable, auditable, and extendable.
-
----
-
-## Contributing
-
-Contributions are welcome!  
-- Open an issue for bugs/feature ideas/improvements.
-- Submit pull requests with extended templates, new agent personas, or bug fixes.
-- Help evolve the knowledge base and documentation for greater adoption.
-- When modifying `.cursor/` or `project-context/`, run `python scripts/update_bundle.py` to refresh both Cursor and Claude Code bundles before publishing.
-
----
-
-## License
-
-Licensed under Apache License 2.0.
-
-> Why Apache-2.0
->    Explicit patent grant and patent retaliation protect maintainers and users from patent disputes, which is valuable for AI/ML methods, agent protocols, and orchestration logic.
->    Permissive terms enable proprietary or closed-source usage while requiring attribution and change notices, which encourages integration into enterprise stacks.
->    Compared to MIT/BSD, Apache-2.0 clarifies modification notices and patent rights, reducing legal ambiguity for contributors and adopters.
-
----
-
-> For detailed step-by-step Phase 2 execution, see [CHECKLIST.md](CHECKLIST.md).  
-> For advanced reference and prompt engineering, see `.cursor/templates/` and `.cursor/rules/`.
