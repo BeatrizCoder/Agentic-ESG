@@ -39,6 +39,14 @@ EXPLICIT_ESCALATION = [
     "manager", "supervisor", "lawsuit", "lawyer", "attorney",
     "demand", "outrageous", "unacceptable", "worst service",
     "i demand", "legal action", "report you",
+    # Security / hacking — always escalate
+    "hackeada", "hackeado", "hack", "hacked", "invadida", "invadido",
+    "acesso nao autorizado", "acesso não autorizado",
+    "nao fui eu", "não fui eu", "estranha", "estranho",
+    "suspicious", "compromised", "unauthorized",
+    "someone else", "not me", "strange activity",
+    "atividade suspeita", "atividade estranha",
+    "roubaram", "roubou", "stolen",
 ]
 
 STEP_BY_STEP_CATEGORIES = ["Account Access", "Technical Issue"]
@@ -55,7 +63,8 @@ HOW_TO_PATTERNS = [
     r'\bcan you (explain|tell me|describe)\b',
     r'^como (fa[cç]o|posso|funciona|rastreio|rastrear)',
     r'\bcomo (fa[cç]o|posso|funciona|rastreio|rastrear)\b',
-    r'\bqual [eé] (a|o)\b',
+    r'\bqual [eéa] (a|o|política|prazo|processo|regra)\b',
+    r'\bqual a (pol[ií]tica|regra|forma|maneira|condi[cç][aã]o)\b',
     r'\bquais s[aã]o\b',
     r'\bonde (posso|devo|fico)\b',
 ]
@@ -282,6 +291,29 @@ def route_ticket(
                 triggered_keyword=None,
                 confidence=0.95,
             )
+
+    # RULE 3.5: Account security issues → always escalate
+    SECURITY_KEYWORDS = [
+        'hack', 'hackeada', 'hackeado', 'hacked', 'invadida', 'invadido',
+        'acesso nao autorizado', 'acesso não autorizado',
+        'nao fui eu', 'nao sou eu', 'suspicious activity',
+        'unauthorized', 'compromised', 'atividade suspeita',
+        'roubaram', 'stolen', 'someone else logged',
+    ]
+    if category == "Account Access" and any(
+        normalize(kw) in norm_inquiry for kw in SECURITY_KEYWORDS
+    ):
+        return RoutingDecision(
+            action="escalate",
+            reason="Account security issue — requires immediate security team review",
+            missing_info=[],
+            has_order_number=has_order,
+            has_email=has_email,
+            has_invoice=has_invoice,
+            explicit_escalation=True,
+            triggered_keyword="security_issue",
+            confidence=1.0,
+        )
 
     # RULE 4: Account Access → step by step
     if category == "Account Access":

@@ -2137,7 +2137,7 @@
       progressState: AGENTS.map(agent => ({ ...agent, status: 'waiting' })),
       activeTab: 'response',
       showOfflineBadge: false,
-      filters: { status: 'All', category: 'All' },
+      filters: { status: 'All', category: 'All', apiTag: '' },
       modal: null,
       lastInquiry: '',
       feedbackStatus: null,
@@ -2161,6 +2161,8 @@
       uploadedFileBase64: null,
       preEscalationOpen: false,
       _preEscKeyHandler: null,
+      connectionStatus: 'connected',
+      refundDetailSubmitted: false,
     };
 
     function render() {
@@ -2174,6 +2176,9 @@
       const total = state.tickets.length;
       const escalatedCount = state.tickets.filter(t => t.escalation_required).length;
       const activeCustomer = state.view === 'customer';
+      const _connColors = { connected: '#10B981', disconnected: '#EF4444', reconnecting: '#FBBF24' };
+      const _connLabels = { connected: 'Connected', disconnected: 'Offline', reconnecting: 'Reconnecting...' };
+      const _cs = state.connectionStatus || 'connected';
       const sidebar = document.getElementById('sidebar');
       sidebar.innerHTML = `
         <div class="sidebar-logo">
@@ -2181,6 +2186,10 @@
           <div class="sidebar-logo-text">
             <strong>Agentic Support</strong>
             <small>Multi-Agent Platform</small>
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:4px;">
+              <div id="connection-dot" style="width:6px;height:6px;border-radius:50%;background:${_connColors[_cs]};transition:background 0.3s;flex-shrink:0;"></div>
+              <span id="connection-text">${_connLabels[_cs]}</span>
+            </div>
           </div>
         </div>
 
@@ -2247,6 +2256,17 @@
         </div>
         ` : ''}
 
+        ${state.view === 'operator' ? `
+        <details id="demo-controls" style="margin-top:16px;">
+          <summary style="font-size:11px;color:var(--muted);cursor:pointer;font-family:var(--mono);user-select:none;list-style:none;display:flex;align-items:center;gap:6px;">
+            <span>⚙️</span><span>Demo Controls</span>
+          </summary>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+            <button id="btn-clear-tickets" style="padding:8px 12px;font-size:11px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#F87171;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">🗑️ Clear All Tickets</button>
+            <button id="btn-list-backups" style="padding:8px 12px;font-size:11px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);color:#38BDF8;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">📦 View Backups</button>
+          </div>
+        </details>
+        ` : ''}
 
       `;
 
@@ -2272,6 +2292,40 @@
 
         document.getElementById('apiKeyInput').addEventListener('input', event => {
           state.apiKey = event.target.value.trim() || DEFAULT_API_KEY;
+        });
+
+        document.getElementById('btn-clear-tickets')?.addEventListener('click', async () => {
+          if (!confirm('⚠️ Clear all tickets?\n\nA backup will be created automatically.\nRefund data will be preserved.')) return;
+          try {
+            const res = await fetch(
+              state.backendUrl.replace('/api/support', '/api/tickets/clear'),
+              { method: 'DELETE', headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+            );
+            const data = await res.json();
+            showToast(`✅ ${data.deleted_tickets} tickets cleared. Backup: ${data.backup_filename}`);
+            state.tickets = [];
+            render();
+            loadMetrics();
+          } catch {
+            showToast('❌ Error clearing tickets');
+          }
+        });
+
+        document.getElementById('btn-list-backups')?.addEventListener('click', async () => {
+          try {
+            const res = await fetch(
+              state.backendUrl.replace('/api/support', '/api/tickets/backups'),
+              { headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+            );
+            const data = await res.json();
+            if (!data.backups.length) { alert('No backups found.'); return; }
+            const list = data.backups.map(
+              b => `📦 ${b.filename}\n   Created: ${b.created_at}\n   Size: ${b.size_kb}KB`
+            ).join('\n\n');
+            alert('Available backups:\n\n' + list);
+          } catch {
+            showToast('❌ Error loading backups');
+          }
         });
       }
     }
@@ -2409,7 +2463,7 @@
 
       const fieldHtml = (id, label, type, placeholder, helpText, required = true) => `
         <div style="margin-bottom:16px;">
-          <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+          <label for="${id}" style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
             ${label}${required ? ' <span style="color:#F87171;">*</span>' : ''}
           </label>
           <input type="${type}" id="${id}" placeholder="${placeholder}"
@@ -2421,7 +2475,7 @@
 
       const textareaHtml = (id, label, placeholder, helpText) => `
         <div style="margin-bottom:16px;">
-          <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+          <label for="${id}" style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
             ${label} <span style="color:#F87171;">*</span>
           </label>
           <textarea id="${id}" rows="3" placeholder="${placeholder}"
@@ -2461,7 +2515,7 @@
           'Be as specific as possible — include any error messages');
         fields += `
           <div style="margin-bottom:16px;">
-            <label style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
+            <label for="field-screenshot" style="display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:6px;letter-spacing:0.03em;text-transform:uppercase;">
               Screenshot or Error Image
               <span style="font-weight:400;color:#6B7280;text-transform:none;"> (optional but helpful)</span>
             </label>
@@ -2653,6 +2707,13 @@
               ${pt ? 'Minha pergunta não foi compreendida' : "My question wasn't understood"}
             </label>
           </div>
+          <div style="margin-bottom:16px;">
+            <textarea id="not-helpful-details" rows="2"
+              placeholder="${pt ? 'Comentário adicional (opcional)' : 'Additional comment (optional)'}"
+              style="width:100%;border-radius:8px;border:1px solid rgba(0,0,0,0.12);padding:8px 12px;font-size:13px;resize:none;box-sizing:border-box;outline:none;font-family:inherit;color:#1E293B;"
+              onfocus="this.style.borderColor='#6366F1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.1)'"
+              onblur="this.style.borderColor='rgba(0,0,0,0.12)';this.style.boxShadow='none'"></textarea>
+          </div>
           <div style="display:flex;gap:10px;">
             <button class="button-secondary" id="not-helpful-submit" style="flex:1;">
               ${pt ? 'Enviar Feedback' : 'Submit Feedback'}
@@ -2724,6 +2785,88 @@
         </section>`;
     }
 
+    function _isRefundNotFound(ticket) {
+      const reason = (ticket.escalation_reason || '').toLowerCase();
+      const isNotFound = reason.includes('not found') || reason.includes('não localizado');
+      const inq = (ticket.inquiry || state.lastInquiry || '').toLowerCase();
+      const hasRefund = ['reembolso', 'refund', 'reemb', 'estorno', 'dinheiro de volta']
+        .some(kw => inq.includes(kw));
+      return ticket.escalation_required && isNotFound && hasRefund;
+    }
+
+    function renderRefundDetailForm(ticket) {
+      if (state.refundDetailSubmitted) {
+        const pt = isPortuguese(ticket.inquiry || state.lastInquiry || '');
+        return `
+          <section class="result-card" style="margin-top:12px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-left:3px solid #10B981;">
+            <div class="card-stack">
+              <p style="margin:14px 0;font-size:0.9rem;color:#065F46;">
+                ✅ ${pt ? 'Detalhes enviados! Nossa equipe terá mais contexto para resolver seu caso.' : 'Details submitted! Our team will have more context to resolve your case.'}
+              </p>
+            </div>
+          </section>`;
+      }
+
+      const inq = ticket.inquiry || state.lastInquiry || '';
+      const pt = isPortuguese(inq);
+      const detectedOrder = (/\b(\d{4,12})\b/.exec(inq) || [])[1] || '';
+
+      const reasons = pt
+        ? ['Item não recebido', 'Item errado', 'Item danificado', 'Mudei de ideia', 'Outro']
+        : ['Item not received', 'Wrong item', 'Damaged item', 'Changed my mind', 'Other'];
+
+      const inputStyle = 'width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.88rem;font-family:inherit;box-sizing:border-box;outline:none;background:#fff;color:#0F172A;';
+      const labelStyle = 'display:block;font-size:0.75rem;font-weight:600;color:#374151;margin-bottom:5px;letter-spacing:0.03em;text-transform:uppercase;';
+
+      return `
+        <section class="result-card" style="margin-top:12px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.18);border-left:3px solid #6366F1;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;font-size:1rem;color:#1E1B4B;">📋 ${pt ? 'Ajude-nos a localizar seu reembolso' : 'Help us locate your refund'}</h2>
+              </div>
+              <span style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">📋 ${pt ? 'Detalhes' : 'Details'}</span>
+            </div>
+            <p style="font-size:0.85rem;color:#4B5563;margin:0 0 16px;line-height:1.5;">
+              ${pt
+                ? 'Forneça informações adicionais para que nossa equipe possa investigar mais rapidamente:'
+                : 'Please provide additional details so our team can investigate faster:'}
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label for="rdf-order" style="${labelStyle}">${pt ? 'Número do Pedido' : 'Order Number'}</label>
+                <input type="text" id="rdf-order" value="${escapeHtml(detectedOrder)}" placeholder="e.g. 12345" style="${inputStyle}">
+              </div>
+              <div>
+                <label for="rdf-date" style="${labelStyle}">${pt ? 'Data da Compra' : 'Purchase Date'}</label>
+                <input type="date" id="rdf-date" style="${inputStyle}">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+              <div>
+                <label for="rdf-amount" style="${labelStyle}">${pt ? 'Valor (R$)' : 'Amount (R$)'}</label>
+                <input type="number" id="rdf-amount" step="0.01" min="0" placeholder="e.g. 150.00" style="${inputStyle}">
+              </div>
+              <div>
+                <label for="rdf-reason" style="${labelStyle}">${pt ? 'Motivo do Reembolso' : 'Reason for Refund'}</label>
+                <select id="rdf-reason" style="${inputStyle}">
+                  <option value="" disabled selected>${pt ? 'Selecione...' : 'Select...'}</option>
+                  ${reasons.map(r => `<option>${escapeHtml(r)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button id="rdf-submit" class="button-primary" style="flex:1;min-width:140px;">
+                📤 ${pt ? 'Adicionar Detalhes' : 'Add Details'}
+              </button>
+              <button id="rdf-skip" style="background:none;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:10px 18px;cursor:pointer;color:#6B7280;font-size:0.85rem;font-family:inherit;flex:1;min-width:120px;">
+                ${pt ? 'Continuar sem detalhes' : 'Continue without details'}
+              </button>
+            </div>
+          </div>
+        </section>`;
+    }
+
     function renderCustomerResult(ticket) {
       // Routing: show awaiting form if missing info needed
       if (state.showAwaitingForm &&
@@ -2787,6 +2930,9 @@
           </div>
         `;
       }
+      const refundDetailCard = _isRefundNotFound(ticket)
+        ? renderRefundDetailForm(ticket)
+        : '';
       return `
         <section class="result-card">
           <div class="card-stack">
@@ -2800,6 +2946,7 @@
             ${feedbackSection}
           </div>
         </section>
+        ${refundDetailCard}
       `;
     }
 
@@ -2881,12 +3028,26 @@
 
         <section class="operator-grid">
           <div class="panel-card ticket-queue-panel">
-            <h3>Ticket Queue</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <h3 style="margin:0;">Ticket Queue</h3>
+              <span style="font-size:0.7rem;font-family:'DM Mono',monospace;color:var(--muted);">${lastRefreshTime ? 'Last updated: ' + lastRefreshTime : '—'}</span>
+            </div>
             <div class="inline-filters">
               <select id="filterStatus">${STATUS_OPTIONS.map(option => `<option value="${option}" ${state.filters.status === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
               <select id="filterCategory">${CATEGORY_OPTIONS.map(option => `<option value="${option}" ${state.filters.category === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
+              <select id="filterApiTag">
+                <option value="" ${!state.filters.apiTag ? 'selected' : ''}>All API Tags</option>
+                <option value="logistics_alert" ${state.filters.apiTag === 'logistics_alert' ? 'selected' : ''}>🚛 Logistics Alert</option>
+                <option value="weather_alert" ${state.filters.apiTag === 'weather_alert' ? 'selected' : ''}>⛈️ Weather Alert</option>
+                <option value="refund_found" ${state.filters.apiTag === 'refund_found' ? 'selected' : ''}>✅ Refund Found</option>
+                <option value="refund_denied" ${state.filters.apiTag === 'refund_denied' ? 'selected' : ''}>❌ Refund Denied</option>
+                <option value="cep_validated" ${state.filters.apiTag === 'cep_validated' ? 'selected' : ''}>📍 CEP Validated</option>
+                <option value="weather_checked" ${state.filters.apiTag === 'weather_checked' ? 'selected' : ''}>🌤️ Weather Checked</option>
+                <option value="refund_lookup" ${state.filters.apiTag === 'refund_lookup' ? 'selected' : ''}>💰 Refund Lookup</option>
+              </select>
+              <button id="queue-refresh" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;background:transparent;cursor:pointer;font-size:0.82rem;font-family:inherit;color:#374151;white-space:nowrap;">↺ Refresh</button>
             </div>
-            <div class="queue-meta">${filteredTickets().length} tickets matching filter</div>
+            <div class="queue-meta">${filteredTickets().length} tickets · ${state.tickets.filter(t => (t.api_tags || []).length > 0).length} with API tags</div>
             <div style="display:flex; flex-direction:column; margin-top: 12px; max-height: 720px; overflow-y: auto; padding-right: 4px;">
               ${renderTicketRows()}
             </div>
@@ -2951,7 +3112,8 @@
       return state.tickets.filter(ticket => {
         const statusMatches = state.filters.status === 'All' || (state.filters.status === 'Escalated' ? ticket.escalation_required : !ticket.escalation_required);
         const categoryMatches = state.filters.category === 'All' || ticket.category === state.filters.category;
-        return statusMatches && categoryMatches;
+        const apiTagMatches = !state.filters.apiTag || (ticket.api_tags || []).includes(state.filters.apiTag);
+        return statusMatches && categoryMatches && apiTagMatches;
       });
     }
 
@@ -2988,6 +3150,19 @@
         const humanPill = isHumanRequested
           ? `<span class="pill" style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.3);">👤 Human Req.</span>`
           : '';
+        const _tagConfig = {
+          logistics_alert: { icon: '🚛', label: 'Logistics Alert', color: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)', text: '#FBBF24' },
+          weather_alert:   { icon: '⛈️', label: 'Weather Alert',   color: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)', text: '#FBBF24' },
+          refund_found:    { icon: '✅', label: 'Refund Found',    color: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.3)', text: '#10B981' },
+          refund_denied:   { icon: '❌', label: 'Refund Denied',   color: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.3)',  text: '#F87171' },
+        };
+        const _visibleTags = ['logistics_alert', 'weather_alert', 'refund_found', 'refund_denied'];
+        const apiTagPills = (ticket.api_tags || [])
+          .filter(tag => _visibleTags.includes(tag))
+          .map(tag => {
+            const cfg = _tagConfig[tag];
+            return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:600;background:${cfg.color};border:1px solid ${cfg.border};color:${cfg.text};font-family:var(--mono);">${cfg.icon} ${cfg.label}</span>`;
+          }).join('');
         return `
           <div class="ticket-row ${isEscalated ? 'escalated' : ''}">
             <div class="ticket-summary">
@@ -3000,6 +3175,7 @@
                 <span class="pill ${ticket.urgency === 'High' ? 'red' : ticket.urgency === 'Medium' ? 'yellow' : 'green'}">${ticket.urgency}</span>
                 <span class="pill ${statusPillClass}">${statusLabel}</span>
                 ${humanPill}
+                ${apiTagPills}
                 <button class="button-secondary" data-view-ticket="${ticket.reference_id}">View</button>
               </div>
             </div>
@@ -3131,18 +3307,46 @@
         if (!fb || fb.helpful === undefined || fb.helpful === null) return '';
         const isHelpful = fb.helpful === true;
         const emoji = isHelpful ? '👍' : '👎';
-        const label = isHelpful ? 'Helpful' : 'Not Helpful';
+        const sentenceLabel = isHelpful
+          ? 'Customer found this helpful'
+          : 'Customer found this not helpful';
         const color = isHelpful ? '#6EE7B7' : '#F87171';
         const ts = fb.submitted_at ? new Date(fb.submitted_at).toLocaleString() : '';
+
+        const reasonLabels = {
+          not_resolved:  "The response didn't solve my problem",
+          incorrect:     'The answer was incorrect or outdated',
+          hard_to_follow:'The instructions were hard to follow',
+          not_understood:"My question wasn't understood",
+          not_specified: 'Not specified',
+        };
+        const reasonMatch   = (fb.comments || '').match(/Reason:\s*([a-z_]+)/i);
+        const rawReason     = reasonMatch ? reasonMatch[1].toLowerCase() : '';
+        const reasonLabel   = rawReason ? (reasonLabels[rawReason] || rawReason) : '';
+        const commentMatch  = (fb.comments || '').match(/Comment:\s*(.+)$/m);
+        const extraComments = commentMatch ? commentMatch[1].trim() : '';
+
         return `
           <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:18px 20px;">
             <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px;">Customer Feedback</div>
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:${fb.comments ? '10px' : '0'};">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:${reasonLabel || extraComments ? '10px' : '0'};">
               <span style="font-size:1.4rem;">${emoji}</span>
-              <span style="font-family:'DM Mono',monospace; font-size:0.95rem; color:${color}; font-weight:500;">${label}</span>
+              <span style="font-family:'DM Mono',monospace; font-size:0.95rem; color:${color}; font-weight:500;">${sentenceLabel}</span>
               ${ts ? `<span style="margin-left:auto; font-size:0.72rem; color:var(--muted); font-family:'DM Mono',monospace;">${ts}</span>` : ''}
             </div>
-            ${fb.comments ? `<p style="margin:0; font-size:0.85rem; color:var(--muted); border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">"${fb.comments}"</p>` : ''}
+            ${reasonLabel || extraComments ? `
+              <div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+                ${reasonLabel ? `
+                  <div style="display:flex; gap:8px; font-size:0.85rem;">
+                    <span style="color:var(--muted); min-width:60px;">Reason:</span>
+                    <span style="color:var(--text);">${reasonLabel}</span>
+                  </div>` : ''}
+                ${extraComments ? `
+                  <div style="display:flex; gap:8px; font-size:0.85rem;">
+                    <span style="color:var(--muted); min-width:60px;">Comment:</span>
+                    <span style="color:var(--text); font-style:italic;">"${escapeHtml(extraComments)}"</span>
+                  </div>` : ''}
+              </div>` : ''}
           </div>
         `;
       })();
@@ -3765,6 +3969,24 @@
         });
       }
 
+      document.getElementById('rdf-submit')?.addEventListener('click', () => {
+        const order  = document.getElementById('rdf-order')?.value.trim() || '';
+        const date   = document.getElementById('rdf-date')?.value || '';
+        const amount = document.getElementById('rdf-amount')?.value.trim() || '';
+        const reason = document.getElementById('rdf-reason')?.value || '';
+        const ticket = state.tickets.find(t => !t._source) || state.tickets[0];
+        if (ticket) {
+          ticket._refundDetails = { order, date, amount, reason, submittedAt: new Date().toISOString() };
+        }
+        state.refundDetailSubmitted = true;
+        render();
+      });
+
+      document.getElementById('rdf-skip')?.addEventListener('click', () => {
+        state.refundDetailSubmitted = true;
+        render();
+      });
+
       document.getElementById('escalate-to-human')
         ?.addEventListener('click', async () => {
           const btn = document.getElementById('escalate-to-human');
@@ -3876,7 +4098,8 @@
           const ticket = state.tickets.find(t => !t._source);
           const selected = document.querySelector('input[name="not-helpful-reason"]:checked');
           const reason = selected ? selected.value : 'not_specified';
-          if (ticket) sendFeedback(ticket.reference_id, false, reason);
+          const extraComment = document.getElementById('not-helpful-details')?.value || '';
+          if (ticket) sendFeedback(ticket.reference_id, false, reason, extraComment);
           state.feedbackDone = 'not-helpful';
           state.notHelpfulFormVisible = false;
           render();
@@ -3997,24 +4220,69 @@
         });
       }
 
+      const filterApiTag = document.getElementById('filterApiTag');
+      if (filterApiTag) {
+        filterApiTag.addEventListener('change', event => {
+          state.filters.apiTag = event.target.value;
+          render();
+        });
+      }
+
+      document.getElementById('queue-refresh')?.addEventListener('click', async () => {
+        await loadHistoricalTickets();
+        await loadMetrics();
+        lastRefreshTime = new Date().toLocaleTimeString();
+        showToast('✅ Data refreshed');
+        render();
+      });
+
       if (state.view === 'customer') {
         initOrbitAnimation();
       }
     }
 
     function willEscalate(inquiry) {
-      const kws = [
-        'reembolso', 'reemb', 'dinheiro de volta', 'estorno',
-        'cobrado errado', 'cobrança errada', 'nao recebi', 'não recebi',
-        'nunca chegou', 'produto danificado', 'chegou com defeito',
-        'quero cancelar', 'cancelamento', 'falar com atendente',
-        'falar com gerente', 'quero reclamar', 'reclamação',
-        'refund', 'money back', 'charge back', 'never received',
-        'damaged', 'defective', 'wrong order', 'cancel', 'complaint',
-        'speak to someone', 'human agent', 'manager',
-      ];
+      if (!inquiry) return false;
       const lower = inquiry.toLowerCase();
-      return kws.some(kw => lower.includes(kw));
+
+      // EXCEPTION 1: Refund WITH order number → let RefundLookupTool handle it
+      const hasRefundKeyword = [
+        'reembolso', 'refund', 'reemb',
+        'dinheiro de volta', 'estorno',
+        'meu reembolso', 'my refund',
+      ].some(kw => lower.includes(kw));
+      const hasOrderNumber = /\b\d{4,6}\b/.test(inquiry);
+      if (hasRefundKeyword && hasOrderNumber) {
+        console.log('willEscalate: refund+order → skip modal');
+        return false;
+      }
+
+      // EXCEPTION 2: Policy/information questions → never escalate
+      const isPolicyQuestion = [
+        'política', 'politica', 'policy',
+        'como funciona', 'how does', 'what is',
+        'qual a', 'quais são', 'prazo',
+        'quanto tempo', 'how long',
+      ].some(kw => lower.includes(kw));
+      if (isPolicyQuestion) {
+        console.log('willEscalate: policy question → skip modal');
+        return false;
+      }
+
+      // Normal escalation keywords
+      const escalationKeywords = [
+        'reembolso', 'refund', 'dinheiro de volta',
+        'estorno', 'cobrado errado', 'cobrança errada',
+        'nao recebi', 'não recebi', 'nunca chegou',
+        'produto danificado', 'chegou com defeito',
+        'quero cancelar', 'cancelamento',
+        'falar com atendente', 'falar com gerente',
+        'quero reclamar', 'reclamação',
+        'speak to someone', 'human agent', 'manager',
+        'gerente', 'supervisor', 'absurdo',
+        'inaceitável', 'inaceitavel', 'procon',
+      ];
+      return escalationKeywords.some(kw => lower.includes(kw));
     }
 
     function likelyBilling(inquiry) {
@@ -4040,6 +4308,8 @@
     }
 
     function showPreEscalationModal(rawInquiry) {
+      console.log('MODAL TRIGGERED for:', rawInquiry);
+      console.trace();
       const billing = likelyBilling(rawInquiry);
       const pt = isPortuguese(rawInquiry);
       const el = document.getElementById('pre-esc-modal');
@@ -4047,7 +4317,7 @@
 
       const billingFields = billing ? `
         <div style="margin-bottom:14px;">
-          <label class="pre-esc-label">${pt ? 'Valor da Compra' : 'Purchase Amount'}
+          <label for="pre-esc-amount" class="pre-esc-label">${pt ? 'Valor da Compra' : 'Purchase Amount'}
             <span class="pre-esc-optional">optional</span>
           </label>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -4057,7 +4327,7 @@
           </div>
         </div>
         <div style="margin-bottom:14px;">
-          <label class="pre-esc-label">${pt ? 'Motivo' : 'Reason'}
+          <label for="pre-esc-reason" class="pre-esc-label">${pt ? 'Motivo' : 'Reason'}
             <span style="color:#F87171;margin-left:3px;">*</span>
           </label>
           <select id="pre-esc-reason" class="pre-esc-input">
@@ -4072,7 +4342,7 @@
           </select>
         </div>
         <div style="margin-bottom:14px;">
-          <label class="pre-esc-label">${pt ? 'Detalhes adicionais' : 'Additional Details'}
+          <label for="pre-esc-details" class="pre-esc-label">${pt ? 'Detalhes adicionais' : 'Additional Details'}
             <span class="pre-esc-optional">optional</span>
           </label>
           <textarea id="pre-esc-details" rows="2" class="pre-esc-input"
@@ -4097,7 +4367,7 @@
           </p>
 
           <div style="margin-bottom:14px;">
-            <label class="pre-esc-label">${pt ? 'Número do Pedido' : 'Order Number / Número do Pedido'}
+            <label for="pre-esc-order" class="pre-esc-label">${pt ? 'Número do Pedido' : 'Order Number / Número do Pedido'}
               <span class="pre-esc-optional">optional</span>
             </label>
             <input type="text" id="pre-esc-order" placeholder="e.g. 12345" class="pre-esc-input">
@@ -4105,7 +4375,7 @@
           </div>
 
           <div style="margin-bottom:14px;">
-            <label class="pre-esc-label">${pt ? 'Data da Compra' : 'Purchase Date / Data da Compra'}
+            <label for="pre-esc-date" class="pre-esc-label">${pt ? 'Data da Compra' : 'Purchase Date / Data da Compra'}
               <span class="pre-esc-optional">optional</span>
             </label>
             <input type="date" id="pre-esc-date" class="pre-esc-input">
@@ -4174,6 +4444,7 @@
       state.showResult = false;
       state.feedbackDone = null;
       state.notHelpfulFormVisible = false;
+      state.refundDetailSubmitted = false;
       state.progressState = AGENTS.map(agent => ({ ...agent, status: 'waiting' }));
       state.feedbackStatus = null;
       render();
@@ -4209,11 +4480,13 @@
           : '✅ Sua solicitação foi processada com sucesso!');
         loadMetrics();
         fetchObservability();
-      }).catch(() => {
+      }).catch(err => {
         _animGeneration++;
-        state.processing = false;
-        showToast('Não foi possível processar o pedido. Verifique o backend ou use o modo offline.');
-        render();
+        if (!handleConnectionError(err)) {
+          state.processing = false;
+          showToast('Não foi possível processar o pedido. Verifique o backend ou use o modo offline.');
+          render();
+        }
       });
     }
 
@@ -4238,6 +4511,14 @@
       if (state.processing) return;
 
       if (willEscalate(inquiry)) {
+        // Double-check: refund + order number should never open the modal
+        const _hasRefund = ['reembolso', 'refund', 'estorno']
+          .some(kw => inquiry.toLowerCase().includes(kw));
+        const _hasOrder = /\b\d{4,6}\b/.test(inquiry);
+        if (_hasRefund && _hasOrder) {
+          doSubmitInquiry(inquiry);
+          return;
+        }
         showPreEscalationModal(inquiry);
         return;
       }
@@ -4333,11 +4614,13 @@
         showToast('✅ Informações recebidas! Sua solicitação foi encaminhada.');
         loadMetrics();
         fetchObservability();
-      }).catch(() => {
+      }).catch(err => {
         _animGeneration++;
-        state.processing = false;
-        showToast('Não foi possível processar. Verifique o backend.');
-        render();
+        if (!handleConnectionError(err)) {
+          state.processing = false;
+          showToast('Não foi possível processar. Verifique o backend.');
+          render();
+        }
       });
     }
 
@@ -4377,7 +4660,7 @@
     }
 
     function callSupportApi(inquiry) {
-      return new Promise(async resolve => {
+      return new Promise(async (resolve, reject) => {
         if (!state.useBackend) {
           return resolve(generateOfflineTicket(inquiry));
         }
@@ -4394,8 +4677,12 @@
           const ticket = normalizeTicket(data, false);
           resolve(ticket);
         } catch (error) {
-          showToast('Backend indisponível. Alternando para modo offline.');
-          resolve(generateOfflineTicket(inquiry));
+          if (error?.name === 'TypeError' || error?.message?.includes('Failed to fetch')) {
+            reject(error);
+          } else {
+            showToast('Backend indisponível. Alternando para modo offline.');
+            resolve(generateOfflineTicket(inquiry));
+          }
         }
       });
     }
@@ -4512,10 +4799,13 @@
       return `${seconds}s`;
     }
 
-    function sendFeedback(referenceId, helpful, reason) {
+    function sendFeedback(referenceId, helpful, reason, extraComment = '') {
       const ticket = state.tickets.find(item => item.reference_id === referenceId);
       if (!ticket) return;
-      const comments = reason ? `Reason: ${reason}` : '';
+      const parts = [];
+      if (reason) parts.push(`Reason: ${reason}`);
+      if (extraComment && extraComment.trim()) parts.push(`Comment: ${extraComment.trim()}`);
+      const comments = parts.join('\n');
       // Always update local state so Analytics can read it immediately
       ticket.feedback = { helpful, comments };
       if (!state.useBackend) {
@@ -4600,7 +4890,8 @@
             state.feedbackStatus = 'Falha ao aprovar ticket no backend.';
           }
           render();
-        }).catch(() => {
+        }).catch(err => {
+          handleConnectionError(err);
           state.feedbackStatus = 'Erro de conexão ao aprovar ticket.';
           render();
         });
@@ -4624,7 +4915,8 @@
             state.feedbackStatus = 'Falha ao rejeitar ticket no backend.';
           }
           render();
-        }).catch(() => {
+        }).catch(err => {
+          handleConnectionError(err);
           state.feedbackStatus = 'Erro de conexão ao rejeitar ticket.';
           render();
         });
@@ -4648,7 +4940,8 @@
             state.feedbackStatus = 'Falha ao atualizar status do ticket.';
           }
           render();
-        }).catch(() => {
+        }).catch(err => {
+          handleConnectionError(err);
           state.feedbackStatus = 'Erro de conexão ao atualizar ticket.';
           render();
         });
@@ -4661,44 +4954,99 @@
     function getExternalAPIMetrics(tickets) {
       const m = {
         viacep:  { calls: 0, valid: 0, invalid: 0, total_latency: 0, fallbacks: 0, alerts_triggered: 0, auto_resolved: 0 },
-        weather: { calls: 0, available: 0, unavailable: 0, total_latency: 0, fallbacks: 0, adverse_alerts: 0, auto_resolved: 0 }
+        weather: { calls: 0, available: 0, unavailable: 0, total_latency: 0, fallbacks: 0, adverse_alerts: 0, auto_resolved: 0 },
+        refund:  { calls: 0, found: 0, not_found: 0, total_latency: 0, auto_resolved: 0, escalated: 0 },
       };
+
+      // Debug: log external-tool steps to browser console
+      console.log('=== DEBUG External API Metrics ===');
       for (const ticket of tickets) {
         for (const step of (ticket.steps || [])) {
-          const d = step.details || {};
-          const agent = step.agent || '';
-          if (agent === 'Address Validation Tool Agent') {
-            m.viacep.calls++;
-            m.viacep.total_latency += (d.execution_time || 0) * 1000;
-            const out = d.output_summary || '';
-            if (out.includes("'valid': True")) m.viacep.valid++;
-            else { m.viacep.invalid++; if (out.includes("'fallback'")) m.viacep.fallbacks++; }
+          const a = (step.agent || '').toLowerCase();
+          if (a.includes('address') || a.includes('weather') || a.includes('viacep') || a.includes('refund')) {
+            console.log('Found external step:', { agent: step.agent, details: step.details, elapsed_ms: step.elapsed_ms });
           }
-          if (agent === 'Address Validation Agent') {
-            if (d.logistics_alert) m.viacep.alerts_triggered++;
-          }
-          if (agent === 'Routing Engine' && d.override === 'logistics_alert') m.viacep.auto_resolved++;
-          if (agent === 'Weather Check Tool Agent') {
-            m.weather.calls++;
-            m.weather.total_latency += (d.execution_time || 0) * 1000;
-            const out = d.output_summary || '';
-            if (out.includes("'available': True")) {
-              m.weather.available++;
-              if (out.includes("'adverse_conditions': True")) m.weather.adverse_alerts++;
-            } else {
-              m.weather.unavailable++;
-              if (out.includes("'fallback'")) m.weather.fallbacks++;
-            }
-          }
-          if (agent === 'Routing Engine' && d.override === 'weather_delay') m.weather.auto_resolved++;
         }
       }
+
+      for (const ticket of tickets) {
+        for (const step of (ticket.steps || [])) {
+          const d      = step.details || {};
+          const agent  = step.agent  || '';
+          const agentL = agent.toLowerCase();
+
+          // Latency: execution_time is in seconds from tool registry; elapsed_ms is since flow start
+          const latency =
+            d.latency_ms                                     ||
+            (d.execution_time != null ? d.execution_time * 1000 : null) ||
+            step.elapsed_ms                                  ||
+            0;
+
+          // ── ViaCEP / Address Validation ──
+          if (agentL.includes('address validation tool')) {
+            m.viacep.calls++;
+            m.viacep.total_latency += latency;
+            const out = (d.output_summary || '').toLowerCase();
+            if (out.includes("'valid': true") || out.includes('"valid": true') || out.includes("valid': true")) {
+              m.viacep.valid++;
+            } else {
+              m.viacep.invalid++;
+              if (out.includes('fallback')) m.viacep.fallbacks++;
+            }
+          }
+          if (agentL.includes('address validation agent') && !agentL.includes('tool')) {
+            if (d.logistics_alert || d.cep_valid === true) {
+              if (d.logistics_alert) m.viacep.alerts_triggered++;
+              // Also count as valid if cep_valid is true and we didn't already count it
+              if (d.cep_valid === true && m.viacep.calls > 0) {
+                // already counted via tool agent; don't double-count
+              }
+            }
+          }
+
+          // ── Weather ──
+          if (agentL.includes('weather check tool')) {
+            m.weather.calls++;
+            m.weather.total_latency += latency;
+            const out = (d.output_summary || '').toLowerCase();
+            if (out.includes("'available': true") || out.includes('"available": true') || out.includes("available': true")) {
+              m.weather.available++;
+              if (out.includes('adverse')) m.weather.adverse_alerts++;
+            } else {
+              m.weather.unavailable++;
+              if (out.includes('fallback')) m.weather.fallbacks++;
+            }
+          }
+
+          // ── Refund DB ──
+          if (agentL.includes('refund status agent') || agentL.includes('refund status tool')) {
+            if (!agentL.includes('routing')) {
+              m.refund.calls++;
+              m.refund.total_latency += latency;
+              if (d.can_auto_resolve === true)  m.refund.found++;
+              else if (d.can_auto_resolve === false) m.refund.not_found++;
+            }
+          }
+
+          // ── Routing Engine overrides ──
+          if (agentL.includes('routing engine')) {
+            if (d.override === 'logistics_alert') m.viacep.auto_resolved++;
+            if (d.override === 'weather_delay')   m.weather.auto_resolved++;
+            if (d.override === 'refund_status') {
+              if (d.auto_resolved) m.refund.auto_resolved++;
+              if (d.hitl)         m.refund.escalated++;
+            }
+          }
+        }
+      }
+
       m.viacep.avg_latency   = m.viacep.calls  > 0 ? Math.round(m.viacep.total_latency  / m.viacep.calls)  : 0;
       m.weather.avg_latency  = m.weather.calls > 0 ? Math.round(m.weather.total_latency / m.weather.calls) : 0;
+      m.refund.avg_latency   = m.refund.calls  > 0 ? Math.round(m.refund.total_latency  / m.refund.calls)  : 0;
       m.viacep.success_rate  = m.viacep.calls  > 0 ? Math.round(m.viacep.valid      / m.viacep.calls  * 100) : 0;
       m.weather.success_rate = m.weather.calls > 0 ? Math.round(m.weather.available  / m.weather.calls * 100) : 0;
-      m.total_calls          = m.viacep.calls + m.weather.calls;
-      m.total_auto_resolved  = m.viacep.auto_resolved + m.weather.auto_resolved;
+      m.total_calls          = m.viacep.calls + m.weather.calls + m.refund.calls;
+      m.total_auto_resolved  = m.viacep.auto_resolved + m.weather.auto_resolved + m.refund.auto_resolved;
       return m;
     }
 
@@ -5259,39 +5607,71 @@
           </div>
 
           ${(() => {
-            const AMBER = '#F59E0B';
+            const AMBER  = '#F59E0B';
+            const EMERALD = '#10B981';
             const m = getExternalAPIMetrics(tickets);
-            const cepCalls = m.address_calls;
-            const cepAvgMs = cepCalls > 0 ? Math.round(m.address_total_latency_ms / cepCalls) : null;
+
+            // ── ViaCEP ──
+            const cepCalls = m.viacep.calls;
+            const cepAvgMs = cepCalls > 0 ? m.viacep.avg_latency : null;
             const cepStatus = cepAvgMs === null ? 'gray' : cepAvgMs < 500 ? 'green' : cepAvgMs <= 1500 ? 'yellow' : 'red';
             const cepPill   = cepStatus === 'green' ? '🟢 Fast' : cepStatus === 'yellow' ? '🟡 Moderate' : cepStatus === 'red' ? '🔴 Slow' : '⚪ No Data';
             const cepVal    = cepAvgMs !== null ? cepAvgMs + 'ms' : '--';
-            const cepNote   = cepCalls > 0 ? `${cepCalls} call${cepCalls !== 1 ? 's' : ''} · ${m.address_valid} valid · ${m.address_invalid} invalid` : 'No ViaCEP calls yet';
+            const cepNote   = cepCalls > 0
+              ? `${cepCalls} call${cepCalls !== 1 ? 's' : ''} · ${m.viacep.valid} valid · ${m.viacep.invalid} invalid`
+              : 'No ViaCEP calls yet';
 
-            const wxCalls  = m.weather_calls;
-            const wxAvgMs  = wxCalls > 0 ? Math.round(m.weather_total_latency_ms / wxCalls) : null;
+            // ── OpenWeather ──
+            const wxCalls  = m.weather.calls;
+            const wxAvgMs  = wxCalls > 0 ? m.weather.avg_latency : null;
             const wxStatus = wxAvgMs === null ? 'gray' : wxAvgMs < 800 ? 'green' : wxAvgMs <= 2000 ? 'yellow' : 'red';
             const wxPill   = wxStatus === 'green' ? '🟢 Fast' : wxStatus === 'yellow' ? '🟡 Moderate' : wxStatus === 'red' ? '🔴 Slow' : '⚪ No Data';
             const wxVal    = wxAvgMs !== null ? wxAvgMs + 'ms' : '--';
-            const wxNote   = wxCalls > 0 ? `${wxCalls} call${wxCalls !== 1 ? 's' : ''} · ${m.weather_available} available · ${m.weather_adverse} adverse` : 'No weather API calls yet';
+            const wxNote   = wxCalls > 0
+              ? `${wxCalls} call${wxCalls !== 1 ? 's' : ''} · ${m.weather.available} available · ${m.weather.adverse_alerts} adverse`
+              : 'No weather API calls yet';
 
-            const totalCalls    = cepCalls + wxCalls;
-            const autoResolved  = m.total_auto_resolved;
-            const resiliencePct = totalCalls > 0 ? Math.round((autoResolved / totalCalls) * 100) : 0;
-            const resStatus     = resiliencePct >= 70 ? 'green' : resiliencePct >= 30 ? 'yellow' : totalCalls === 0 ? 'gray' : 'red';
-            const resPill       = resStatus === 'green' ? '🟢 High Impact' : resStatus === 'yellow' ? '🟡 Moderate' : resStatus === 'gray' ? '⚪ No Data' : '🔴 Low Impact';
-            const resVal        = totalCalls > 0 ? resiliencePct + '%' : '--';
-            const resNote       = autoResolved > 0 ? `${autoResolved} ticket${autoResolved !== 1 ? 's' : ''} auto-resolved via real-time data` : 'No auto-resolutions yet';
+            // ── Refund DB ──
+            const rfCalls  = m.refund.calls;
+            const rfAvgMs  = rfCalls > 0 ? m.refund.avg_latency : null;
+            const rfStatus = rfAvgMs === null ? 'gray' : rfAvgMs < 50 ? 'green' : rfAvgMs <= 200 ? 'yellow' : 'red';
+            const rfPill   = rfStatus === 'green' ? '🟢 Fast' : rfStatus === 'yellow' ? '🟡 Moderate' : rfStatus === 'red' ? '🔴 Slow' : '⚪ No Data';
+            const rfVal    = rfAvgMs !== null ? rfAvgMs + 'ms' : '--';
+            const rfNote   = rfCalls > 0
+              ? `${rfCalls} lookup${rfCalls !== 1 ? 's' : ''} · ${m.refund.found} found · ${m.refund.not_found} not found`
+              : 'No refund lookups yet';
+
+            // ── API Resilience (combined success rate) ──
+            const totalCalls   = m.viacep.calls + m.weather.calls + m.refund.calls;
+            const totalSuccess = m.viacep.valid + m.weather.available + m.refund.found;
+            const totalFallbacks = m.viacep.fallbacks + m.weather.fallbacks;
+            const resScore  = totalCalls > 0 ? Math.round(totalSuccess / totalCalls * 100) : null;
+            const resStatus = resScore === null ? 'gray'
+              : resScore >= 95 ? 'green'
+              : resScore >= 85 ? 'green'
+              : resScore >= 70 ? 'yellow'
+              : 'red';
+            const resPill   = resScore === null ? '⚪ No Data'
+              : resScore >= 95 ? '🟢 Excellent'
+              : resScore >= 85 ? '🟢 Healthy'
+              : resScore >= 70 ? '🟡 Degraded'
+              : '🔴 Issues';
+            const resVal    = resScore !== null ? resScore + '%' : '--';
+            const resNote   = totalCalls > 0
+              ? `${totalCalls} total · ${totalSuccess} successful · ${totalFallbacks} fallback${totalFallbacks !== 1 ? 's' : ''}`
+              : 'No external API calls yet';
 
             return `
               ${rowHeader(AMBER, 'External API Health', 'Performance of integrated external services')}
-              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:stretch;">
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;align-items:stretch;">
                 ${card(AMBER, cepStatus, '📮', 'ViaCEP Latency', cepVal,
                   'Average response time for address validation API', cepNote, cepPill, 540)}
                 ${card(AMBER, wxStatus, '🌦️', 'OpenWeather Latency', wxVal,
                   'Average response time for weather check API', wxNote, wxPill, 600)}
+                ${card(EMERALD, rfStatus, '🗄️', 'Refund DB Latency', rfVal,
+                  'Local SQLite refund database lookup · Internal DB — no external dependency', rfNote, rfPill, 630)}
                 ${card(AMBER, resStatus, '🛡️', 'API Resilience', resVal,
-                  'Tickets auto-resolved using real-time external data', resNote, resPill, 660)}
+                  'Combined reliability across ViaCEP + OpenWeatherMap + Refund DB', resNote, resPill, 660)}
               </div>`;
           })()}
 
@@ -5901,7 +6281,7 @@
         state.perfMetrics = data;
         state.csatMetrics = data;
         render();
-      } catch (e) {}
+      } catch (e) { handleConnectionError(e); }
     }
 
     async function fetchObservability() {
@@ -5936,8 +6316,9 @@
             state.tickets.push(t);
           }
         }
+        lastRefreshTime = new Date().toLocaleTimeString();
         render();
-      } catch (e) {}
+      } catch (e) { handleConnectionError(e); }
     }
 
     function syntaxHighlight(json) {
@@ -5948,14 +6329,88 @@
       }).replace(/\b(true|false|null)\b/g, '<span class="json-boolean">$1</span>').replace(/(\b\d+\.?\d*\b)/g, '<span class="json-number">$1</span>');
     }
 
-    function showToast(message) {
+    function showToast(message, duration = 3200) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
       toast.classList.add('show');
       clearTimeout(toast.timeoutId);
       toast.timeoutId = setTimeout(() => {
         toast.classList.remove('show');
-      }, 3200);
+      }, duration);
+    }
+
+    // ── Connection management ─────────────────────────────────────────────────
+    let _isConnected = true;
+
+    function updateConnectionStatus(status) {
+      state.connectionStatus = status;
+      const dot = document.getElementById('connection-dot');
+      const text = document.getElementById('connection-text');
+      if (!dot) return;
+      const states = {
+        connected:    { color: '#10B981', label: 'Connected' },
+        disconnected: { color: '#EF4444', label: 'Offline' },
+        reconnecting: { color: '#FBBF24', label: 'Reconnecting...' },
+      };
+      const s = states[status] || states.disconnected;
+      dot.style.background = s.color;
+      if (text) text.textContent = s.label;
+    }
+
+    function handleConnectionError(error) {
+      const isConnErr = error?.name === 'TypeError' ||
+                        error?.message?.includes('Failed to fetch') ||
+                        error?.message?.includes('ERR_CONNECTION_REFUSED') ||
+                        error?.message?.includes('NetworkError');
+      if (!isConnErr) return false;
+      _isConnected = false;
+      updateConnectionStatus('disconnected');
+      showToast('⚠️ Backend unavailable. Start the server and refresh.', 5000);
+      if (state.view === 'customer' && state.processing) {
+        state.processing = false;
+        state.showResult = false;
+        render();
+        const main = document.getElementById('mainContent');
+        if (main) {
+          const errCard = document.createElement('div');
+          errCard.style.cssText = 'padding:0 0 24px;';
+          errCard.innerHTML = `
+            <div style="padding:24px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;text-align:center;">
+              <div style="font-size:24px;margin-bottom:8px;">⚠️</div>
+              <div style="font-weight:600;margin-bottom:4px;">Service temporarily unavailable</div>
+              <div style="font-size:13px;color:#94A3B8;">Please try again in a few moments.</div>
+              <button onclick="location.reload()" style="margin-top:16px;padding:8px 20px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;background:transparent;color:#94A3B8;cursor:pointer;font-family:inherit;">↺ Retry</button>
+            </div>`;
+          main.appendChild(errCard);
+        }
+      }
+      return true;
+    }
+
+    async function checkBackendHealth() {
+      if (!state.useBackend) return;
+      try {
+        const healthUrl = state.backendUrl.replace('/api/support', '/health');
+        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          if (!_isConnected) {
+            _isConnected = true;
+            updateConnectionStatus('connected');
+            showToast('✅ Connection restored — reloading data...');
+            loadHistoricalTickets();
+            loadMetrics();
+          } else {
+            updateConnectionStatus('connected');
+          }
+        } else {
+          throw new Error('Backend unhealthy');
+        }
+      } catch {
+        if (_isConnected) {
+          _isConnected = false;
+          updateConnectionStatus('disconnected');
+        }
+      }
     }
 
     // ── Auto-refresh ─────────────────────────────────────────────────────────
@@ -5985,7 +6440,7 @@
               if (state.view === 'analytics') render();
             });
           })
-          .catch(() => {});
+          .catch(err => { handleConnectionError(err); });
       }, 30000);
     }
 
@@ -6011,6 +6466,8 @@
     loadMetrics();
     fetchObservability();
     startAnalyticsRefresh();
+    setInterval(checkBackendHealth, 15000);
+    checkBackendHealth();
   </script>
 </body>
 </html>

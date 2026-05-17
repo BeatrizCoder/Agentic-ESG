@@ -2,6 +2,7 @@
 
 from typing import Dict, Any
 from . import BaseSupportTool
+from .utils import clean_inquiry
 
 
 class SentimentTool(BaseSupportTool):
@@ -24,6 +25,7 @@ class SentimentTool(BaseSupportTool):
             try:
                 from anthropic import Anthropic
                 client = Anthropic()
+                clean_inq = clean_inquiry(inquiry)
                 prompt = (
                     "You are a sentiment analysis engine for customer support.\n"
                     "Analyze the following customer inquiry and return a JSON object.\n\n"
@@ -39,7 +41,7 @@ class SentimentTool(BaseSupportTool):
                     "- Concerned: customer expresses frustration, worry, or dissatisfaction.\n"
                     "- Neutral: calm, informational tone.\n"
                     "- High urgency matches Urgent sentiment; Medium matches Concerned; Low matches Neutral.\n\n"
-                    f"Customer inquiry: \"{inquiry}\""
+                    f"Customer inquiry: \"{clean_inq}\""
                 )
                 result = client.messages.create(
                     model=DEFAULT_MODEL,

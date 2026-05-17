@@ -9,7 +9,7 @@ import logging
 
 # Database imports (optional)
 try:
-    from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, DateTime, JSON
+    from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, Text, DateTime, JSON
     from sqlalchemy.ext.declarative import declarative_base
     from sqlalchemy.orm import sessionmaker
     SQLALCHEMY_AVAILABLE = True
@@ -23,6 +23,24 @@ logger = logging.getLogger(__name__)
 # SQLAlchemy setup (if available)
 if SQLALCHEMY_AVAILABLE:
     Base = declarative_base()
+
+    class RefundDB(Base):
+        """SQLAlchemy model for refund records."""
+        __tablename__ = "refunds"
+
+        id = Column(Integer, primary_key=True, autoincrement=True)
+        order_number = Column(String(20), unique=True, nullable=False, index=True)
+        customer_email = Column(String(200))
+        customer_name = Column(String(200))
+        status = Column(String(20), nullable=False)
+        valor = Column(Float, nullable=False)
+        produto = Column(String(200), nullable=False)
+        solicitado_em = Column(String(20))
+        aprovado_em = Column(String(20))
+        previsao_credito = Column(String(20))
+        banco_processou = Column(Integer, default=0)
+        motivo_negacao = Column(Text)
+        created_at = Column(String(20))
 
     class SupportTicketDB(Base):
         """SQLAlchemy model for support tickets."""
@@ -55,6 +73,7 @@ if SQLALCHEMY_AVAILABLE:
         feedback = Column(JSON)
         run_id = Column(String(36))
         execution_time_ms = Column(Integer, default=0)
+        api_tags = Column(JSON, default=list)
 
 
 class SupportTicketData(BaseModel):
@@ -89,6 +108,7 @@ class SupportTicketData(BaseModel):
     wall_time_sec: Optional[float] = None
     token_usage: Dict[str, Any] = {}
     cost_usd: float = 0.0
+    api_tags: List[str] = []
 
 
 class DataStore:
@@ -103,11 +123,26 @@ class DataStore:
             self.engine = create_engine(DATABASE_URL)
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             Base.metadata.create_all(bind=self.engine)
+            self._migrate_add_api_tags()
+            self._seed_refunds()
             logger.info("Using %s database for data storage", DATABASE_PROVIDER)
         else:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_data_file()
             logger.info("Using JSON file storage for data persistence")
+
+    def _migrate_add_api_tags(self):
+        """Add api_tags column to existing databases that predate it."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE support_tickets ADD COLUMN api_tags JSON"
+                    )
+                )
+                conn.commit()
+        except Exception:
+            pass  # Column already exists
 
     def _ensure_data_file(self):
         """Ensure the JSON data file exists."""
@@ -159,7 +194,110 @@ class DataStore:
             run_id=db_ticket.run_id,
             execution_time_ms=db_ticket.execution_time_ms or 0,
             wall_time_sec=round((db_ticket.execution_time_ms or 0) / 1000, 3),
+            api_tags=db_ticket.api_tags or [],
         )
+
+    _REFUND_SEED = [
+        {"order_number": "11111", "customer_email": "cliente@email.com",
+         "customer_name": "Cliente Teste", "status": "aprovado", "valor": 150.00,
+         "produto": "Tênis Nike Air", "solicitado_em": "2026-05-08",
+         "aprovado_em": "2026-05-10", "previsao_credito": "2026-05-17",
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-08"},
+        {"order_number": "22222", "customer_email": "cliente2@email.com",
+         "customer_name": "Cliente Dois", "status": "pendente", "valor": 89.90,
+         "produto": "Camiseta Adidas", "solicitado_em": "2026-05-13",
+         "aprovado_em": None, "previsao_credito": None,
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-13"},
+        {"order_number": "33333", "customer_email": "cliente3@email.com",
+         "customer_name": "Cliente Três", "status": "negado", "valor": 45.00,
+         "produto": "Acessório USB", "solicitado_em": "2026-05-01",
+         "aprovado_em": None, "previsao_credito": None, "banco_processou": 0,
+         "motivo_negacao": "Produto aberto e utilizado fora da política de devolução",
+         "created_at": "2026-05-01"},
+        {"order_number": "44444", "customer_email": "cliente4@email.com",
+         "customer_name": "Cliente Quatro", "status": "processado", "valor": 299.00,
+         "produto": "Smartwatch", "solicitado_em": "2026-05-05",
+         "aprovado_em": "2026-05-07", "previsao_credito": "2026-05-12",
+         "banco_processou": 1, "motivo_negacao": None, "created_at": "2026-05-05"},
+        {"order_number": "55555", "customer_email": "cliente5@email.com",
+         "customer_name": "Cliente Cinco", "status": "aprovado", "valor": 199.90,
+         "produto": "Mochila Escolar", "solicitado_em": "2026-05-10",
+         "aprovado_em": "2026-05-12", "previsao_credito": "2026-05-19",
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-10"},
+        {"order_number": "66666", "customer_email": "cliente6@email.com",
+         "customer_name": "Cliente Seis", "status": "pendente", "valor": 520.00,
+         'produto': 'Monitor 24"', "solicitado_em": "2026-05-14",
+         "aprovado_em": None, "previsao_credito": None,
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-14"},
+        {"order_number": "77777", "customer_email": "cliente7@email.com",
+         "customer_name": "Cliente Sete", "status": "processado", "valor": 35.00,
+         "produto": "Carregador USB-C", "solicitado_em": "2026-05-03",
+         "aprovado_em": "2026-05-05", "previsao_credito": "2026-05-10",
+         "banco_processou": 1, "motivo_negacao": None, "created_at": "2026-05-03"},
+        {"order_number": "88888", "customer_email": "cliente8@email.com",
+         "customer_name": "Cliente Oito", "status": "aprovado", "valor": 750.00,
+         "produto": "iPhone Case Premium", "solicitado_em": "2026-05-11",
+         "aprovado_em": "2026-05-13", "previsao_credito": "2026-05-20",
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-11"},
+        {"order_number": "99999", "customer_email": "cliente9@email.com",
+         "customer_name": "Cliente Nove", "status": "negado", "valor": 180.00,
+         "produto": "Perfume Importado", "solicitado_em": "2026-05-02",
+         "aprovado_em": None, "previsao_credito": None, "banco_processou": 0,
+         "motivo_negacao": "Item fora do prazo de devolução de 30 dias",
+         "created_at": "2026-05-02"},
+        {"order_number": "10000", "customer_email": "cliente10@email.com",
+         "customer_name": "Cliente Dez", "status": "em_analise", "valor": 440.00,
+         "produto": "Notebook Sleeve", "solicitado_em": "2026-05-15",
+         "aprovado_em": None, "previsao_credito": None,
+         "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-15"},
+    ]
+
+    def _seed_refunds(self):
+        """Insert seed refund records if the table is empty."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return
+        db = self.SessionLocal()
+        try:
+            count = db.query(RefundDB).count()
+            if count == 0:
+                for row in self._REFUND_SEED:
+                    db.add(RefundDB(**row))
+                db.commit()
+                logger.info("Seeded %d refund records", len(self._REFUND_SEED))
+        except Exception as e:
+            db.rollback()
+            logger.error("Error seeding refunds: %s", e)
+        finally:
+            db.close()
+
+    def get_refund(self, order_number: str) -> Optional[Dict[str, Any]]:
+        """Return refund record for an order number, or None if not found."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return None
+        db = self.SessionLocal()
+        try:
+            row = db.query(RefundDB).filter(
+                RefundDB.order_number == str(order_number)
+            ).first()
+            if not row:
+                return None
+            return {
+                "order_number": row.order_number,
+                "customer_name": row.customer_name,
+                "status": row.status,
+                "valor": row.valor,
+                "produto": row.produto,
+                "solicitado_em": row.solicitado_em,
+                "aprovado_em": row.aprovado_em or "",
+                "previsao_credito": row.previsao_credito or "",
+                "banco_processou": bool(row.banco_processou),
+                "motivo_negacao": row.motivo_negacao or "",
+            }
+        except Exception as e:
+            logger.error("Error fetching refund for order %s: %s", order_number, e)
+            return None
+        finally:
+            db.close()
 
     def save_ticket(self, ticket_data: SupportTicketData):
         """Save a support ticket."""
@@ -194,7 +332,8 @@ class DataStore:
                     updated_at=datetime.fromisoformat(ticket_data.updated_at),
                     feedback=ticket_data.feedback,
                     run_id=ticket_data.run_id,
-                    execution_time_ms=ticket_data.execution_time_ms
+                    execution_time_ms=ticket_data.execution_time_ms,
+                    api_tags=ticket_data.api_tags or [],
                 )
                 db.merge(db_ticket)  # Use merge to handle updates
                 db.commit()

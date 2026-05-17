@@ -45,7 +45,8 @@ SKILLS_DIR: str = os.path.join(os.path.dirname(__file__), "..", "..", "skills")
 # Tool constants
 CATEGORY_KEYWORDS = {
     "Order Issues": ["order", "tracking", "shipment", "delivery", "package", "arrived", "delay"],
-    "Billing": ["bill", "charge", "refund", "invoice", "payment", "price"],
+    "Billing": ["bill", "charge", "refund", "invoice", "payment", "price",
+                "reembolso", "estorno", "fatura", "cobrança", "cobranca"],
     "Account Access": ["account", "login", "password", "sign in", "locked", "profile"],
     "Technical Issue": ["error", "bug", "crash", "failed", "site", "website", "problem"],
     "General Support": ["question", "help", "support", "information", "info", "request"],

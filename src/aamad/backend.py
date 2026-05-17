@@ -45,6 +45,7 @@ from tools.weather_tool import WeatherTool
 from tools.github_tool import GitHubTool
 from tools.address_validation_tool import AddressValidationTool
 from tools.weather_check_tool import WeatherCheckTool
+from tools.refund_lookup_tool import RefundLookupTool, is_refund_inquiry, extract_order_number
 
 # Load environment variables
 load_dotenv()
@@ -69,11 +70,23 @@ with open("config/tasks.yaml", "r") as f:
 
 
 def _is_portuguese(text: str) -> bool:
-    pt_words = ['meu', 'minha', 'não', 'nao', 'quero', 'preciso',
-                'pedido', 'ajuda', 'problema', 'como', 'por', 'que',
-                'olá', 'ola', 'obrigado', 'produto', 'conta']
+    en_words = [
+        'what', 'how', 'where', 'when', 'why', 'is',
+        'the', 'your', 'my', 'order', 'return', 'policy',
+        'refund', 'help', 'please', 'can', 'could',
+        'have', 'not', 'arrived', 'want', 'need', 'this',
+    ]
+    pt_words = [
+        'meu', 'minha', 'não', 'nao', 'quero', 'preciso',
+        'pedido', 'ajuda', 'problema', 'como', 'olá',
+        'obrigado', 'produto', 'conta', 'chegou', 'estou',
+        'política', 'politica', 'devolução', 'devolucao',
+        'qual', 'reembolso', 'estorno', 'fatura', 'prazo',
+    ]
     text_lower = text.lower()
-    return sum(1 for w in pt_words if w in text_lower) >= 2
+    en_score = sum(1 for w in en_words if w in text_lower)
+    pt_score = sum(1 for w in pt_words if w in text_lower)
+    return pt_score > en_score
 
 
 class SupportTicket(BaseModel):
@@ -154,6 +167,7 @@ class SupportResponse(BaseModel):
     routing_action: str | None = None
     routing_reason: str | None = None
     routing_missing_info: list[str] | None = None
+    api_tags: list[str] | None = None
 
 
 class SupportState(BaseModel):
@@ -191,6 +205,8 @@ class SupportState(BaseModel):
     external_context: str = ""
     logistics_alert: dict = {}
     weather_delay: dict = {}
+    refund_data: dict = {}
+    api_tags: list[str] = []
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -440,13 +456,26 @@ class SupportFlow(Flow[SupportState]):
 
     @staticmethod
     def _is_portuguese(text: str) -> bool:
-        pt_words = [
+        import re as _re
+        pt_indicators = {
             "meu", "minha", "não", "nao", "quero", "preciso",
-            "pedido", "ajuda", "problema", "como", "por", "que",
-            "olá", "ola", "obrigado", "produto", "conta", "fatura"
-        ]
-        text_lower = text.lower()
-        return sum(1 for w in pt_words if w in text_lower) >= 2
+            "pedido", "ajuda", "problema", "como", "obrigado",
+            "produto", "conta", "fatura", "chegou", "comprei",
+            "recebi", "estou", "qual", "política", "politica",
+            "prazo", "entrega", "cancelar", "cancelamento",
+            "devolução", "devolucao", "reembolso", "estorno",
+        }
+        en_indicators = {
+            "my", "your", "what", "how", "where", "when", "why",
+            "please", "help", "want", "need", "order", "return",
+            "policy", "refund", "account", "issue", "problem",
+            "cannot", "the", "this", "that", "have", "has",
+            "not", "arrived", "i", "we", "is", "are",
+        }
+        words = set(_re.split(r"\W+", text.lower()))
+        pt_score = len(words & pt_indicators)
+        en_score = len(words & en_indicators)
+        return pt_score > en_score
 
     @start()
     async def analyze_sentiment(self):
@@ -474,8 +503,19 @@ class SupportFlow(Flow[SupportState]):
         self.state.routing_confidence = decision.confidence
         if decision.triggered_keyword:
             self.state.triggered_keyword = decision.triggered_keyword
+
+        # If refund intent + order number in the inquiry, always defer to the
+        # refund lookup tool regardless of the routing engine's decision
+        # (catches both "awaiting" and billing "escalate" cases).
+        import re as _re
+        _has_refund_intent = is_refund_inquiry(self.state.inquiry)
+        _has_order = bool(_re.search(r'\b\d{4,12}\b', self.state.inquiry))
+        if _has_refund_intent and _has_order:
+            self.state.routing_action = "pending_lookup"
+            self.state.escalation_required = False
+
         self.log_step("Routing Engine", {
-            "action": decision.action,
+            "action": self.state.routing_action,
             "reason": decision.reason,
             "missing_info": decision.missing_info,
             "has_order_number": decision.has_order_number,
@@ -483,7 +523,7 @@ class SupportFlow(Flow[SupportState]):
             "explicit_escalation": decision.explicit_escalation,
             "confidence": decision.confidence,
         })
-        return f"Routed as: {decision.action}"
+        return f"Routed as: {self.state.routing_action}"
 
     @listen(route_inquiry)
     async def retrieve_knowledge(self):
@@ -517,14 +557,18 @@ class SupportFlow(Flow[SupportState]):
             addr_result = await self.execute_tool("Address Validation Tool", cep)
             self.state.tools_used.append("Address Validation Tool")
             if addr_result.get("valid"):
+                self.state.api_tags.append("cep_validated")
                 state_code = addr_result.get("state", "")
                 formatted = addr_result.get("formatted") or (
                     f"{addr_result.get('street')}, {addr_result.get('neighborhood')}, "
                     f"{addr_result.get('city')} - {addr_result.get('state')}"
                 )
                 alert = check_logistics_alert(state_code)
+                print(f"DEBUG CEP result: state={state_code}, valid=True")
+                print(f"DEBUG logistics alert: {alert}")
                 if alert:
                     self.state.logistics_alert = alert
+                    self.state.api_tags.append("logistics_alert")
                     context_parts.append(
                         f"Validated address: {formatted}"
                         f"\nLOGISTICS ALERT ACTIVE for {state_code}: "
@@ -548,7 +592,9 @@ class SupportFlow(Flow[SupportState]):
                         "state": state_code,
                         "logistics_alert": False,
                     })
-            elif addr_result.get("fallback"):
+            else:
+                print(f"DEBUG CEP result: valid=False, error={addr_result.get('error', addr_result.get('error_type', 'unknown'))}, logistics_alert=N/A")
+            if addr_result.get("fallback"):
                 context_parts.append(f"Address validation: {addr_result.get('fallback')}")
 
         # ── City → weather check + weather delay ──
@@ -563,9 +609,11 @@ class SupportFlow(Flow[SupportState]):
             weather_result = await self.execute_tool("Weather Check Tool", detected_city)
             self.state.tools_used.append("Weather Check Tool")
             if weather_result.get("available"):
+                self.state.api_tags.append("weather_checked")
                 weather_delay = check_weather_delay(detected_city, weather_result)
                 if weather_delay:
                     self.state.weather_delay = weather_delay
+                    self.state.api_tags.append("weather_alert")
                     context_parts.append(
                         f"WEATHER DELAY ALERT: "
                         f"{weather_result['conditions']} in {detected_city} "
@@ -579,6 +627,37 @@ class SupportFlow(Flow[SupportState]):
                         f"{weather_result.get('temperature_c', '')}°C. "
                         f"No weather delays."
                     )
+
+        # ── Refund status lookup ──
+        has_refund_intent = is_refund_inquiry(self.state.inquiry)
+        print(f"DEBUG enrich: has_refund_intent={has_refund_intent}")
+        print(f"DEBUG enrich: routing_action={self.state.routing_action}")
+        if has_refund_intent:
+            order_num = extract_order_number(self.state.inquiry)
+            if order_num:
+                is_pt = self._is_portuguese(self.state.inquiry)
+                refund_result = await asyncio.to_thread(
+                    tool_registry.execute_tool, "Refund Status Tool", order_num
+                )
+                self.state.tools_used.append("Refund Status Tool")
+                self.state.refund_data = refund_result
+                self.state.api_tags.append("refund_lookup")
+                if refund_result.get("found"):
+                    self.state.api_tags.append("refund_found")
+                if refund_result.get("should_escalate"):
+                    self.state.api_tags.append("refund_denied")
+                msg = refund_result.get("message_pt" if is_pt else "message_en", "")
+                if msg:
+                    context_parts.append(
+                        f"REFUND STATUS (pedido {order_num}): {msg}"
+                    )
+                self.log_step("Refund Status Agent", {
+                    "order_number": order_num,
+                    "refund_status": refund_result.get("status"),
+                    "found": refund_result.get("found"),
+                    "auto_resolve": refund_result.get("auto_resolve"),
+                    "should_escalate": refund_result.get("should_escalate"),
+                })
 
         self.state.external_context = "\n".join(context_parts)
         print(f"DEBUG external_context after: '{self.state.external_context}'")
@@ -640,6 +719,13 @@ class SupportFlow(Flow[SupportState]):
 
     @listen(generate_response)
     async def evaluate_escalation(self):
+        print(f"DEBUG evaluate_escalation:")
+        print(f"  routing_action: {self.state.routing_action}")
+        print(f"  routing_missing_info: {self.state.routing_missing_info}")
+        print(f"  logistics_alert: {self.state.logistics_alert}")
+        print(f"  weather_delay: {self.state.weather_delay}")
+        print(f"  escalation_required: {self.state.escalation_required}")
+        print(f"  external_context: '{self.state.external_context[:100]}'")
         # Simulate agent collaboration
         self.log_step("Escalation Agent", {
             "collaboration": "delegate",
@@ -676,84 +762,162 @@ class SupportFlow(Flow[SupportState]):
         )
         self.state.skills_used.extend(escalation_skills.get("skills_used", []))
 
-        # ── Apply routing engine decision (overrides escalation tool) ──
-        if self.state.routing_action == "escalate":
-            self.state.escalation_required = True
-            self.state.escalation_reason = self.state.routing_reason
+        # ── Priority chain: external alerts first, routing decision last ──
+        print(f"DEBUG escalation: refund_data={self.state.refund_data}")
+        print(f"DEBUG escalation: routing_action={self.state.routing_action}")
 
-        elif self.state.routing_action == "awaiting":
-            self.state.escalation_required = True
-            self.state.escalation_reason = (
-                f"Awaiting customer information: "
-                f"{', '.join(self.state.routing_missing_info)}"
-            )
-            missing = self.state.routing_missing_info
-            pt = self._is_portuguese(self.state.inquiry)
-            if "order_number" in missing and "email" in missing:
-                self.state.response = (
-                    "Entendo sua situação e quero ajudá-la o mais rápido possível! "
-                    "Para isso, preciso de algumas informações:\n\n"
-                    "1. Número do pedido\n"
-                    "2. E-mail cadastrado na conta\n\n"
-                    "Assim que receber essas informações, encaminharei para nossa equipe especializada."
-                ) if pt else (
-                    "I'd love to help resolve this quickly! To proceed, I need:\n\n"
-                    "1. Your order number\n"
-                    "2. Email address on the account\n\n"
-                    "Once I have these details, I'll route your case to our specialist team immediately."
-                )
-            elif "order_number" in missing:
-                self.state.response = (
-                    "Para localizar seu pedido e ajudá-la, preciso do número do pedido. "
-                    "Você pode encontrá-lo no e-mail de confirmação da compra. Pode me informar?"
-                ) if pt else (
-                    "To locate your order and help you, I need your order number. "
-                    "You can find it in your purchase confirmation email. Could you share it?"
-                )
-            elif "screenshot_or_description" in missing:
-                self.state.response = (
-                    "Para diagnosticar o problema técnico, pode me fornecer:\n\n"
-                    "1. Um screenshot do erro (se possível)\n"
-                    "2. Qual navegador e dispositivo está usando\n"
-                    "3. Mensagem de erro exata (se aparecer)\n\n"
-                    "Com essas informações consigo ajudá-la melhor!"
-                ) if pt else (
-                    "To diagnose the technical issue, could you provide:\n\n"
-                    "1. A screenshot of the error (if possible)\n"
-                    "2. Which browser and device you're using\n"
-                    "3. The exact error message (if any)\n\n"
-                    "This will help me assist you better!"
-                )
-
-        elif self.state.routing_action in ("step_by_step", "resolve"):
-            self.state.escalation_required = False
-
-        # ── Alert overrides: logistics and weather take priority ──
         if self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
+            # PRIORITY 1: logistics alert overrides everything
             alert = self.state.logistics_alert
             is_pt = self._is_portuguese(self.state.inquiry)
             self.state.escalation_required = False
-            self.state.response = alert["message_pt"] if is_pt else alert["message_en"]
             self.state.routing_action = "resolve"
+            self.state.response = alert["message_pt"] if is_pt else alert["message_en"]
             self.log_step("Routing Engine", {
                 "override": "logistics_alert",
-                "reason": "Active logistics delay in customer region",
+                "reason": "Active logistics delay — auto-resolved",
+                "alert_key": alert.get("alert_key"),
                 "auto_resolved": True,
-                "logistics_alert": True,
             })
 
         elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
+            # PRIORITY 2: weather delay
             delay = self.state.weather_delay
             is_pt = self._is_portuguese(self.state.inquiry)
             self.state.escalation_required = False
-            self.state.response = delay["message_pt"] if is_pt else delay["message_en"]
             self.state.routing_action = "resolve"
+            self.state.response = delay["message_pt"] if is_pt else delay["message_en"]
             self.log_step("Routing Engine", {
                 "override": "weather_delay",
-                "reason": "Adverse weather affecting deliveries",
+                "reason": "Adverse weather — auto-resolved",
                 "auto_resolved": True,
-                "weather_delay": True,
             })
+
+        elif (self.state.refund_data.get("found") and
+              self.state.refund_data.get("auto_resolve")):
+            # PRIORITY 3: refund found + auto-resolvable (approved / pending)
+            refund_status = self.state.refund_data.get("status")
+            is_pt = self._is_portuguese(self.state.inquiry)
+            msg = self.state.refund_data.get(
+                "message_pt" if is_pt else "message_en", ""
+            )
+            self.state.escalation_required = False
+            self.state.routing_action = "resolve"
+            if msg:
+                self.state.response = msg
+            self.log_step("Routing Engine", {
+                "override": "refund_status",
+                "refund_status": refund_status,
+                "auto_resolved": True,
+            })
+
+        elif self.state.refund_data.get("should_escalate"):
+            # PRIORITY 4: refund found + denied → route to human
+            refund_status = self.state.refund_data.get("status")
+            is_pt = self._is_portuguese(self.state.inquiry)
+            msg = self.state.refund_data.get(
+                "message_pt" if is_pt else "message_en", ""
+            )
+            self.state.escalation_required = True
+            self.state.routing_action = "escalate"
+            self.state.escalation_reason = (
+                "Reembolso negado — requer explicação e revisão humana"
+                if is_pt else
+                "Refund denied — requires human explanation and review"
+            )
+            if msg:
+                self.state.response = msg
+            self.log_step("Routing Engine", {
+                "override": "refund_status",
+                "refund_status": refund_status,
+                "auto_resolved": False,
+                "hitl": True,
+            })
+
+        else:
+            # PRIORITY 5: routing engine decision (no external alert / refund match)
+            if self.state.routing_action == "escalate":
+                self.state.escalation_required = True
+                self.state.escalation_reason = self.state.routing_reason
+
+            elif self.state.routing_action == "pending_lookup":
+                is_pt = self._is_portuguese(self.state.inquiry)
+                _rd = self.state.refund_data
+                if _rd.get("found") and _rd.get("auto_resolve"):
+                    # Safety net: lookup found auto-resolvable refund
+                    _msg = _rd.get("message_pt" if is_pt else "message_en", "")
+                    self.state.escalation_required = False
+                    self.state.routing_action = "resolve"
+                    if _msg:
+                        self.state.response = _msg
+                elif _rd.get("should_escalate"):
+                    # Safety net: lookup found denied refund
+                    _msg = _rd.get("message_pt" if is_pt else "message_en", "")
+                    self.state.escalation_required = True
+                    self.state.routing_action = "escalate"
+                    self.state.escalation_reason = (
+                        "Reembolso negado — requer explicação e revisão humana"
+                        if is_pt else
+                        "Refund denied — requires human explanation and review"
+                    )
+                    if _msg:
+                        self.state.response = _msg
+                else:
+                    # Refund not found → route to human for manual investigation
+                    self.state.escalation_required = True
+                    self.state.routing_action = "escalate"
+                    self.state.escalation_reason = (
+                        "Reembolso não localizado — requer verificação manual"
+                        if is_pt else
+                        "Refund not found — requires manual investigation"
+                    )
+
+            elif self.state.routing_action == "awaiting":
+                self.state.escalation_required = True
+                self.state.escalation_reason = (
+                    f"Awaiting customer information: "
+                    f"{', '.join(self.state.routing_missing_info)}"
+                )
+                missing = self.state.routing_missing_info
+                pt = self._is_portuguese(self.state.inquiry)
+                if "order_number" in missing and "email" in missing:
+                    self.state.response = (
+                        "Entendo sua situação e quero ajudá-la o mais rápido possível! "
+                        "Para isso, preciso de algumas informações:\n\n"
+                        "1. Número do pedido\n"
+                        "2. E-mail cadastrado na conta\n\n"
+                        "Assim que receber essas informações, encaminharei para nossa equipe especializada."
+                    ) if pt else (
+                        "I'd love to help resolve this quickly! To proceed, I need:\n\n"
+                        "1. Your order number\n"
+                        "2. Email address on the account\n\n"
+                        "Once I have these details, I'll route your case to our specialist team immediately."
+                    )
+                elif "order_number" in missing:
+                    self.state.response = (
+                        "Para localizar seu pedido e ajudá-la, preciso do número do pedido. "
+                        "Você pode encontrá-lo no e-mail de confirmação da compra. Pode me informar?"
+                    ) if pt else (
+                        "To locate your order and help you, I need your order number. "
+                        "You can find it in your purchase confirmation email. Could you share it?"
+                    )
+                elif "screenshot_or_description" in missing:
+                    self.state.response = (
+                        "Para diagnosticar o problema técnico, pode me fornecer:\n\n"
+                        "1. Um screenshot do erro (se possível)\n"
+                        "2. Qual navegador e dispositivo está usando\n"
+                        "3. Mensagem de erro exata (se aparecer)\n\n"
+                        "Com essas informações consigo ajudá-la melhor!"
+                    ) if pt else (
+                        "To diagnose the technical issue, could you provide:\n\n"
+                        "1. A screenshot of the error (if possible)\n"
+                        "2. Which browser and device you're using\n"
+                        "3. The exact error message (if any)\n\n"
+                        "This will help me assist you better!"
+                    )
+
+            elif self.state.routing_action in ("step_by_step", "resolve"):
+                self.state.escalation_required = False
 
         # ── Append escalation notice to response ──
         if self.state.escalation_required and self.state.routing_action != "awaiting":
@@ -855,6 +1019,7 @@ tool_registry.register_tool(WeatherTool)
 tool_registry.register_tool(GitHubTool)
 tool_registry.register_tool(AddressValidationTool, "Address Validation Tool")
 tool_registry.register_tool(WeatherCheckTool, "Weather Check Tool")
+tool_registry.register_tool(RefundLookupTool, "Refund Status Tool")
 
 # Inject services into tools that need them
 tool_registry.tools["Knowledge Retrieval Tool"].knowledge_service = knowledge_service
@@ -952,6 +1117,7 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         wall_time_sec=wall_time,
         token_usage=final_state.token_usage,
         cost_usd=final_state.cost_usd,
+        api_tags=final_state.api_tags,
     )
 
     # Save to data store
@@ -1013,6 +1179,7 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         routing_action=final_state.routing_action or None,
         routing_reason=final_state.routing_reason or None,
         routing_missing_info=final_state.routing_missing_info or None,
+        api_tags=final_state.api_tags or None,
     )
 
     return response
@@ -1272,6 +1439,78 @@ async def get_all_tickets_endpoint(_=Depends(verify_api_key)):
     tickets = data_store.get_all_tickets()
     sorted_tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)
     return [ticket.model_dump() for ticket in sorted_tickets]
+
+
+@app.delete("/api/tickets/clear")
+async def clear_tickets(_=Depends(verify_api_key)):
+    """Delete all tickets and create an automatic backup first."""
+    import shutil
+    from pathlib import Path
+    from sqlalchemy import text as sa_text
+
+    db_path = Path("src/aamad/data/tickets.db")
+    backup_path = None
+    if db_path.exists():
+        backup_name = (
+            f"support_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        )
+        backup_path = Path(f"src/aamad/data/{backup_name}")
+        shutil.copy2(db_path, backup_path)
+
+    with data_store.SessionLocal() as session:
+        result = session.execute(sa_text("DELETE FROM support_tickets"))
+        session.commit()
+        deleted = result.rowcount
+
+    return {
+        "success": True,
+        "deleted_tickets": deleted,
+        "backup_created": str(backup_path) if backup_path else None,
+        "backup_filename": backup_path.name if backup_path else None,
+        "message": (
+            f"Cleared {deleted} tickets. "
+            f"Backup: {backup_path.name if backup_path else 'none'}"
+        ),
+    }
+
+
+@app.get("/api/tickets/backups")
+async def list_backups(_=Depends(verify_api_key)):
+    """List all automatic database backups."""
+    from pathlib import Path
+    data_dir = Path("src/aamad/data")
+    backups = sorted(data_dir.glob("support_backup_*.db"), reverse=True)
+    return {
+        "backups": [
+            {
+                "filename": b.name,
+                "created_at": b.stem.replace("support_backup_", ""),
+                "size_kb": round(b.stat().st_size / 1024, 1),
+            }
+            for b in backups
+        ]
+    }
+
+
+@app.post("/api/tickets/restore")
+async def restore_backup(payload: dict, _=Depends(verify_api_key)):
+    """Restore the database from a named backup file."""
+    import shutil
+    from pathlib import Path
+
+    backup_file = payload.get("backup_file")
+    if not backup_file:
+        raise HTTPException(status_code=400, detail="backup_file is required")
+    backup_path = Path(f"src/aamad/data/{backup_file}")
+    db_path = Path("src/aamad/data/tickets.db")
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail=f"Backup {backup_file} not found")
+    shutil.copy2(backup_path, db_path)
+    return {
+        "success": True,
+        "restored_from": backup_file,
+        "message": "Database restored successfully",
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

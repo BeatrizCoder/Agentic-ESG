@@ -2,6 +2,7 @@
 
 from typing import Dict, Any
 from . import BaseSupportTool
+from .utils import clean_inquiry
 
 VALID_CATEGORIES = ["Order Issues", "Billing", "Account Access", "Technical Issue", "General Support"]
 
@@ -26,6 +27,7 @@ class ClassificationTool(BaseSupportTool):
             try:
                 from anthropic import Anthropic
                 client = Anthropic()
+                clean_inq = clean_inquiry(inquiry)
                 prompt = (
                     "You are a customer support classifier. Classify the following customer inquiry "
                     "into exactly ONE of these categories:\n"
@@ -39,7 +41,27 @@ class ClassificationTool(BaseSupportTool):
                     "- Format: {\"category\": \"<category name>\", \"confidence\": <0-100>}\n"
                     "- confidence reflects how certain you are (0=very uncertain, 100=very certain).\n"
                     "- Works for any language (Portuguese, English, etc.).\n\n"
-                    f"Customer inquiry: \"{inquiry}\""
+                    "IMPORTANT DISTINCTIONS:\n\n"
+                    "General Support (policy/information questions — no specific order):\n"
+                    '- "What is your return policy?" → General Support\n'
+                    '- "What is the refund policy?" → General Support\n'
+                    '- "How do returns work?" → General Support\n'
+                    '- "What is the exchange policy?" → General Support\n'
+                    '- "How long do I have to return an item?" → General Support\n'
+                    '- "Qual a política de devolução?" → General Support\n'
+                    '- "Como funciona a devolução?" → General Support\n'
+                    "These are INFORMATION requests, not problems with a specific order.\n\n"
+                    "Order Issues (specific problems with a real order):\n"
+                    '- "My order hasn\'t arrived" → Order Issues\n'
+                    '- "I received the wrong item" → Order Issues\n'
+                    '- "I want to return my order #12345" → Order Issues\n'
+                    '- "Meu pedido não chegou" → Order Issues\n'
+                    "These are specific problems that may need an order number.\n\n"
+                    "Billing (financial issues — refunds, charges, payments):\n"
+                    '- "I want a refund for order 11111" → Billing\n'
+                    '- "Unauthorized charge on my card" → Billing\n'
+                    '- "Quero reembolso" → Billing\n\n"'
+                    f"Customer inquiry: \"{clean_inq}\""
                 )
                 result = client.messages.create(
                     model=DEFAULT_MODEL,

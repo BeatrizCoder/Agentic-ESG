@@ -5,6 +5,22 @@ It systematizes research-driven planning, modular AI agent workflows, and rapid 
 
 ---
 
+## Architecture Highlights
+
+- **Multi-agent orchestration with CrewAI** — specialized agents (Classifier, Sentiment, Knowledge, Response, Escalation) coordinated by a Manager agent via hierarchical process
+- **Hybrid deterministic + LLM execution pipeline** — runs zero-cost in deterministic mode by default; flip `USE_LLM=true` to enable full Claude-powered inference
+- **Structured observability and tracing** — every tool call, LLM invocation, and agent step is recorded with latency, token counts, cost, and execution mode
+- **Human-in-the-loop escalation workflows** — operator dashboard with approve / reject / await-customer actions and full audit trail
+- **RAG with contextual document retrieval** — local keyword search across `knowledge/` files; upgradable to vector-based retrieval via `ENABLE_CREWAI_KNOWLEDGE=true`
+- **Real-time analytics and KPI dashboard** — CSAT, ticket volume, sentiment distribution, urgency breakdown, timeline, and agent performance metrics
+- **External API enrichment** — live address validation (ViaCEP, no key required) and weather-based delivery delay detection (OpenWeatherMap)
+- **Token and cost tracking** — per-ticket input/output token counts and USD cost estimates surfaced in observability events and the analytics dashboard
+- **Response caching and fallback handling** — tool-level caching via `ToolRegistry`; graceful degradation when APIs are unavailable
+- **SQLite persistence layer** — full SQLAlchemy ORM with automatic schema creation; PostgreSQL-ready via `DATABASE_PROVIDER=postgres`
+- **Operator review dashboard** — dedicated view for escalated tickets with inline detail, timeline, knowledge sources, and one-click resolution actions
+
+---
+
 ## Quick Start: CrewAI Support System
 
 AAMAD includes a complete customer support system powered by CrewAI with hierarchical agent orchestration. The system uses multiple specialized agents working together under a manager agent to handle customer inquiries.
