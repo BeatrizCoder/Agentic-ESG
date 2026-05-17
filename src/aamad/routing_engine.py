@@ -11,11 +11,11 @@ def normalize(text: str) -> str:
 
 
 ORDER_NUMBER_PATTERNS = [
-    r'pedido\s*[:#]?\s*(\d{4,10})',    # "pedido 12345"
-    r'order\s*[:#]?\s*(\d{4,10})',     # "order 12345"
-    r'n[uú]mero\s*[:#]?\s*(\d{4,10})', # "número 12345"
-    r'#(\d{4,8})',                      # "#12345"
-    r'\border\s+#?(\d{4,8})\b',        # "order #12345"
+    r'pedido\s*[:#]?\s*(\d{4,8})',
+    r'order\s*[:#]?\s*(\d{4,8})',
+    r'n[uú]mero\s+(?:do\s+)?pedido\s*[:#]?\s*(\d{4,8})',
+    r'#(\d{4,8})',
+    r'\border\s+#?(\d{4,8})\b',
 ]
 
 EMAIL_PATTERNS = [
@@ -189,13 +189,15 @@ class RoutingDecision:
 
 
 def _clean_for_routing(inquiry: str) -> str:
-    """Strip intake metadata (Phone/Email/Name lines) before pattern matching."""
+    """Strip all appended intake metadata before pattern matching."""
     clean = inquiry
-    clean = re.sub(r'\nPhone:.*', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\nEmail:.*', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\nName:.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nPhone:\s*.+', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nEmail:\s*.+', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nName:\s*.+', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\nCustomer Name:\s*.+', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\n---.*$', '', clean, flags=re.DOTALL | re.IGNORECASE)
-    clean = re.sub(r"',\)$", '', clean)
+    clean = re.sub(r"',\s*\)$", '', clean)
+    clean = re.sub(r"'\s*,?\s*\)$", '', clean)
     return clean.strip()
 
 
@@ -220,12 +222,20 @@ def route_ticket(
     sentiment: str,
     urgency: str,
 ) -> RoutingDecision:
+    print(f"DEBUG route_ticket input: '{inquiry[:200]}'")
+
     norm_inquiry  = normalize(inquiry)
     clean_inquiry = _clean_for_routing(inquiry)
+
+    print(f"DEBUG route_ticket clean: '{clean_inquiry[:200]}'")
 
     has_order   = _has_pattern(clean_inquiry, ORDER_NUMBER_PATTERNS)
     has_email   = _has_pattern(clean_inquiry, EMAIL_PATTERNS)
     has_invoice = _has_pattern(clean_inquiry, INVOICE_PATTERNS)
+
+    print(f"DEBUG has_order: {has_order}")
+    print(f"DEBUG has_email: {has_email}")
+    print(f"DEBUG category: {category}")
 
     esc_keyword = _find_explicit_escalation(clean_inquiry)
 
