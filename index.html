@@ -4321,25 +4321,36 @@
           if (!key) return;
           const s = DEMO_SCENARIOS[key];
           if (!s) return;
-          const fields = {
-            name: document.querySelector('input[id*="name"], input[placeholder*="name" i], input[placeholder*="nome" i]'),
-            email: document.querySelector('input[type="email"], input[id*="email"]'),
-            phone: document.querySelector('input[id*="phone"], input[placeholder*="phone" i], input[placeholder*="telefone" i]'),
-            inquiry: document.querySelector('textarea#inquiryInput')
-          };
-          if (fields.name) fields.name.value = s.name;
-          if (fields.email) fields.email.value = s.email;
-          if (fields.phone) fields.phone.value = s.phone || '';
-          if (fields.inquiry) {
-            fields.inquiry.value = s.inquiry;
-            fields.inquiry.dispatchEvent(new Event('input'));
-          }
-          const checkbox = document.querySelector('input[type="checkbox"]#privacyCheckbox');
-          if (checkbox) checkbox.checked = true;
-          state.customerName = s.name;
-          state.customerEmail = s.email;
+
+          // Fill intake fields using their actual IDs
+          const nameEl  = document.getElementById('customerName');
+          const emailEl = document.getElementById('customerEmail');
+          const phoneEl = document.getElementById('customerPhone');
+          const inquiry = document.getElementById('inquiryInput');
+
+          if (nameEl)  { nameEl.value  = s.name;         nameEl.dispatchEvent(new Event('input', { bubbles: true })); }
+          if (emailEl) { emailEl.value = s.email;        emailEl.dispatchEvent(new Event('input', { bubbles: true })); }
+          if (phoneEl) { phoneEl.value = s.phone || '';  phoneEl.dispatchEvent(new Event('input', { bubbles: true })); }
+          if (inquiry) { inquiry.value = s.inquiry;      inquiry.dispatchEvent(new Event('input', { bubbles: true })); }
+
+          // Update state directly
+          state.customerName    = s.name;
+          state.customerEmail   = s.email;
+          state.customerPhone   = s.phone || '';
           state.privacyAccepted = true;
-          state.lastInquiry = s.inquiry;
+          state.lastInquiry     = s.inquiry;
+
+          // Check privacy checkbox AND fire its change event so the button gets enabled
+          const checkbox = document.getElementById('privacyCheckbox');
+          if (checkbox) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+
+          // Belt-and-suspenders: enable the submit button directly
+          const submitBtn = document.getElementById('submitRequest');
+          if (submitBtn) submitBtn.disabled = false;
+
           const label = e.target.options[e.target.selectedIndex].text;
           showToast(`⚡ Loaded: ${label.trim()}`);
           setTimeout(() => { e.target.value = ''; }, 500);
