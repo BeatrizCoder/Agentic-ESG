@@ -2928,22 +2928,27 @@
     }
 
     function renderCustomerResult(ticket) {
+      // Detect external-API auto-resolve (logistics, weather, refund)
+      const autoResolvedByAPI =
+        ticket.steps?.some(s => ['logistics_alert', 'weather_delay', 'refund_status'].includes(s.details?.override)) ||
+        ticket.routing_action === 'resolve';
+
       // Routing: show awaiting form if missing info needed
       if (state.showAwaitingForm &&
           (ticket.routing_action === 'awaiting' ||
            ticket.status === 'awaiting_customer_info')) {
         return renderAwaitingForm(ticket);
       }
-      // Human-requested escalation card (amber, warm tone)
-      if (ticket.tags?.includes('requested_human_support')) {
+      // Human-requested escalation card (not for auto-resolved)
+      if (!autoResolvedByAPI && ticket.tags?.includes('requested_human_support')) {
         return renderHumanRequestedEscalationCard(ticket);
       }
-      // Order Issues escalation card (cyan, investigative tone)
-      if (ticket.category === 'Order Issues' && ticket.escalation_required && !ticket.triggered_keyword) {
+      // Order Issues escalation card (not for auto-resolved)
+      if (!autoResolvedByAPI && ticket.category === 'Order Issues' && ticket.escalation_required && !ticket.triggered_keyword) {
         return renderOrderIssueEscalationCard(ticket);
       }
-      // Routing: show guided steps for step_by_step
-      if (ticket.routing_action === 'step_by_step') {
+      // Routing: show guided steps for step_by_step (not for auto-resolved)
+      if (!autoResolvedByAPI && ticket.routing_action === 'step_by_step') {
         return renderStepByStepCard(ticket);
       }
       const offlineText = ticket.offline ? '<span class="badge" style="background: rgba(248,113,113,0.1); color: var(--danger); border-color: rgba(248,113,113,0.22);">offline</span>' : '';
@@ -4695,9 +4700,10 @@
 
       if (willEscalate(inquiry)) {
         // Double-check: refund + order number should never open the modal
+        const _lower = inquiry.toLowerCase();
         const _hasRefund = ['reembolso', 'refund', 'estorno']
-          .some(kw => inquiry.toLowerCase().includes(kw));
-        const _hasOrder = /\b\d{4,6}\b/.test(inquiry);
+          .some(kw => _lower.includes(kw));
+        const _hasOrder = /\bpedido\s*\d{4,8}\b|#\d{4,8}/.test(_lower);
         if (_hasRefund && _hasOrder) {
           doSubmitInquiry(inquiry);
           return;
@@ -4763,6 +4769,13 @@
         (state.uploadedFile
           ? `Screenshot attached: ${state.uploadedFile.name} (${(state.uploadedFile.size/1024).toFixed(1)} KB)\n`
           : (state.missingInfo.includes('screenshot_or_description') ? 'No screenshot provided\n' : ''));
+
+      // Close pre-escalation modal if still open
+      closePreEscalationModal();
+
+      // Disable submit button and show processing state
+      const _submitBtn = document.getElementById('submit-missing-info');
+      if (_submitBtn) { _submitBtn.disabled = true; _submitBtn.textContent = '⏳ Processing...'; }
 
       // Reset awaiting state and reprocess
       state.showAwaitingForm = false;

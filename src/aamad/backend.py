@@ -721,7 +721,7 @@ class SupportFlow(Flow[SupportState]):
     async def evaluate_escalation(self):
         print(f"DEBUG evaluate_escalation:")
         print(f"  routing_action: {self.state.routing_action}")
-        print(f"  routing_missing_info: {self.state.routing_missing_info}")
+        print(f"  refund_data: {self.state.refund_data}")
         print(f"  logistics_alert: {self.state.logistics_alert}")
         print(f"  weather_delay: {self.state.weather_delay}")
         print(f"  escalation_required: {self.state.escalation_required}")
