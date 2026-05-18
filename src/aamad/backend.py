@@ -215,9 +215,12 @@ class SupportState(BaseModel):
     external_context: str = ""
     logistics_alert: dict = {}
     weather_delay: dict = {}
+    weather_result: dict = {}
     refund_data: dict = {}
     api_tags: list[str] = []
+    detected_city: str = ""
     auto_resolve_reason: str = ""
+    awaiting_weather_context: str = ""
     quality_evaluation: dict = {}
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
@@ -380,6 +383,83 @@ class SupportCrew:
 
 
 
+
+
+async def extract_location_with_llm(inquiry: str) -> str | None:
+    """
+    Use LLM to extract any location mention from inquiry.
+    Returns city/state name for OpenWeatherMap query,
+    or None if no location detected.
+    """
+    import anthropic
+    import os
+    import re
+
+    location_hints = [
+        'sou de', 'sou do', 'sou da', 'moro em', 'moro no', 'moro na',
+        'cidade de', 'estado de', 'região de',
+        'i live in', 'i am from', 'located in',
+        'from', 'in the city', 'cep', 'bairro',
+        'zona sul', 'zona norte', 'interior',
+    ]
+
+    inquiry_lower = inquiry.lower()
+    has_location_hint = any(hint in inquiry_lower for hint in location_hints)
+    has_cep = bool(re.search(r'\b\d{5}-?\d{3}\b', inquiry))
+
+    if not has_location_hint and not has_cep:
+        return None
+
+    # If CEP detected, location will come from ViaCEP
+    if has_cep:
+        return None
+
+    try:
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+        response = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=50,
+            messages=[{
+                "role": "user",
+                "content": f"""Extract the location (city or state) \
+from this text for a weather API query.
+
+Text: "{inquiry}"
+
+Rules:
+- Return ONLY the location name in English or Portuguese
+- If state mentioned: return state capital city
+- If city mentioned: return city name
+- If neighborhood/region: return nearest major city
+- If no location found: return null
+- Do NOT include country
+- Keep it short: "Cuiabá" not "Cuiabá, Mato Grosso, Brasil"
+
+Examples:
+"sou do Mato Grosso" → "Cuiabá"
+"moro em Florianópolis" → "Florianópolis"
+"sou do interior de SP" → "São Paulo"
+"I live in Bahia" → "Salvador"
+"zona sul do Rio" → "Rio de Janeiro"
+"moro no Nordeste" → "Recife"
+
+Return ONLY the city name or null. No explanation."""
+            }]
+        )
+
+        result = response.content[0].text.strip()
+        result = result.replace('"', '').replace("'", '').strip()
+
+        if result.lower() in ['null', 'none', '', 'n/a']:
+            return None
+
+        print(f"DEBUG location_extraction: '{result}'")
+        return result
+
+    except Exception as e:
+        print(f"DEBUG location_extraction failed: {e}")
+        return None
 
 
 class SupportFlow(Flow[SupportState]):
@@ -570,7 +650,9 @@ class SupportFlow(Flow[SupportState]):
             self.state.tools_used.append("Address Validation Tool")
             if addr_result.get("valid"):
                 self.state.api_tags.append("cep_validated")
+                city_from_cep = addr_result.get("city", "")
                 state_code = addr_result.get("state", "")
+                self.state.detected_city = city_from_cep
                 formatted = addr_result.get("formatted") or (
                     f"{addr_result.get('street')}, {addr_result.get('neighborhood')}, "
                     f"{addr_result.get('city')} - {addr_result.get('state')}"
@@ -604,23 +686,65 @@ class SupportFlow(Flow[SupportState]):
                         "state": state_code,
                         "logistics_alert": False,
                     })
+                    if city_from_cep:
+                        weather_result = await self.execute_tool("Weather Check Tool", city_from_cep)
+                        self.state.tools_used.append("Weather Check Tool")
+                        if weather_result.get("available"):
+                            self.state.api_tags.append("weather_checked")
+                            weather_delay = check_weather_delay(city_from_cep, weather_result)
+                            if weather_delay:
+                                self.state.weather_delay = weather_delay
+                                self.state.api_tags.append("weather_alert")
+                                context_parts.append(
+                                    f"WEATHER DELAY ALERT: "
+                                    f"{weather_result['conditions']} in {city_from_cep} "
+                                    f"({weather_result['temperature_c']}°C). "
+                                    f"Adverse conditions affecting deliveries."
+                                )
+                            else:
+                                context_parts.append(
+                                    f"Weather in {city_from_cep}: "
+                                    f"{weather_result.get('conditions', 'normal')}, "
+                                    f"{weather_result.get('temperature_c', '')}°C. "
+                                    f"No weather delays."
+                                )
             else:
                 print(f"DEBUG CEP result: valid=False, error={addr_result.get('error', addr_result.get('error_type', 'unknown'))}, logistics_alert=N/A")
             if addr_result.get("fallback"):
                 context_parts.append(f"Address validation: {addr_result.get('fallback')}")
 
-        # ── City → weather check + weather delay ──
-        city_match = re.search(
-            r'\b(São Paulo|Rio de Janeiro|Belo Horizonte|Curitiba|Porto Alegre|'
-            r'Florianópolis|Florianopolis|Joinville|Blumenau|Caxias do Sul|'
-            r'Salvador|Fortaleza|Recife|Manaus|Brasília|Brasilia|Goiânia|Goiania|Belém|Belem)\b',
-            self.state.inquiry, re.IGNORECASE
-        )
-        if city_match:
-            detected_city = city_match.group(1)
+        # ── Location → weather check (LLM-based extraction) ──
+        detected_city = await extract_location_with_llm(self.state.inquiry)
+
+        # Fallback: try to get city from ViaCEP result stored in context
+        if not detected_city and self.state.logistics_alert:
+            city_match = re.search(
+                r'Validated address: .+, (.+) -',
+                self.state.external_context
+            )
+            if city_match:
+                detected_city = city_match.group(1).strip()
+
+        print(f"DEBUG detected_city: {detected_city}")
+
+        delay_words = [
+            'atrasou', 'atraso', 'atrasada', 'atrasado',
+            'nao chegou', 'não chegou',
+            'nao receb', 'não receb',
+            'demora', 'demorou', 'cadê', 'cade',
+            'sumiu', 'extraviado', 'perdido',
+            'delayed', 'not arrived', 'late',
+            'not received', 'missing', 'where is',
+        ]
+
+        has_delay = any(w in self.state.inquiry.lower() for w in delay_words)
+
+        if detected_city and (has_delay or self.state.category == "Order Issues"):
+            self.state.detected_city = detected_city
             weather_result = await self.execute_tool("Weather Check Tool", detected_city)
             self.state.tools_used.append("Weather Check Tool")
             if weather_result.get("available"):
+                self.state.weather_result = weather_result
                 self.state.api_tags.append("weather_checked")
                 weather_delay = check_weather_delay(detected_city, weather_result)
                 if weather_delay:
@@ -634,10 +758,10 @@ class SupportFlow(Flow[SupportState]):
                     )
                 else:
                     context_parts.append(
-                        f"Weather in {detected_city}: "
+                        f"WEATHER CHECK: Weather in {detected_city}: "
                         f"{weather_result.get('conditions', 'normal')}, "
-                        f"{weather_result.get('temperature_c', '')}°C. "
-                        f"No weather delays."
+                        f"{weather_result.get('temperature_c', '')}°C — "
+                        f"normal conditions, no weather impact on deliveries."
                     )
 
         # ── Refund status lookup ──
@@ -863,10 +987,19 @@ class SupportFlow(Flow[SupportState]):
             })
 
         elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
-            # PRIORITY 2: weather delay — LLM already generated response using external_context
+            # PRIORITY 2: weather delay — overrides "awaiting" regardless of order number
             self.state.escalation_required = False
             self.state.routing_action = "resolve"
             self.state.auto_resolve_reason = "weather_delay"
+
+            # If order number was provided, flag it so the LLM includes it in the response
+            if (self.state.routing_missing_info and
+                    "order_number" not in self.state.routing_missing_info):
+                self.state.external_context += (
+                    "\nNote: Customer provided order number — "
+                    "include it in the weather delay response."
+                )
+
             self.log_step("Routing Engine", {
                 "override": "weather_delay",
                 "reason": "Adverse weather — auto-resolved",
@@ -914,6 +1047,27 @@ class SupportFlow(Flow[SupportState]):
             if self.state.routing_action == "escalate":
                 self.state.escalation_required = True
                 self.state.escalation_reason = self.state.routing_reason
+                if (self.state.weather_result and
+                        self.state.weather_result.get("available") and
+                        not self.state.weather_delay.get("delay_active")):
+                    city = self.state.detected_city
+                    temp = self.state.weather_result.get("temperature_c", "")
+                    conditions = self.state.weather_result.get("conditions", "")
+                    is_pt = self._is_portuguese(self.state.inquiry)
+                    if is_pt:
+                        self.state.external_context += (
+                            f"\nWEATHER CHECK: Clima em {city}: "
+                            f"{conditions}, {temp}°C — condições normais, "
+                            f"sem impacto climático nas entregas. "
+                            f"Atraso deve ser investigado pela equipe."
+                        )
+                    else:
+                        self.state.external_context += (
+                            f"\nWEATHER CHECK: Weather in {city}: "
+                            f"{conditions}, {temp}°C — normal conditions, "
+                            f"no weather impact on deliveries. "
+                            f"Delay must be investigated by the team."
+                        )
 
             elif self.state.routing_action == "pending_lookup":
                 is_pt = self._is_portuguese(self.state.inquiry)
@@ -955,7 +1109,36 @@ class SupportFlow(Flow[SupportState]):
                 )
                 missing = self.state.routing_missing_info
                 pt = self._is_portuguese(self.state.inquiry)
-                if "order_number" in missing and "email" in missing:
+
+                # Build weather context if clear weather data available
+                if (self.state.weather_result and
+                        self.state.weather_result.get("available") and
+                        not self.state.weather_delay.get("delay_active")):
+                    city = self.state.detected_city
+                    temp = self.state.weather_result.get("temperature_c", "")
+                    conditions = self.state.weather_result.get("conditions", "")
+                    if pt:
+                        self.state.awaiting_weather_context = (
+                            f"Verificamos o clima em {city} — "
+                            f"{conditions}, {temp}°C. "
+                            f"Não há fatores climáticos afetando "
+                            f"as entregas na sua região. "
+                            "Para investigar o atraso do seu pedido, "
+                            "precisamos do número do pedido."
+                        )
+                    else:
+                        self.state.awaiting_weather_context = (
+                            f"We checked the weather in {city} — "
+                            f"{conditions}, {temp}°C. "
+                            f"No weather-related delivery issues "
+                            f"in your area. "
+                            "To investigate your order delay, "
+                            "we need your order number."
+                        )
+
+                if self.state.awaiting_weather_context:
+                    self.state.response = self.state.awaiting_weather_context
+                elif "order_number" in missing and "email" in missing:
                     self.state.response = (
                         "Entendo sua situação e quero ajudá-la o mais rápido possível! "
                         "Para isso, preciso de algumas informações:\n\n"

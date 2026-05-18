@@ -2627,7 +2627,7 @@
               <div style="font-size:1.8rem;flex-shrink:0;">📋</div>
               <div>
                 <h2 style="margin:0 0 4px;font-size:1.1rem;color:#0F172A;">We need a little more information</h2>
-                <p style="margin:0;font-size:0.85rem;color:#64748B;line-height:1.5;">${escapeHtml(ticket.response)}</p>
+                <div style="margin:0;font-size:0.85rem;color:#64748B;line-height:1.5;">${formatResponseText(ticket.response)}</div>
               </div>
             </div>
 
@@ -2650,6 +2650,15 @@
     function linkifyText(text) {
       return text.replace(/(https?:\/\/[^\s]+)/g,
         '<a href="$1" target="_blank" rel="noopener" style="color:#0EA5E9;text-decoration:underline;word-break:break-all;">$1</a>');
+    }
+
+    function formatResponseText(text) {
+      if (!text) return ''
+      const escaped = escapeHtml(text)
+      const withBreaks = escaped
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+      return linkifyText('<p style="margin:0 0 0.6em 0;">' + withBreaks + '</p>')
     }
 
     function renderStepByStepCard(ticket) {
@@ -2684,7 +2693,7 @@
 
       // If no numbered steps found, render as plain response bubble
       if (stepCount === 0) {
-        stepsHtml = `<div class="response-bubble" style="margin:0;">${linkifyText(escapeHtml(raw))}</div>`;
+        stepsHtml = `<div class="response-bubble" style="margin:0;">${formatResponseText(raw)}</div>`;
       }
 
       const wasAutoResolved = !ticket.escalation_required &&
@@ -2944,7 +2953,7 @@
               </div>
               <span style="background:rgba(239,68,68,0.1);color:#EF4444;border:1px solid rgba(239,68,68,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">❌ ${pt ? 'Negado' : 'Denied'}</span>
             </div>
-            <div class="response-bubble">${ticket.response}</div>
+            <div class="response-bubble">${formatResponseText(ticket.response)}</div>
             <p style="font-size:0.85rem;color:#4B5563;margin:14px 0 10px;line-height:1.5;">
               ${pt ? 'O que você gostaria de fazer?' : 'What would you like to do?'}
             </p>
@@ -3061,7 +3070,7 @@
               </div>
               <div>${offlineText}</div>
             </div>
-            <div class="response-bubble">${ticket.response}</div>
+            <div class="response-bubble">${formatResponseText(ticket.response)}</div>
             ${feedbackSection}
           </div>
         </section>
@@ -3403,7 +3412,7 @@
         const sentMessage = ticket.response
           ? `<div style="margin-top: 14px;">
                <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 6px 0;">Message sent to customer:</p>
-               <div class="response-bubble" style="margin: 0;">${ticket.response}</div>
+               <div class="response-bubble" style="margin: 0;">${formatResponseText(ticket.response)}</div>
              </div>`
           : '';
         confirmAction = `
@@ -3427,7 +3436,7 @@
             <p>${ticket.escalation_reason || 'The AI team flagged this request for human review.'}</p>
             ${ticket.triggered_keyword ? `<p><strong>Trigger:</strong> ${ticket.triggered_keyword}</p>` : ''}
           </div>
-          ${ticket.response ? `<div class="response-bubble">${ticket.response}</div>` : ''}
+          ${ticket.response ? `<div class="response-bubble">${formatResponseText(ticket.response)}</div>` : ''}
           <p style="margin: 0; font-size: 0.82rem; color: var(--muted);">Select action after reviewing the AI response above:</p>
           <div class="detail-action-row">
             <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Approve & Resolve</button>
@@ -3436,7 +3445,7 @@
           </div>
         `;
       } else {
-        confirmAction = `<div class="response-bubble">${ticket.response}</div>`;
+        confirmAction = `<div class="response-bubble">${formatResponseText(ticket.response)}</div>`;
       }
       const feedbackCard = (() => {
         const fb = ticket.feedback;

@@ -14,6 +14,18 @@ class ResponseTool(BaseSupportTool):
     def __init__(self):
         super().__init__()
 
+    def _format_response(self, text: str) -> str:
+        """Post-process LLM response to ensure proper formatting and line breaks."""
+        import re
+        # Ensure numbered steps that run together get separated
+        # "1. Step one 2. Step two" → "1. Step one\n2. Step two"
+        text = re.sub(r'(\d+\.\s+[^\d]+?)(?=\d+\.)', r'\1\n', text)
+        # Remove excessive blank lines (max 2 consecutive)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        # Ensure a blank line before a numbered list that follows a sentence
+        text = re.sub(r'([.!?:])\s+(1\.)', r'\1\n\n\2', text)
+        return text.strip()
+
     def _run(self, category: str, urgency: str, article_count: int,
              inquiry: str = "", knowledge_context: str = "",
              routing_action: str = "resolve",
@@ -67,16 +79,35 @@ class ResponseTool(BaseSupportTool):
                         "- Be empathetic and apologetic\n"
                         "- Do NOT ask for more information — resolve this directly\n"
                     )
-                elif "WEATHER DELAY ALERT" in (external_context or ""):
+                elif "WEATHER DELAY" in (external_context or ""):
                     alert_instructions = (
-                        "\nIMPORTANT: Adverse weather is affecting deliveries in the customer's city. "
+                        "\nSITUATION: Adverse weather affecting deliveries "
+                        "in the customer's region. Real weather data retrieved.\n"
                         "Your response MUST:\n"
-                        "- Mention the specific city and real weather conditions from the data above\n"
-                        "- Include the actual temperature\n"
-                        "- Explain clearly that weather is causing delivery delays\n"
+                        "- Mention the specific city and real conditions\n"
+                        "- Include the real temperature from the data\n"
+                        "- Explain weather is causing delivery delays\n"
+                        "- If order number mentioned in inquiry: reference it\n"
                         "- Estimate 1-2 additional business days\n"
                         "- Be warm and reassuring\n"
+                        "- Keep under 100 words\n"
                         "- Do NOT ask for more information — resolve this directly\n"
+                    )
+
+                elif ("WEATHER CHECK" in (external_context or "") and
+                      ("normal conditions" in (external_context or "") or
+                       "condições normais" in (external_context or ""))):
+                    alert_instructions = (
+                        "\nSITUATION: Weather was checked but conditions are NORMAL. "
+                        "No weather-related delivery issues in the customer's region.\n"
+                        "Your response MUST:\n"
+                        "- Briefly mention weather was checked and is normal\n"
+                        "- Explain that since weather is not the cause, "
+                        "the team will investigate the order directly\n"
+                        "- Be reassuring and professional\n"
+                        "- Mention the order number if provided\n"
+                        "- Keep under 80 words\n"
+                        "- Respond in customer's language\n"
                     )
 
                 elif "REFUND DATA FOUND" in (external_context or ""):
@@ -112,46 +143,105 @@ class ResponseTool(BaseSupportTool):
                 elif routing_action == "step_by_step":
                     routing_block = (
                         "\nThis requires step-by-step guidance. "
-                        "Provide clear numbered steps (1. 2. 3.). "
-                        "Include relevant links as plain text if available. "
-                        "End with an offer to help with any of the steps.\n"
+                        "Format EXACTLY like this:\n\n"
+                        "[Brief empathetic intro — 1 sentence]\n\n"
+                        "[numbered steps, each on its own line]\n"
+                        "1. First action\n"
+                        "2. Second action\n"
+                        "3. Third action\n\n"
+                        "[Closing line offering more help]\n\n"
+                        "Each numbered step MUST be on its own line. "
+                        "Include relevant links as plain text if available.\n"
                     )
 
-                prompt = f"""{lang_instruction}
-
-You are a helpful, empathetic customer support agent.
+                dynamic_prompt = f"""{lang_instruction}
 
 Customer inquiry: {clean_inq}
 Language detected: {lang_name}
 Category: {category}
 Urgency: {urgency}
 
-{external_section}Relevant knowledge base:
-{knowledge_text}
-{routing_block}{alert_instructions}
+{external_section}{routing_block}{alert_instructions}
 Instructions:
 - {lang_instruction}
 - Be warm and empathetic
 - Answer the question directly — do NOT ask for more info if this is an informational or policy question
 - Keep response under 150 words
 - Do not mention internal systems, agent names, or tools
-- Do not use markdown formatting (no **, no #, no bullet hyphens)
-- Write in plain conversational text"""
+
+Formatting rules (MANDATORY):
+- Use line breaks between paragraphs (\\n\\n)
+- When listing steps, put EACH step on its own line:
+  1. First step
+  2. Second step
+  3. Third step
+- Separate action items from the explanation with a blank line
+- Keep each paragraph focused on ONE idea
+- Maximum 3 paragraphs total
+- Do NOT use markdown (no **, no #, no ---)
+- Do NOT use bullet points with hyphens (-)
+- Use numbered lists (1. 2. 3.) for steps only
+- Each numbered step must be on its own line
+- Add a blank line before and after numbered lists
+
+Example of CORRECT format:
+"Entendo sua situação e vou ajudá-lo.
+
+Seu reembolso foi aprovado em 10/05. O banco pode levar até 5 dias úteis para processar.
+
+Para verificar:
+1. Acesse seu extrato bancário
+2. Procure por crédito nos últimos 5 dias
+3. Se não encontrar, entre em contato conosco
+
+Estamos à disposição para ajudar!"
+
+Example of WRONG format (do not do this):
+"Seu reembolso foi aprovado. O banco leva 5 dias. Para verificar: 1. Acesse seu extrato 2. Procure o crédito Se não encontrar, entre em contato." """
 
                 result = client.messages.create(
                     model=DEFAULT_MODEL,
                     max_tokens=400,
-                    messages=[{"role": "user", "content": prompt}]
+                    system=[
+                        {
+                            "type": "text",
+                            "text": "You are a helpful, empathetic customer support agent.",
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Relevant knowledge base:\n{knowledge_text}",
+                                    "cache_control": {"type": "ephemeral"}
+                                },
+                                {
+                                    "type": "text",
+                                    "text": dynamic_prompt
+                                }
+                            ]
+                        }
+                    ]
                 )
                 import re
                 text = result.content[0].text
                 text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
                 text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
                 text = text.strip()
+                text = self._format_response(text)
                 input_tokens  = result.usage.input_tokens
                 output_tokens = result.usage.output_tokens
+                cache_create = getattr(result.usage, 'cache_creation_input_tokens', 0) or 0
+                cache_read = getattr(result.usage, 'cache_read_input_tokens', 0) or 0
                 real_cost = round(
-                    (input_tokens * 0.0000008) + (output_tokens * 0.000004), 6
+                    (input_tokens * 0.0000008) +
+                    (cache_create * 0.000001) +
+                    (cache_read * 0.00000008) +
+                    (output_tokens * 0.000004),
+                    6
                 )
                 return {
                     "response": text,

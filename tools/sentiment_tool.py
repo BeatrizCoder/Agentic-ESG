@@ -26,27 +26,32 @@ class SentimentTool(BaseSupportTool):
                 from anthropic import Anthropic
                 client = Anthropic()
                 clean_inq = clean_inquiry(inquiry)
-                prompt = (
-                    "You are a sentiment analysis engine for customer support.\n"
-                    "Analyze the following customer inquiry and return a JSON object.\n\n"
-                    "Rules:\n"
-                    "- sentiment must be exactly one of: \"Neutral\", \"Concerned\", \"Urgent\"\n"
-                    "- urgency must be exactly one of: \"Low\", \"Medium\", \"High\"\n"
-                    "- confidence is 0-100 (how certain you are of the sentiment).\n"
-                    "- Respond ONLY with JSON, no extra text.\n"
-                    "- Format: {\"sentiment\": \"<value>\", \"urgency\": \"<value>\", \"confidence\": <0-100>}\n"
-                    "- Works for any language (Portuguese, English, etc.).\n\n"
-                    "Guidelines:\n"
-                    "- Urgent: customer uses words like 'urgente', 'immediately', 'asap', 'right now', 'agora'.\n"
-                    "- Concerned: customer expresses frustration, worry, or dissatisfaction.\n"
-                    "- Neutral: calm, informational tone.\n"
-                    "- High urgency matches Urgent sentiment; Medium matches Concerned; Low matches Neutral.\n\n"
-                    f"Customer inquiry: \"{clean_inq}\""
-                )
                 result = client.messages.create(
                     model=DEFAULT_MODEL,
                     max_tokens=60,
-                    messages=[{"role": "user", "content": prompt}]
+                    system=[
+                        {
+                            "type": "text",
+                            "text": (
+                                "You are a sentiment analysis engine for customer support.\n"
+                                "Analyze the following customer inquiry and return a JSON object.\n\n"
+                                "Rules:\n"
+                                "- sentiment must be exactly one of: \"Neutral\", \"Concerned\", \"Urgent\"\n"
+                                "- urgency must be exactly one of: \"Low\", \"Medium\", \"High\"\n"
+                                "- confidence is 0-100 (how certain you are of the sentiment).\n"
+                                "- Respond ONLY with JSON, no extra text.\n"
+                                "- Format: {\"sentiment\": \"<value>\", \"urgency\": \"<value>\", \"confidence\": <0-100>}\n"
+                                "- Works for any language (Portuguese, English, etc.).\n\n"
+                                "Guidelines:\n"
+                                "- Urgent: customer uses words like 'urgente', 'immediately', 'asap', 'right now', 'agora'.\n"
+                                "- Concerned: customer expresses frustration, worry, or dissatisfaction.\n"
+                                "- Neutral: calm, informational tone.\n"
+                                "- High urgency matches Urgent sentiment; Medium matches Concerned; Low matches Neutral."
+                            ),
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ],
+                    messages=[{"role": "user", "content": f'Customer inquiry: "{clean_inq}"'}]
                 )
                 import json, re
                 raw = result.content[0].text.strip()
@@ -64,8 +69,14 @@ class SentimentTool(BaseSupportTool):
                 input_tokens = result.usage.input_tokens
                 output_tokens = result.usage.output_tokens
                 total_tokens = input_tokens + output_tokens
+                cache_create = getattr(result.usage, 'cache_creation_input_tokens', 0) or 0
+                cache_read = getattr(result.usage, 'cache_read_input_tokens', 0) or 0
                 cost_usd = round(
-                    (input_tokens * 0.0000008) + (output_tokens * 0.000004), 6
+                    (input_tokens * 0.0000008) +
+                    (cache_create * 0.000001) +
+                    (cache_read * 0.00000008) +
+                    (output_tokens * 0.000004),
+                    6
                 )
                 return {
                     "sentiment": sentiment,
