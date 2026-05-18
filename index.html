@@ -2417,6 +2417,7 @@
                 <option value="password_en">🔒 Forgot password (EN)</option>
                 <option value="locked_en">🔐 Account locked (EN)</option>
                 <option value="hacked_pt">🚨 Conta hackeada → escala</option>
+                <option value="hacked_en">🚨 Account hacked (EN) → escalate</option>
               </optgroup>
               <optgroup label="📦 Order Issues">
                 <option value="order_no_number">❓ Pedido sem número → awaiting</option>
@@ -2437,6 +2438,7 @@
                 <option value="refund_11111">✅ Pedido 11111 — aprovado R$150</option>
                 <option value="refund_44444">✅ Pedido 44444 — processado R$299</option>
                 <option value="refund_22222">⏳ Pedido 22222 — pendente R$89,90</option>
+                <option value="refund_10000">⏳ Pedido 10000 — em análise R$75</option>
                 <option value="refund_33333">❌ Pedido 33333 — negado → escala</option>
                 <option value="refund_not_found">🔍 Pedido 99888 — não encontrado</option>
               </optgroup>
@@ -2449,6 +2451,12 @@
               <optgroup label="🔧 Technical">
                 <option value="technical_site">💻 Site não carrega</option>
                 <option value="technical_payment">💳 Erro no pagamento</option>
+              </optgroup>
+              <optgroup label="🧪 Advanced Scenarios">
+                <option value="cep_plus_weather">🌧️ CEP SP + Curitiba → ambas APIs</option>
+                <option value="refund_frustrated">😤 Reembolso frustrado → sentimento urgente</option>
+                <option value="billing_en">💳 Unauthorized charge (EN) → billing escala</option>
+                <option value="mixed_language">🌐 Mixed PT/EN inquiry</option>
               </optgroup>
             </select>
           </div>
@@ -4550,7 +4558,13 @@
       procon: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Vou no Procon se não resolverem meu problema hoje' },
       billing: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Não reconheço essa cobrança na minha fatura' },
       technical_site: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'O site não está carregando, dá erro toda vez' },
-      technical_payment: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Erro ao tentar pagar, meu cartão foi recusado' }
+      technical_payment: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Erro ao tentar pagar, meu cartão foi recusado' },
+      refund_10000: { name:'Pedro Santos', email:'pedro@demo.com', phone:'', inquiry:'Meu reembolso pedido 10000 está em análise há 3 dias' },
+      hacked_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'My account was hacked, someone logged in without my permission' },
+      cep_plus_weather: { name:'beatriz costa', email:'beatriz@demo.com', phone:'41999999999', inquiry:'Meu pedido não chegou, CEP 80010-000, Curitiba' },
+      refund_frustrated: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'JÁ FAZ DUAS SEMANAS QUE PEDI O REEMBOLSO DO PEDIDO 55555 E NÃO RECEBI NADA, ABSURDO!' },
+      billing_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'I do not recognize this charge on my credit card, please investigate' },
+      mixed_language: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'What is your política de devolução? I need to return my order' }
     };
 
     function willEscalate(inquiry) {
