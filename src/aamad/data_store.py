@@ -74,6 +74,7 @@ if SQLALCHEMY_AVAILABLE:
         run_id = Column(String(36))
         execution_time_ms = Column(Integer, default=0)
         api_tags = Column(JSON, default=list)
+        quality_evaluation = Column(JSON, default=dict)
 
 
 class SupportTicketData(BaseModel):
@@ -109,6 +110,7 @@ class SupportTicketData(BaseModel):
     token_usage: Dict[str, Any] = {}
     cost_usd: float = 0.0
     api_tags: List[str] = []
+    quality_evaluation: Dict[str, Any] = {}
 
 
 class DataStore:
@@ -132,12 +134,22 @@ class DataStore:
             logger.info("Using JSON file storage for data persistence")
 
     def _migrate_add_api_tags(self):
-        """Add api_tags column to existing databases that predate it."""
+        """Add api_tags and quality_evaluation columns to existing databases."""
         try:
             with self.engine.connect() as conn:
                 conn.execute(
                     __import__("sqlalchemy").text(
                         "ALTER TABLE support_tickets ADD COLUMN api_tags JSON"
+                    )
+                )
+                conn.commit()
+        except Exception:
+            pass  # Column already exists
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE support_tickets ADD COLUMN quality_evaluation JSON"
                     )
                 )
                 conn.commit()
@@ -195,6 +207,7 @@ class DataStore:
             execution_time_ms=db_ticket.execution_time_ms or 0,
             wall_time_sec=round((db_ticket.execution_time_ms or 0) / 1000, 3),
             api_tags=db_ticket.api_tags or [],
+            quality_evaluation=db_ticket.quality_evaluation or {},
         )
 
     _REFUND_SEED = [
@@ -334,6 +347,7 @@ class DataStore:
                     run_id=ticket_data.run_id,
                     execution_time_ms=ticket_data.execution_time_ms,
                     api_tags=ticket_data.api_tags or [],
+                    quality_evaluation=ticket_data.quality_evaluation or {},
                 )
                 db.merge(db_ticket)  # Use merge to handle updates
                 db.commit()

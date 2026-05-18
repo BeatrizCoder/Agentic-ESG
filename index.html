@@ -3555,6 +3555,42 @@
         }
       }
 
+      const qualityCard = (() => {
+        const qe = ticket.quality_evaluation;
+        if (!qe || qe.evaluated !== true) return '';
+        return `
+          <div style="background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-left:3px solid #7C3AED;border-radius:8px;padding:14px 16px;margin-bottom:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="font-size:11px;font-family:'DM Mono',monospace;color:#A78BFA;text-transform:uppercase;letter-spacing:0.1em;">⚖️ Quality Evaluation</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                ${qe.hallucination_detected ? `<span style="font-size:10px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#F87171;padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;">⚠️ Hallucination detected</span>` : ''}
+                <span style="font-size:22px;font-weight:800;color:${gradeColor(qe.grade)};">${qe.grade}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+              ${['faithfulness','relevance','empathy','completeness'].map(dim => {
+                const score = qe[dim] || 0;
+                return `<div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:11px;color:var(--muted);width:95px;text-transform:capitalize;font-family:'DM Mono',monospace;">${dim}</span>
+                  <div style="flex:1;height:3px;background:rgba(255,255,255,0.08);border-radius:999px;">
+                    <div style="height:100%;width:${score*10}%;background:${scoreColor(score)};border-radius:999px;"></div>
+                  </div>
+                  <span style="font-size:11px;font-family:'DM Mono',monospace;color:${scoreColor(score)};width:24px;text-align:right;">${score}</span>
+                </div>`;
+              }).join('')}
+            </div>
+            ${qe.hallucination_detected && qe.hallucination_details && qe.hallucination_details !== 'none' ? `
+              <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px;color:#F87171;">⚠️ ${qe.hallucination_details}</div>` : ''}
+            ${qe.issues && qe.issues.length ? `
+              <div style="margin-bottom:6px;">${qe.issues.map(i => `<div style="font-size:12px;color:#F87171;margin-bottom:2px;">• ${i}</div>`).join('')}</div>` : ''}
+            ${qe.suggestion ? `
+              <div style="font-size:12px;color:var(--muted2);font-style:italic;padding:6px 8px;background:rgba(0,0,0,0.15);border-radius:4px;margin-bottom:8px;">💡 ${qe.suggestion}</div>` : ''}
+            <div style="margin-top:8px;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;border-top:1px solid rgba(255,255,255,0.05);padding-top:8px;">
+              judge: ${qe.judge_model} → evaluated: ${qe.response_model} · cost: $${(qe.cost_usd || 0).toFixed(6)}
+            </div>
+          </div>`;
+      })();
+
       return `
         <div class="card-stack">
           ${caseDetailsCard}
@@ -3565,6 +3601,7 @@
             Confidence: Response ${Math.round(ticket.response_confidence || 0)}% · Category ${Math.round(ticket.category_confidence || 0)}% · Sentiment ${Math.round(ticket.sentiment_confidence || 0)}%
           </p>
           ${feedbackCard}
+          ${qualityCard}
         </div>
       `;
     }
@@ -5571,6 +5608,7 @@
         <p style="margin:0 0 4px;font-size:0.78rem;color:var(--muted);opacity:0.65;">Technical performance data for engineering teams</p>
 
         ${renderAgentHealth(tickets)}
+        ${renderQualityEvaluation(tickets)}
         ${renderAgentPerformanceTable()}
         <div style="height: 40px;"></div>
       `;
@@ -5938,15 +5976,38 @@
           </div>
 
           ${rowHeader(CYAN, 'Quality Metrics', 'How well agents understand and respond')}
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:stretch;">
-            ${card(CYAN, classStatus, '🎯', 'Classification Accuracy', classAcc + '%',
-              'Accuracy in categorizing customer issues', 'Target: &gt;80%', classPill, 0)}
-            ${card(CYAN, timeStatus, '⚡', 'Avg Response Time',
-              avgTime !== null ? avgTime.toFixed(1) + 's' : '--',
-              'End-to-end response time per ticket', 'Target: &lt;15s', timePill, 60)}
-            ${card(CYAN, sentStatus, '📊', 'Sentiment Score', avgSent !== null ? avgSent + '/100' : '--',
-              'Avg customer sentiment (neutral=100, urgent=0)', 'Weighted: neutral · concerned · urgent', sentPill, 120)}
-          </div>
+          ${(() => {
+            const evaluated = tickets.filter(t => t.quality_evaluation && t.quality_evaluation.evaluated === true);
+            const hallucinated = evaluated.filter(t => t.quality_evaluation.hallucination_detected === true);
+            const hallRate = evaluated.length > 0 ? Math.round(hallucinated.length / evaluated.length * 100) : null;
+            const hallVal = hallRate !== null ? hallRate + '%' : '--';
+            const hallStatus = hallRate === null ? 'gray' : hallRate === 0 ? 'green' : hallRate <= 5 ? 'green' : hallRate <= 15 ? 'yellow' : 'red';
+            const hallPill = hallRate === null ? '⚪ No Data' : hallRate === 0 ? '🟢 Low Risk' : hallRate <= 5 ? '🟢 Healthy' : hallRate <= 15 ? '🟡 Monitor' : '🔴 Critical';
+            const hallNote = evaluated.length > 0 ? `${hallucinated.length} of ${evaluated.length} evaluated` : 'Process tickets to populate';
+            const hallBorder = hallRate !== null && hallRate > 0 ? '#EF4444' : hallRate === 0 ? '#10B981' : CYAN;
+            return `
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch;">
+              ${card(CYAN, classStatus, '🎯', 'Classification Accuracy', classAcc + '%',
+                'Accuracy in categorizing customer issues', 'Target: &gt;80%', classPill, 0)}
+              ${card(CYAN, timeStatus, '⚡', 'Avg Response Time',
+                avgTime !== null ? avgTime.toFixed(1) + 's' : '--',
+                'End-to-end response time per ticket', 'Target: &lt;15s', timePill, 60)}
+              ${card(CYAN, sentStatus, '📊', 'Sentiment Score', avgSent !== null ? avgSent + '/100' : '--',
+                'Avg customer sentiment (neutral=100, urgent=0)', 'Weighted: neutral · concerned · urgent', sentPill, 120)}
+              <div style="background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${hallBorder};border-radius:14px;padding:20px 18px 16px;display:flex;flex-direction:column;gap:10px;animation:ahFadeUp 0.38s ease both;animation-delay:180ms;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <span style="font-size:1.05rem;">🧠</span>
+                    <span style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;">Hallucination Rate</span>
+                  </div>
+                  ${pill(hallStatus, hallPill)}
+                </div>
+                <div style="font-size:2.4rem;font-family:'DM Mono',monospace;color:${(SC[hallStatus]||SC.gray).text};line-height:1;letter-spacing:-0.02em;">${hallVal}</div>
+                <div style="font-size:0.74rem;color:var(--muted);font-family:'DM Mono',monospace;opacity:0.85;">${hallNote}</div>
+                <div style="font-size:0.74rem;color:var(--muted);opacity:0.6;margin-top:auto;line-height:1.4;">Responses with hallucinated information<br><span style="font-size:0.68rem;opacity:0.6;">Evaluated by claude-sonnet-4-6</span></div>
+              </div>
+            </div>`;
+          })()}
 
           ${rowHeader(VIOLET, 'Operational Metrics', 'Business efficiency of the support pipeline')}
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:stretch;">
@@ -6051,6 +6112,93 @@
       `;
     }
 
+    function gradeColor(grade) {
+      const c = { 'A': '#10B981', 'B': '#38BDF8', 'C': '#FBBF24', 'D': '#F97316', 'F': '#EF4444' };
+      return c[grade] || '#94A3B8';
+    }
+    function scoreColor(score) {
+      if (score >= 8) return '#10B981';
+      if (score >= 6) return '#FBBF24';
+      return '#EF4444';
+    }
+
+    function renderQualityEvaluation(tickets) {
+      const evaluated = tickets.filter(t => t.quality_evaluation && t.quality_evaluation.evaluated === true);
+      if (evaluated.length === 0) {
+        return `
+          <div class="panel-card" style="margin-top:24px;padding:28px 32px;">
+            <h3 style="margin:0 0 6px;font-size:1.05rem;font-weight:700;">⚖️ Response Quality Evaluation</h3>
+            <p style="margin:0 0 18px;font-size:0.81rem;color:var(--muted);">Cross-model evaluation: claude-sonnet judges claude-haiku responses</p>
+            <div style="text-align:center;padding:36px;color:var(--muted);opacity:0.5;">
+              <div style="font-size:2rem;margin-bottom:10px;">⚖️</div>
+              <div style="font-size:0.88rem;">No evaluations yet — process auto-resolved tickets to populate.</div>
+            </div>
+          </div>`;
+      }
+
+      const avgScore = (dim) => evaluated.length > 0
+        ? Math.round(evaluated.reduce((sum, t) => sum + (t.quality_evaluation[dim] || 0), 0) / evaluated.length * 10) / 10
+        : null;
+
+      const dims = [
+        { key: 'faithfulness', label: 'Faithfulness', icon: '🔍' },
+        { key: 'relevance',    label: 'Relevance',    icon: '🎯' },
+        { key: 'empathy',      label: 'Empathy',      icon: '💬' },
+        { key: 'completeness', label: 'Completeness', icon: '✅' },
+      ];
+
+      const scoreDimCards = dims.map(d => {
+        const v = avgScore(d.key);
+        const col = v === null ? '#94A3B8' : v >= 8 ? '#10B981' : v >= 6 ? '#FBBF24' : '#EF4444';
+        const pct = v !== null ? (v / 10 * 100) : 0;
+        return `
+          <div style="background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${col};border-radius:14px;padding:18px 16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;">${d.icon} ${d.label}</div>
+            <div style="font-size:2.2rem;font-family:'DM Mono',monospace;color:${col};line-height:1;">${v !== null ? v + '/10' : '--'}</div>
+            <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:999px;"><div style="height:100%;width:${pct}%;background:${col};border-radius:999px;transition:width 0.4s;"></div></div>
+          </div>`;
+      }).join('');
+
+      const gradeCounts = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+      evaluated.forEach(t => { const g = t.quality_evaluation.grade; if (g in gradeCounts) gradeCounts[g]++; });
+      const gradeColors = { A: '#10B981', B: '#38BDF8', C: '#FBBF24', D: '#F97316', F: '#EF4444' };
+      const gradePills = Object.entries(gradeCounts).map(([g, n]) => `
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:1px solid ${gradeColors[g]}44;border-radius:8px;padding:6px 12px;">
+          <span style="font-size:1rem;font-weight:800;color:${gradeColors[g]};">${g}</span>
+          <span style="font-size:0.78rem;color:var(--muted);">${n} ticket${n !== 1 ? 's' : ''}</span>
+        </span>`).join('');
+
+      const hallucinatedTickets = evaluated.filter(t => t.quality_evaluation.hallucination_detected === true);
+
+      return `
+        <div class="panel-card" style="margin-top:24px;padding:28px 32px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;">⚖️ Response Quality Evaluation</h3>
+            <span style="font-size:0.68rem;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.6;">${evaluated.length} ticket${evaluated.length !== 1 ? 's' : ''} evaluated</span>
+          </div>
+          <p style="margin:0 0 18px;font-size:0.81rem;color:var(--muted);">Cross-model evaluation: claude-sonnet-4-6 judges claude-haiku-4-5 responses</p>
+
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+            ${scoreDimCards}
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Grade Distribution</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">${gradePills}</div>
+          </div>
+
+          ${hallucinatedTickets.length > 0 ? `
+          <div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:14px 16px;">
+            <div style="font-size:0.78rem;font-weight:600;color:#F87171;margin-bottom:8px;">⚠️ Hallucinations Detected: ${hallucinatedTickets.length} ticket${hallucinatedTickets.length !== 1 ? 's' : ''}</div>
+            ${hallucinatedTickets.map(t => `
+              <div style="font-size:0.75rem;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:4px;">
+                <span style="color:#F87171;">${t.reference_id}</span> — ${t.quality_evaluation.hallucination_details || 'details not available'}
+              </div>`).join('')}
+          </div>` : `
+          <div style="font-size:0.78rem;color:#10B981;opacity:0.8;">✅ No hallucinations detected across ${evaluated.length} evaluated response${evaluated.length !== 1 ? 's' : ''}.</div>`}
+        </div>`;
+    }
+
     function renderAgentPerformanceTable() {
       const obs = state.observability;
       const perf = obs && obs.agent_performance ? obs.agent_performance : null;
@@ -6060,6 +6208,7 @@
         { key: 'Sentiment Analysis Tool Agent', icon: '💬', label: 'Sentiment Analysis' },
         { key: 'Knowledge Retrieval Tool Agent',icon: '📚', label: 'Knowledge Retrieval' },
         { key: 'Response Generation Tool Agent',icon: '🤖', label: 'Response Generation' },
+        { key: 'Quality Evaluator Agent',        icon: '⚖️', label: 'Quality Evaluator' },
         { key: 'Escalation Evaluation Tool Agent',icon:'🚨', label: 'Escalation Evaluation' },
       ];
 

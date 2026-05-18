@@ -46,6 +46,7 @@ from tools.github_tool import GitHubTool
 from tools.address_validation_tool import AddressValidationTool
 from tools.weather_check_tool import WeatherCheckTool
 from tools.refund_lookup_tool import RefundLookupTool, is_refund_inquiry, extract_order_number
+from tools.quality_evaluator import quality_evaluator
 
 # Load environment variables
 load_dotenv()
@@ -168,6 +169,7 @@ class SupportResponse(BaseModel):
     routing_reason: str | None = None
     routing_missing_info: list[str] | None = None
     api_tags: list[str] | None = None
+    quality_evaluation: dict | None = None
 
 
 class SupportState(BaseModel):
@@ -207,6 +209,8 @@ class SupportState(BaseModel):
     weather_delay: dict = {}
     refund_data: dict = {}
     api_tags: list[str] = []
+    auto_resolve_reason: str = ""
+    quality_evaluation: dict = {}
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({
@@ -644,13 +648,25 @@ class SupportFlow(Flow[SupportState]):
                 self.state.api_tags.append("refund_lookup")
                 if refund_result.get("found"):
                     self.state.api_tags.append("refund_found")
+                    refund_details = [f"REFUND DATA FOUND - Pedido {order_num}:"]
+                    refund_details.append(f"Status: {refund_result.get('status', '')}")
+                    if refund_result.get("amount"):
+                        refund_details.append(f"Amount: {refund_result['amount']}")
+                    if refund_result.get("product_name"):
+                        refund_details.append(f"Product: {refund_result['product_name']}")
+                    if refund_result.get("approval_date"):
+                        refund_details.append(f"Approval date: {refund_result['approval_date']}")
+                    if refund_result.get("bank_deadline"):
+                        refund_details.append(f"Bank deadline: {refund_result['bank_deadline']}")
+                    if refund_result.get("eta_days"):
+                        refund_details.append(f"ETA: {refund_result['eta_days']} business days")
+                    context_parts.append("\n".join(refund_details))
+                else:
+                    msg = refund_result.get("message_pt" if is_pt else "message_en", "")
+                    if msg:
+                        context_parts.append(f"REFUND NOT FOUND (pedido {order_num}): {msg}")
                 if refund_result.get("should_escalate"):
                     self.state.api_tags.append("refund_denied")
-                msg = refund_result.get("message_pt" if is_pt else "message_en", "")
-                if msg:
-                    context_parts.append(
-                        f"REFUND STATUS (pedido {order_num}): {msg}"
-                    )
                 self.log_step("Refund Status Agent", {
                     "order_number": order_num,
                     "refund_status": refund_result.get("status"),
@@ -718,6 +734,65 @@ class SupportFlow(Flow[SupportState]):
         return f"Generated response with confidence {self.state.response_confidence}%"
 
     @listen(generate_response)
+    async def evaluate_response_quality(self):
+        """Cross-model quality evaluation: Sonnet judges Haiku responses."""
+        # Skip if no substantive response yet (awaiting/missing-info cases have short canned messages)
+        if not self.state.response or len(self.state.response) < 40:
+            self.log_step("Quality Evaluator Agent", {
+                "skipped": True,
+                "reason": "no substantive response to evaluate",
+            })
+            return "Skipped: no response"
+
+        # Skip explicit escalation-only paths (no AI response generated)
+        if self.state.routing_action == "escalate" and not self.state.external_context:
+            self.log_step("Quality Evaluator Agent", {
+                "skipped": True,
+                "reason": "escalated with no external context",
+            })
+            return "Skipped: pure escalation"
+
+        try:
+            evaluation = await asyncio.to_thread(
+                quality_evaluator.evaluate,
+                inquiry=self.state.inquiry,
+                response=self.state.response,
+                category=self.state.category,
+                routing_action=self.state.routing_action,
+                knowledge_context=self.state.knowledge_context,
+                external_context=self.state.external_context,
+            )
+
+            self.state.quality_evaluation = evaluation
+
+            self.log_step("Quality Evaluator Agent", {
+                "judge_model": evaluation.get("judge_model"),
+                "response_model": evaluation.get("response_model"),
+                "overall": evaluation.get("overall"),
+                "grade": evaluation.get("grade"),
+                "faithfulness": evaluation.get("faithfulness"),
+                "relevance": evaluation.get("relevance"),
+                "empathy": evaluation.get("empathy"),
+                "completeness": evaluation.get("completeness"),
+                "hallucination_detected": evaluation.get("hallucination_detected"),
+                "hallucination_details": evaluation.get("hallucination_details"),
+                "issues": evaluation.get("issues", []),
+                "suggestion": evaluation.get("suggestion"),
+                "cost_usd": evaluation.get("cost_usd", 0),
+                "latency_ms": evaluation.get("latency_ms", 0),
+            })
+
+            return (
+                f"Evaluated: grade={evaluation.get('grade', '?')} "
+                f"overall={evaluation.get('overall', 0)} "
+                f"hallucination={evaluation.get('hallucination_detected', False)}"
+            )
+
+        except Exception as e:
+            logger.error("Quality evaluation failed: %s", e)
+            return f"Evaluation failed: {e}"
+
+    @listen(evaluate_response_quality)
     async def evaluate_escalation(self):
         print(f"DEBUG evaluate_escalation:")
         print(f"  routing_action: {self.state.routing_action}")
@@ -767,12 +842,11 @@ class SupportFlow(Flow[SupportState]):
         print(f"DEBUG escalation: routing_action={self.state.routing_action}")
 
         if self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
-            # PRIORITY 1: logistics alert overrides everything
+            # PRIORITY 1: logistics alert — LLM already generated response using external_context
             alert = self.state.logistics_alert
-            is_pt = self._is_portuguese(self.state.inquiry)
             self.state.escalation_required = False
             self.state.routing_action = "resolve"
-            self.state.response = alert["message_pt"] if is_pt else alert["message_en"]
+            self.state.auto_resolve_reason = "logistics_alert"
             self.log_step("Routing Engine", {
                 "override": "logistics_alert",
                 "reason": "Active logistics delay — auto-resolved",
@@ -781,12 +855,10 @@ class SupportFlow(Flow[SupportState]):
             })
 
         elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
-            # PRIORITY 2: weather delay
-            delay = self.state.weather_delay
-            is_pt = self._is_portuguese(self.state.inquiry)
+            # PRIORITY 2: weather delay — LLM already generated response using external_context
             self.state.escalation_required = False
             self.state.routing_action = "resolve"
-            self.state.response = delay["message_pt"] if is_pt else delay["message_en"]
+            self.state.auto_resolve_reason = "weather_delay"
             self.log_step("Routing Engine", {
                 "override": "weather_delay",
                 "reason": "Adverse weather — auto-resolved",
@@ -795,16 +867,11 @@ class SupportFlow(Flow[SupportState]):
 
         elif (self.state.refund_data.get("found") and
               self.state.refund_data.get("auto_resolve")):
-            # PRIORITY 3: refund found + auto-resolvable (approved / pending)
+            # PRIORITY 3: refund found + auto-resolvable — LLM generated response via REFUND DATA FOUND context
             refund_status = self.state.refund_data.get("status")
-            is_pt = self._is_portuguese(self.state.inquiry)
-            msg = self.state.refund_data.get(
-                "message_pt" if is_pt else "message_en", ""
-            )
             self.state.escalation_required = False
             self.state.routing_action = "resolve"
-            if msg:
-                self.state.response = msg
+            self.state.auto_resolve_reason = "refund_found"
             self.log_step("Routing Engine", {
                 "override": "refund_status",
                 "refund_status": refund_status,
@@ -1166,6 +1233,7 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         token_usage=final_state.token_usage,
         cost_usd=final_state.cost_usd,
         api_tags=final_state.api_tags,
+        quality_evaluation=final_state.quality_evaluation or {},
     )
 
     # Save to data store
@@ -1228,6 +1296,7 @@ async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
         routing_reason=final_state.routing_reason or None,
         routing_missing_info=final_state.routing_missing_info or None,
         api_tags=final_state.api_tags or None,
+        quality_evaluation=final_state.quality_evaluation or None,
     )
 
     return response
