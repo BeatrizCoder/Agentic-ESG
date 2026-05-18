@@ -1110,7 +1110,7 @@
 
     .metrics-row {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       margin-bottom: 24px;
       align-items: stretch;
@@ -1118,7 +1118,13 @@
 
     @media (max-width: 1440px) {
       .metrics-row {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 960px) {
+      .metrics-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
@@ -2137,7 +2143,8 @@
       progressState: AGENTS.map(agent => ({ ...agent, status: 'waiting' })),
       activeTab: 'response',
       showOfflineBadge: false,
-      filters: { status: 'All', category: 'All', apiTag: '' },
+      filters: { status: '', category: 'All', apiTag: '' },
+      humanRequestedFilter: false,
       modal: null,
       lastInquiry: '',
       feedbackStatus: null,
@@ -3174,11 +3181,13 @@
         </div>` : ''}
 
         <section class="metrics-row">
-          ${renderMetricCard(metrics.total, 'Total Tickets')}
-          ${renderMetricCard(metrics.escalated, 'Escalated')}
-          ${renderMetricCard(metrics.resolved, 'Resolved')}
-          ${renderMetricCard(metrics.avgConfidence, 'Avg Confidence')}
-          ${renderMetricCard(metrics.highUrgency, 'High Urgency')}
+          ${renderMetricCard(metrics.total, 'Total Tickets', `All time · ${metrics.todayCount} today`)}
+          ${renderMetricCard(metrics.escalated, 'Escalated', `${metrics.escPct}% of total · ${metrics.pendingReview} pending review`, metrics.escPct > 50 ? '#EF4444' : metrics.escPct > 30 ? '#F59E0B' : '#10B981')}
+          ${renderMetricCard(metrics.resolved, 'Resolved', `${metrics.resPct}% of total · ${metrics.todayResolved} today`, metrics.resPct > 60 ? '#10B981' : metrics.resPct > 40 ? '#F59E0B' : '#EF4444')}
+          ${renderMetricCard(metrics.avgConfidence, 'Avg Confidence', `Based on ${state.tickets.length} evaluated tickets`)}
+          ${renderMetricCard(metrics.highUrgency, 'High Urgency', `${metrics.urgPct}% of total`, metrics.urgPct > 30 ? '#EF4444' : '')}
+          ${renderMetricCard(metrics.humanRequested, '👤 Human Requested', `${metrics.humanPct}% of total`, '#F59E0B')}
+          ${renderMetricCard(metrics.awaiting, '⏳ Awaiting Info', 'Waiting for customer', '#38BDF8')}
         </section>
 
         <section class="operator-grid">
@@ -3187,8 +3196,37 @@
               <h3 style="margin:0;">Ticket Queue</h3>
               <span style="font-size:0.7rem;font-family:'DM Mono',monospace;color:var(--muted);">${lastRefreshTime ? 'Last updated: ' + lastRefreshTime : '—'}</span>
             </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;" id="quick-filter-row">
+              ${(function() {
+                const m = calculateOperatorMetrics();
+                const resolvedCount = m.resolved;
+                const pendingCount = m.pendingReview;
+                const awaitingCount = m.awaiting;
+                const humanCount = m.humanRequested;
+                const total = m.total;
+                const activeStatus = state.humanRequestedFilter ? 'human_requested' : (state.filters.status || '');
+                const pill = (status, label, borderColor, bgColor, textColor) => {
+                  const isActive = activeStatus === status;
+                  return `<button class="quick-filter" data-status="${status}" style="padding:4px 10px;font-size:11px;border-radius:999px;border:1px solid ${borderColor};background:${isActive ? borderColor : bgColor};color:${isActive ? '#fff' : textColor};cursor:pointer;font-family:var(--mono);font-weight:${isActive ? '700' : 'normal'};transition:all 0.15s;">${label}</button>`;
+                };
+                return [
+                  pill('',               `All (${total})`,              'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)', 'var(--muted)'),
+                  pill('pending_human_review',  `🚨 Pending (${pendingCount})`, 'rgba(239,68,68,0.5)',   'rgba(239,68,68,0.1)',   '#F87171'),
+                  pill('awaiting_customer_info',`⏳ Awaiting (${awaitingCount})`,'rgba(56,189,248,0.5)','rgba(56,189,248,0.1)',  '#38BDF8'),
+                  pill('completed',      `✅ Resolved (${resolvedCount})`,'rgba(16,185,129,0.5)', 'rgba(16,185,129,0.1)',  '#10B981'),
+                  pill('human_requested',`👤 Human Req (${humanCount})`, 'rgba(251,191,36,0.5)', 'rgba(251,191,36,0.1)',  '#FBBF24'),
+                ].join('');
+              })()}
+            </div>
             <div class="inline-filters">
-              <select id="filterStatus">${STATUS_OPTIONS.map(option => `<option value="${option}" ${state.filters.status === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
+              <select id="filterStatus">
+                <option value="" ${!state.filters.status ? 'selected' : ''}>All Statuses</option>
+                <option value="pending_human_review" ${state.filters.status === 'pending_human_review' ? 'selected' : ''}>🚨 Pending Review</option>
+                <option value="awaiting_customer_info" ${state.filters.status === 'awaiting_customer_info' ? 'selected' : ''}>⏳ Awaiting Customer Info</option>
+                <option value="completed" ${state.filters.status === 'completed' ? 'selected' : ''}>✅ Resolved</option>
+                <option value="approved" ${state.filters.status === 'approved' ? 'selected' : ''}>✅ Approved</option>
+                <option value="rejected" ${state.filters.status === 'rejected' ? 'selected' : ''}>❌ Rejected</option>
+              </select>
               <select id="filterCategory">${CATEGORY_OPTIONS.map(option => `<option value="${option}" ${state.filters.category === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
               <select id="filterApiTag">
                 <option value="" ${!state.filters.apiTag ? 'selected' : ''}>All API Tags</option>
@@ -3246,29 +3284,62 @@
     }
 
     function calculateOperatorMetrics() {
-      const total = state.tickets.length;
-      const escalated = state.tickets.filter(isEscalated).length;
-      const resolved = state.tickets.filter(isResolved).length;
-      const highUrgency = state.tickets.filter(t => t.urgency === 'High').length;
-      const avgConfidence = total === 0 ? '0%' : `${Math.round(state.tickets.reduce((sum, ticket) => sum + (ticket.response_confidence || 0), 0) / total)}%`;
-      return { total, escalated, resolved, avgConfidence, highUrgency };
+      const tickets = state.tickets;
+      const total = tickets.length;
+      const todayStr = new Date().toDateString();
+      const todayCount = tickets.filter(t => t.created_at && new Date(t.created_at).toDateString() === todayStr).length;
+      const escalated = tickets.filter(isEscalated).length;
+      const pendingReview = tickets.filter(t => t.status === 'pending_human_review').length;
+      const resolved = tickets.filter(isResolved).length;
+      const todayResolved = tickets.filter(t => isResolved(t) && t.created_at && new Date(t.created_at).toDateString() === todayStr).length;
+      const highUrgency = tickets.filter(t => t.urgency === 'High').length;
+      const awaiting = tickets.filter(t => t.status === 'awaiting_customer_info').length;
+      const humanRequested = tickets.filter(t =>
+        (t.inquiry || '').includes('CUSTOMER REQUESTED HUMAN SUPPORT') ||
+        (t.api_tags || []).includes('requested_human_support')
+      ).length;
+      const avgConfidence = total === 0 ? '0%' : `${Math.round(tickets.reduce((sum, t) => sum + (t.response_confidence || 0), 0) / total)}%`;
+      const pct = n => total === 0 ? 0 : Math.round(n / total * 100);
+      return {
+        total, todayCount,
+        escalated, escPct: pct(escalated), pendingReview,
+        resolved, resPct: pct(resolved), todayResolved,
+        avgConfidence,
+        highUrgency, urgPct: pct(highUrgency),
+        humanRequested, humanPct: pct(humanRequested),
+        awaiting,
+      };
     }
 
-    function renderMetricCard(value, label) {
+    function renderMetricCard(value, label, sub = '', accentColor = '') {
+      const accent = accentColor ? `border-left: 3px solid ${accentColor};` : '';
+      const subHtml = sub ? `<span style="font-size:0.68rem;color:var(--muted);font-family:var(--mono);line-height:1.3;margin-top:-4px;">${sub}</span>` : '';
       return `
-        <div class="metric-card">
+        <div class="metric-card" style="${accent}">
           <strong>${value}</strong>
           <span>${label}</span>
+          ${subHtml}
         </div>
       `;
     }
 
     function filteredTickets() {
       return state.tickets.filter(ticket => {
-        const statusMatches = state.filters.status === 'All' || (state.filters.status === 'Escalated' ? ticket.escalation_required : !ticket.escalation_required);
-        const categoryMatches = state.filters.category === 'All' || ticket.category === state.filters.category;
+        if (state.humanRequestedFilter) {
+          const isHuman =
+            (ticket.inquiry || '').includes('CUSTOMER REQUESTED HUMAN SUPPORT') ||
+            (ticket.api_tags || []).includes('requested_human_support');
+          if (!isHuman) return false;
+        }
+        const sf = state.filters.status;
+        if (sf && sf !== 'All') {
+          if (ticket.status !== sf) return false;
+        }
+        const categoryMatches = !state.filters.category || state.filters.category === 'All' || ticket.category === state.filters.category;
+        if (!categoryMatches) return false;
         const apiTagMatches = !state.filters.apiTag || (ticket.api_tags || []).includes(state.filters.apiTag);
-        return statusMatches && categoryMatches && apiTagMatches;
+        if (!apiTagMatches) return false;
+        return true;
       });
     }
 
@@ -4518,9 +4589,24 @@
       if (filterStatus) {
         filterStatus.addEventListener('change', event => {
           state.filters.status = event.target.value;
+          state.humanRequestedFilter = false;
           render();
         });
       }
+
+      document.querySelectorAll('.quick-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const status = btn.dataset.status;
+          if (status === 'human_requested') {
+            state.humanRequestedFilter = true;
+            state.filters.status = '';
+          } else {
+            state.humanRequestedFilter = false;
+            state.filters.status = status;
+          }
+          render();
+        });
+      });
 
       const filterCategory = document.getElementById('filterCategory');
       if (filterCategory) {
