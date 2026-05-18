@@ -1,9 +1,12 @@
 from crewai import Agent, Flow
 from crewai.flow.flow import start, listen, and_
 from crewai.tools import BaseTool
-from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel, Field
 import yaml
 import hashlib
@@ -54,6 +57,11 @@ load_dotenv()
 # API key authentication
 _API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "dev-key-change-in-production")
+if INTERNAL_API_KEY == "dev-key-change-in-production":
+    logger.warning(
+        "⚠️  INTERNAL_API_KEY is using the default value. "
+        "Set it in .env before deploying to production!"
+    )
 
 
 async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
@@ -91,7 +99,7 @@ def _is_portuguese(text: str) -> bool:
 
 
 class SupportTicket(BaseModel):
-    inquiry: str
+    inquiry: str = Field(..., min_length=1, max_length=2000, description="Customer inquiry text. Max 2000 characters.")
 
 
 class FeedbackRequest(BaseModel):
@@ -1046,6 +1054,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000"
@@ -1149,12 +1161,14 @@ _response_cache: Dict[str, Dict[str, Any]] = {}
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+@limiter.limit("60/minute")
+async def health(request: Request) -> dict[str, str]:
     return {"status": "ok", "service": "aamad backend"}
 
 
 @app.post("/api/support", response_model=SupportResponse)
-async def create_support_ticket(ticket: SupportTicket) -> SupportResponse:
+@limiter.limit("10/minute")
+async def create_support_ticket(request: Request, ticket: SupportTicket) -> SupportResponse:
     inquiry = ticket.inquiry.strip()
     if not inquiry:
         raise HTTPException(status_code=400, detail="Inquiry text cannot be empty.")

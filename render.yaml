@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: agentic-support-platform
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn aamad.backend:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

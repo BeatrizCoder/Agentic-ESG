@@ -2095,8 +2095,8 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000/api/support';
-    const DEFAULT_API_KEY = 'dev-key-change-in-production';
+    const DEFAULT_BACKEND_URL = (window.BACKEND_URL || 'http://127.0.0.1:8000') + '/api/support';
+    const DEFAULT_API_KEY = window.OPERATOR_API_KEY || '';
     const AGENTS = [
       { label: 'Classifier Agent', key: 'Classifier' },
       { label: 'Sentiment Agent', key: 'Sentiment' },
@@ -2132,7 +2132,7 @@
       activeTicketId: null,
       useBackend: true,
       backendUrl: DEFAULT_BACKEND_URL,
-      apiKey: DEFAULT_API_KEY,
+      apiKey: window.OPERATOR_API_KEY || localStorage.getItem('operator_api_key') || '',
       processing: false,
       progressState: AGENTS.map(agent => ({ ...agent, status: 'waiting' })),
       activeTab: 'response',
@@ -2165,6 +2165,12 @@
       refundDetailSubmitted: false,
       datasetMode: 'live',
     };
+
+    function getApiKey() {
+      return state.apiKey ||
+             localStorage.getItem('operator_api_key') ||
+             'dev-key-change-in-production';
+    }
 
     function render() {
       document.body.classList.toggle('customer-view', state.view === 'customer');
@@ -2295,6 +2301,7 @@
 
         document.getElementById('apiKeyInput').addEventListener('input', event => {
           state.apiKey = event.target.value.trim() || DEFAULT_API_KEY;
+          if (state.apiKey) localStorage.setItem('operator_api_key', state.apiKey);
         });
 
         document.getElementById('btn-clear-tickets')?.addEventListener('click', async () => {
@@ -2302,7 +2309,7 @@
           try {
             const res = await fetch(
               state.backendUrl.replace('/api/support', '/api/tickets/clear'),
-              { method: 'DELETE', headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+              { method: 'DELETE', headers: { 'X-API-Key': getApiKey() } }
             );
             const data = await res.json();
             showToast(`✅ ${data.deleted_tickets} tickets cleared. Backup: ${data.backup_filename}`);
@@ -2318,7 +2325,7 @@
           try {
             const res = await fetch(
               state.backendUrl.replace('/api/support', '/api/tickets/backups'),
-              { headers: { 'X-API-Key': state.apiKey || 'dev-key-change-in-production' } }
+              { headers: { 'X-API-Key': getApiKey() } }
             );
             const data = await res.json();
             if (!data.backups.length) { alert('No backups found.'); return; }
@@ -6804,7 +6811,7 @@
         const baseUrl = state.backendUrl.replace('/api/support', '');
         const res = await fetch(`${baseUrl}/api/observability/summary`, {
           headers: {
-            'X-API-Key': state.apiKey || 'dev-key-change-in-production'
+            'X-API-Key': getApiKey()
           }
         });
         if (!res.ok) return null;
@@ -6850,7 +6857,7 @@
           state.backendUrl.replace('/api/support', '/api/dataset/mode'),
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-API-Key': state.apiKey || 'dev-key-change-in-production' },
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() },
             body: JSON.stringify({ mode })
           }
         );
