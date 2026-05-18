@@ -56,6 +56,50 @@ class ResponseTool(BaseSupportTool):
                         f"You MUST reference this real data in your response.\n"
                     )
 
+                alert_instructions = ""
+                if "LOGISTICS ALERT ACTIVE" in (external_context or ""):
+                    alert_instructions = (
+                        "\nIMPORTANT: There is an active logistics alert for the customer's region. "
+                        "Your response MUST:\n"
+                        "- Acknowledge the specific validated address from the data above\n"
+                        "- Mention the fleet maintenance situation causing the delay\n"
+                        "- State the 3 additional business days delay clearly\n"
+                        "- Be empathetic and apologetic\n"
+                        "- Do NOT ask for more information — resolve this directly\n"
+                    )
+                elif "WEATHER DELAY ALERT" in (external_context or ""):
+                    alert_instructions = (
+                        "\nIMPORTANT: Adverse weather is affecting deliveries in the customer's city. "
+                        "Your response MUST:\n"
+                        "- Mention the specific city and real weather conditions from the data above\n"
+                        "- Include the actual temperature\n"
+                        "- Explain clearly that weather is causing delivery delays\n"
+                        "- Estimate 1-2 additional business days\n"
+                        "- Be warm and reassuring\n"
+                        "- Do NOT ask for more information — resolve this directly\n"
+                    )
+
+                elif "REFUND DATA FOUND" in (external_context or ""):
+                    alert_instructions = (
+                        "\nSITUATION: Refund record found in database. "
+                        "The customer is asking about their refund status. "
+                        "Use the exact data provided in the real-time data above.\n"
+                        "Your response MUST:\n"
+                        "- Address the customer's specific concern empathetically\n"
+                        "- Mention the EXACT order number\n"
+                        "- Mention the EXACT product name if available\n"
+                        "- Mention the EXACT amount in R$ if available\n"
+                        "- Clearly explain the current status in plain language\n"
+                        "- If approved but bank not processed: explain banking timeline\n"
+                        "- If processed: confirm money was returned\n"
+                        "- If pending: give realistic timeline\n"
+                        "- Match the tone to customer sentiment "
+                        "(if frustrated: more apologetic, if neutral: informative)\n"
+                        "- Keep under 120 words\n"
+                        "- Sound human, not like a template\n"
+                        "- Do NOT ask for more information — resolve this directly\n"
+                    )
+
                 routing_block = ""
                 if routing_action == "resolve":
                     routing_block = (
@@ -84,7 +128,7 @@ Urgency: {urgency}
 
 {external_section}Relevant knowledge base:
 {knowledge_text}
-{routing_block}
+{routing_block}{alert_instructions}
 Instructions:
 - {lang_instruction}
 - Be warm and empathetic
