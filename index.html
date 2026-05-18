@@ -2169,7 +2169,16 @@
     function getApiKey() {
       return state.apiKey ||
              localStorage.getItem('operator_api_key') ||
+             window.OPERATOR_API_KEY ||
              'dev-key-change-in-production';
+    }
+
+    function initOperatorDashboard() {
+      if (!state.apiKey && !localStorage.getItem('operator_api_key')) {
+        state.apiKey = 'dev-key-change-in-production';
+        localStorage.setItem('operator_api_key', 'dev-key-change-in-production');
+        console.log('Dev API key set automatically');
+      }
     }
 
     function render() {
@@ -2284,6 +2293,7 @@
           state.view = item.dataset.view;
           if (state.view === 'operator') {
             state.activeTab = 'response';
+            initOperatorDashboard();
           }
           render();
         });
@@ -5300,7 +5310,7 @@
         render();
         return;
       }
-      fetch(`${state.backendUrl}/${referenceId}/approve`, { method: 'POST', headers: { 'X-API-Key': state.apiKey } })
+      fetch(`${state.backendUrl}/${referenceId}/approve`, { method: 'POST', headers: { 'X-API-Key': getApiKey() } })
         .then(response => {
           if (response.ok) {
             ticket.escalation_required = false;
@@ -5325,7 +5335,7 @@
         render();
         return;
       }
-      fetch(`${state.backendUrl}/${referenceId}/reject`, { method: 'POST', headers: { 'X-API-Key': state.apiKey } })
+      fetch(`${state.backendUrl}/${referenceId}/reject`, { method: 'POST', headers: { 'X-API-Key': getApiKey() } })
         .then(response => {
           if (response.ok) {
             ticket.escalation_required = true;
@@ -5350,7 +5360,7 @@
         render();
         return;
       }
-      fetch(`${state.backendUrl}/${referenceId}/await-customer`, { method: 'POST', headers: { 'X-API-Key': state.apiKey } })
+      fetch(`${state.backendUrl}/${referenceId}/await-customer`, { method: 'POST', headers: { 'X-API-Key': getApiKey() } })
         .then(response => {
           if (response.ok) {
             ticket.status = 'awaiting_customer_info';
@@ -6806,7 +6816,7 @@
       if (!state.useBackend) return;
       try {
         const metricsUrl = state.backendUrl.replace('/api/support', '/api/metrics/summary');
-        const resp = await fetch(metricsUrl, { headers: { 'X-API-Key': state.apiKey } });
+        const resp = await fetch(metricsUrl, { headers: { 'X-API-Key': getApiKey() } });
         if (!resp.ok) return;
         const data = await resp.json();
         state.perfMetrics = data;
@@ -6836,7 +6846,7 @@
       if (!state.useBackend) return;
       try {
         const ticketsUrl = state.backendUrl.replace('/api/support', '/api/tickets');
-        const resp = await fetch(ticketsUrl, { headers: { 'X-API-Key': state.apiKey } });
+        const resp = await fetch(ticketsUrl, { headers: { 'X-API-Key': getApiKey() } });
         if (!resp.ok) return;
         const dbTickets = await resp.json();
         const existingIds = new Set(state.tickets.map(t => t.reference_id));
@@ -7003,7 +7013,7 @@
       analyticsRefreshInterval = setInterval(() => {
         if (!state.useBackend) return;
         const ticketsUrl = state.backendUrl.replace('/api/support', '/api/tickets');
-        fetch(ticketsUrl, { headers: { 'X-API-Key': state.apiKey } })
+        fetch(ticketsUrl, { headers: { 'X-API-Key': getApiKey() } })
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data || !Array.isArray(data)) return;
