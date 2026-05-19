@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 import urllib.request
 import urllib.error
 import urllib.parse
+import asyncio
+import httpx
 import json
 import time
 import logging
@@ -217,3 +219,158 @@ class WeatherCheckTool(BaseTool):
                 "fallback": "Weather check temporarily unavailable — proceeding without weather data.",
                 "latency_ms": latency_ms,
             }
+
+    async def _arun(self, city: str) -> dict:
+        start_time = time.time()
+
+        try:
+            api_key = self._get_api_key()
+        except ValueError as e:
+            logger.error("WeatherCheckTool: %s", e)
+            return {
+                "available": False,
+                "city": city,
+                "error": str(e),
+                "error_type": "config_error",
+                "adverse_conditions": False,
+                "fallback": "Weather check unavailable — API key not configured.",
+                "latency_ms": 0,
+            }
+
+        url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            "q": f"{city},BR",
+            "appid": api_key,
+            "units": "metric",
+            "lang": "pt_br",
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            for attempt in range(self.max_retries + 1):
+                try:
+                    logger.info(
+                        "WeatherCheckTool: async attempt %d/%d city=%s",
+                        attempt + 1, self.max_retries + 1, city,
+                    )
+                    response = await client.get(url, params=params)
+
+                    if response.status_code == 429:
+                        logger.warning("WeatherCheckTool: rate limited, waiting before retry...")
+                        if attempt < self.max_retries:
+                            await asyncio.sleep(self.retry_delay * 2)
+                            continue
+                        latency_ms = round((time.time() - start_time) * 1000, 2)
+                        return {
+                            "available": False,
+                            "city": city,
+                            "error": "Rate limit exceeded (429)",
+                            "error_type": "api_unavailable",
+                            "adverse_conditions": False,
+                            "fallback": "Weather check temporarily unavailable — proceeding without weather data.",
+                            "latency_ms": latency_ms,
+                        }
+
+                    if response.status_code == 401:
+                        latency_ms = round((time.time() - start_time) * 1000, 2)
+                        logger.error("WeatherCheckTool: invalid API key")
+                        return {
+                            "available": False,
+                            "city": city,
+                            "error": "Invalid OpenWeather API key",
+                            "error_type": "auth_error",
+                            "adverse_conditions": False,
+                            "fallback": "Weather check unavailable — invalid API key.",
+                            "latency_ms": latency_ms,
+                        }
+
+                    if response.status_code == 404:
+                        latency_ms = round((time.time() - start_time) * 1000, 2)
+                        logger.warning("WeatherCheckTool: city not found: %s", city)
+                        return {
+                            "available": False,
+                            "city": city,
+                            "error": f"City '{city}' not found.",
+                            "error_type": "city_not_found",
+                            "adverse_conditions": False,
+                            "fallback": "Could not check weather — proceeding without weather data.",
+                            "latency_ms": latency_ms,
+                        }
+
+                    response.raise_for_status()
+                    data = response.json()
+                    latency_ms = round((time.time() - start_time) * 1000, 2)
+
+                    weather_id = data["weather"][0]["id"]
+                    weather_desc = data["weather"][0]["description"]
+                    temp = data["main"]["temp"]
+                    feels_like = data["main"]["feels_like"]
+                    humidity = data["main"]["humidity"]
+                    adverse = self._is_adverse(weather_id)
+
+                    logger.info(
+                        "OpenWeather: %s → %s %.1f°C adverse=%s latency=%dms",
+                        city, weather_desc, temp, adverse, latency_ms,
+                    )
+
+                    return {
+                        "available": True,
+                        "city": data.get("name", city),
+                        "country": data.get("sys", {}).get("country", "BR"),
+                        "temperature_c": round(temp, 1),
+                        "feels_like_c": round(feels_like, 1),
+                        "humidity_pct": humidity,
+                        "conditions": weather_desc,
+                        "weather_id": weather_id,
+                        "adverse_conditions": adverse,
+                        "delivery_impact": (
+                            "Adverse weather conditions detected — "
+                            "deliveries may be delayed in this region."
+                            if adverse else
+                            "Weather conditions are normal — "
+                            "no weather-related delays expected."
+                        ),
+                        "source": "openweathermap",
+                        "latency_ms": latency_ms,
+                    }
+
+                except httpx.TimeoutException:
+                    logger.warning(
+                        "WeatherCheckTool: timeout attempt %d/%d",
+                        attempt + 1, self.max_retries + 1,
+                    )
+                    if attempt == self.max_retries:
+                        latency_ms = round((time.time() - start_time) * 1000, 2)
+                        return {
+                            "available": False,
+                            "city": city,
+                            "error": f"Timeout after {self.timeout_seconds}s",
+                            "error_type": "api_unavailable",
+                            "adverse_conditions": False,
+                            "fallback": "Weather check temporarily unavailable — proceeding without weather data.",
+                            "latency_ms": latency_ms,
+                        }
+                    await asyncio.sleep(self.retry_delay)
+
+                except Exception as e:
+                    latency_ms = round((time.time() - start_time) * 1000, 2)
+                    logger.error("WeatherCheckTool: unexpected error: %s", e, exc_info=True)
+                    return {
+                        "available": False,
+                        "city": city,
+                        "error": str(e),
+                        "error_type": "api_unavailable",
+                        "adverse_conditions": False,
+                        "fallback": "Weather check temporarily unavailable — proceeding without weather data.",
+                        "latency_ms": latency_ms,
+                    }
+
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        return {
+            "available": False,
+            "city": city,
+            "error": "Max retries exceeded",
+            "error_type": "api_unavailable",
+            "adverse_conditions": False,
+            "fallback": "Weather check temporarily unavailable — proceeding without weather data.",
+            "latency_ms": latency_ms,
+        }

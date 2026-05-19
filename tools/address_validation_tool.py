@@ -4,6 +4,8 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 import urllib.request
 import urllib.error
+import asyncio
+import httpx
 import json
 import time
 import logging
@@ -167,3 +169,132 @@ class AddressValidationTool(BaseTool):
                 "latency_ms": latency_ms,
                 "fallback": "Address validation unavailable — proceeding without validation.",
             }
+
+    async def _arun(self, cep: str) -> dict:
+        start_time = time.time()
+        cep_clean = self._clean_cep(cep)
+
+        if not self._validate_cep_format(cep_clean):
+            logger.warning("AddressValidationTool: invalid CEP format: %s", cep)
+            return {
+                "valid": False,
+                "cep": cep,
+                "error": f"Invalid CEP format: '{cep}'. CEP must be 8 digits.",
+                "error_type": "validation_error",
+                "source": "viacep",
+                "latency_ms": 0,
+            }
+
+        url = self.base_url.format(cep=cep_clean)
+
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            for attempt in range(self.max_retries + 1):
+                try:
+                    logger.info(
+                        "AddressValidationTool: async attempt %d/%d url=%s",
+                        attempt + 1, self.max_retries + 1, url,
+                    )
+                    response = await client.get(
+                        url, headers={"Accept": "application/json"}
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    latency_ms = round((time.time() - start_time) * 1000, 2)
+
+                    if data.get("erro"):
+                        logger.info(
+                            "AddressValidationTool: CEP not found: %s latency=%dms",
+                            cep_clean, latency_ms,
+                        )
+                        return {
+                            "valid": False,
+                            "cep": cep_clean,
+                            "error": f"CEP {cep_clean} not found in ViaCEP database.",
+                            "error_type": "not_found",
+                            "source": "viacep",
+                            "latency_ms": latency_ms,
+                        }
+
+                    address = {
+                        "valid": True,
+                        "cep": data.get("cep", cep_clean),
+                        "street": data.get("logradouro", ""),
+                        "complement": data.get("complemento", ""),
+                        "neighborhood": data.get("bairro", ""),
+                        "city": data.get("localidade", ""),
+                        "state": data.get("uf", ""),
+                        "ibge": data.get("ibge", ""),
+                        "formatted": (
+                            f"{data.get('logradouro', '')}, "
+                            f"{data.get('bairro', '')}, "
+                            f"{data.get('localidade', '')} - "
+                            f"{data.get('uf', '')}"
+                        ),
+                        "source": "viacep",
+                        "latency_ms": latency_ms,
+                    }
+                    logger.info(
+                        "ViaCEP: success %s → %s-%s latency=%dms",
+                        cep_clean,
+                        data.get("localidade"),
+                        data.get("uf"),
+                        latency_ms,
+                    )
+                    return address
+
+                except httpx.TimeoutException:
+                    logger.warning(
+                        "AddressValidationTool: timeout attempt %d/%d",
+                        attempt + 1, self.max_retries + 1,
+                    )
+                    if attempt == self.max_retries:
+                        latency_ms = round((time.time() - start_time) * 1000, 2)
+                        return {
+                            "valid": False,
+                            "cep": cep_clean,
+                            "error": f"Timeout after {self.timeout_seconds}s",
+                            "error_type": "api_unavailable",
+                            "source": "viacep",
+                            "latency_ms": latency_ms,
+                            "fallback": "Address validation unavailable — proceeding without validation.",
+                        }
+                    await asyncio.sleep(self.retry_delay)
+
+                except httpx.HTTPStatusError as e:
+                    latency_ms = round((time.time() - start_time) * 1000, 2)
+                    logger.error("AddressValidationTool: HTTP error %s", e)
+                    return {
+                        "valid": False,
+                        "cep": cep_clean,
+                        "error": str(e),
+                        "error_type": "api_unavailable",
+                        "source": "viacep",
+                        "latency_ms": latency_ms,
+                        "fallback": "Address validation unavailable — proceeding without validation.",
+                    }
+
+                except Exception as e:
+                    latency_ms = round((time.time() - start_time) * 1000, 2)
+                    logger.error(
+                        "AddressValidationTool: unexpected error: %s", e, exc_info=True
+                    )
+                    return {
+                        "valid": False,
+                        "cep": cep_clean,
+                        "error": str(e),
+                        "error_type": "api_unavailable",
+                        "source": "viacep",
+                        "latency_ms": latency_ms,
+                        "fallback": "Address validation unavailable — proceeding without validation.",
+                    }
+
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        return {
+            "valid": False,
+            "cep": cep_clean,
+            "error": "Max retries exceeded",
+            "error_type": "api_unavailable",
+            "source": "viacep",
+            "latency_ms": latency_ms,
+            "fallback": "Address validation unavailable — proceeding without validation.",
+        }

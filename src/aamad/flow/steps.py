@@ -184,6 +184,18 @@ class SupportFlowStepsMixin:
         )
         return result
 
+    async def _run_viacep(self, cep: str) -> dict:
+        tool = _svc.tool_registry.tools.get("Address Validation Tool")
+        if tool is None:
+            return {"valid": False, "error": "Address Validation Tool not found"}
+        return await tool._arun(cep)
+
+    async def _run_weather(self, city: str) -> dict:
+        tool = _svc.tool_registry.tools.get("Weather Check Tool")
+        if tool is None:
+            return {"available": False, "error": "Weather Check Tool not found"}
+        return await tool._arun(city)
+
     @staticmethod
     def _is_portuguese(text: str) -> bool:
         import re as _re
@@ -310,11 +322,46 @@ class SupportFlowStepsMixin:
 
         context_parts = []
 
-        # ── CEP → address validation + logistics alert ──
+        # ── Detect CEP in inquiry (cheap, no I/O) ──
         cep_match = re.search(r'\b(\d{5}-?\d{3})\b', self.state.inquiry)
-        if cep_match:
-            cep = cep_match.group(1)
-            addr_result = await self.execute_tool("Address Validation Tool", cep)
+        cep = cep_match.group(1) if cep_match else None
+        is_order_issue = self.state.category == "Order Issues"
+
+        # ── Fetch external data (parallel when possible) ──
+        addr_result = None
+        weather_result = None
+        pre_weather_city = None   # city used for parallel weather call
+
+        if cep and is_order_issue:
+            # Pre-extract city via LLM so we can run ViaCEP + Weather simultaneously
+            pre_weather_city = await extract_location_with_llm(self.state.inquiry)
+            if pre_weather_city:
+                logger.info(
+                    "Running ViaCEP + Weather in parallel: cep=%s city=%s",
+                    cep, pre_weather_city,
+                )
+                gathered = await asyncio.gather(
+                    self._run_viacep(cep),
+                    self._run_weather(pre_weather_city),
+                    return_exceptions=True,
+                )
+                if isinstance(gathered[0], Exception):
+                    logger.error("ViaCEP parallel failed: %s", gathered[0])
+                    addr_result = {"valid": False}
+                else:
+                    addr_result = gathered[0]
+                if isinstance(gathered[1], Exception):
+                    logger.error("Weather parallel failed: %s", gathered[1])
+                    weather_result = {"available": False}
+                else:
+                    weather_result = gathered[1]
+            else:
+                addr_result = await self._run_viacep(cep)
+        elif cep:
+            addr_result = await self._run_viacep(cep)
+
+        # ── Process CEP result → logistics alert ──
+        if addr_result is not None:
             self.state.tools_used.append("Address Validation Tool")
             if addr_result.get("valid"):
                 self.state.api_tags.append("cep_validated")
@@ -362,7 +409,7 @@ class SupportFlowStepsMixin:
             if addr_result.get("fallback"):
                 context_parts.append(f"Address validation: {addr_result.get('fallback')}")
 
-        # ── Location detection + unified weather check ──
+        # ── Location detection ──
         # STEP A: Use city already set from CEP, or search partial context
         city_from_cep = None
         if self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
@@ -379,25 +426,26 @@ class SupportFlowStepsMixin:
                 if cep_city_match:
                     city_from_cep = cep_city_match.group(1).strip()
 
-        # STEP B: Try LLM location extraction if no CEP city
+        # STEP B: Determine final city — CEP city > LLM city
         detected_city = city_from_cep
-
         if not detected_city and not (
             self.state.logistics_alert and self.state.logistics_alert.get("alert_active")
         ):
-            detected_city = await extract_location_with_llm(self.state.inquiry)
+            # Use pre-extracted LLM city (from parallel path) or run now
+            detected_city = pre_weather_city or await extract_location_with_llm(self.state.inquiry)
 
         self.state.detected_city = detected_city or ""
         logger.debug("detected_city: %s", self.state.detected_city)
 
-        # STEP C: Run weather check for Order Issues with a detected city
-        if (detected_city and
-                self.state.category == "Order Issues" and
+        # STEP C: Weather check for Order Issues with a detected city
+        if (detected_city and is_order_issue and
                 not (self.state.logistics_alert and self.state.logistics_alert.get("alert_active"))):
 
-            logger.debug("weather: checking %s", detected_city)
+            if weather_result is None:
+                # Not pre-fetched (no parallel path) — run now
+                logger.debug("weather: checking %s", detected_city)
+                weather_result = await self._run_weather(detected_city)
 
-            weather_result = await self.execute_tool("Weather Check Tool", detected_city)
             self.state.tools_used.append("Weather Check Tool")
             self.state.weather_result = weather_result
 
