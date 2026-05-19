@@ -143,6 +143,8 @@ def check_weather_delay(city: str, weather_result: dict) -> dict | None:
         return None
     if not weather_result.get("adverse_conditions"):
         return None
+    conditions = weather_result.get("conditions", "")
+    temp = weather_result.get("temperature_c", "")
     city_lower = city.lower()
     for region, config in WEATHER_DELAY_REGIONS.items():
         if config.get("active") and any(
@@ -153,17 +155,29 @@ def check_weather_delay(city: str, weather_result: dict) -> dict | None:
                 "delay_active": True,
                 "region": region,
                 "message_pt": config["message_pt"].format(
-                    city=city,
-                    conditions=weather_result.get("conditions", ""),
-                    temp=weather_result.get("temperature_c", ""),
+                    city=city, conditions=conditions, temp=temp,
                 ),
                 "message_en": config["message_en"].format(
-                    city=city,
-                    conditions=weather_result.get("conditions", ""),
-                    temp=weather_result.get("temperature_c", ""),
+                    city=city, conditions=conditions, temp=temp,
                 ),
             }
-    return None
+    # Fallback: any city with adverse conditions gets a delay
+    return {
+        "delay_active": True,
+        "region": "generic",
+        "message_pt": (
+            f"Identificamos condições climáticas adversas em {city} "
+            f"({conditions}, {temp}°C). "
+            f"As condições estão causando atrasos nas operações logísticas. "
+            f"Sua entrega pode ter um atraso adicional de 1-2 dias úteis."
+        ),
+        "message_en": (
+            f"We've detected adverse weather conditions in {city} "
+            f"({conditions}, {temp}°C). "
+            f"These conditions are causing logistics delays. "
+            f"Your delivery may have an additional delay of 1-2 business days."
+        ),
+    }
 
 
 def _is_how_to_question(text: str) -> bool:
@@ -287,8 +301,6 @@ def route_ticket(
     if category == "Order Issues":
         if not has_order:
             missing.append("order_number")
-        if not has_email:
-            missing.append("email")
 
         if missing:
             return RoutingDecision(

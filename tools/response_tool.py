@@ -79,28 +79,42 @@ class ResponseTool(BaseSupportTool):
                         "- Be empathetic and apologetic\n"
                         "- Do NOT ask for more information — resolve this directly\n"
                     )
-                elif "WEATHER DELAY" in (external_context or ""):
+                elif "WEATHER DELAY ALERT" in (external_context or ""):
                     alert_instructions = (
                         "\nSITUATION: Adverse weather affecting deliveries "
                         "in the customer's region. Real weather data retrieved.\n"
                         "Your response MUST:\n"
-                        "- Mention the specific city and real conditions\n"
-                        "- Include the real temperature from the data\n"
+                        "- Start with weather emoji (🌧️ 🌩️ ⛈️ based on conditions)\n"
+                        "- Mention the specific city and real temperature\n"
+                        "- Mention the real weather conditions\n"
                         "- Explain weather is causing delivery delays\n"
-                        "- If order number mentioned in inquiry: reference it\n"
                         "- Estimate 1-2 additional business days\n"
                         "- Be warm and reassuring\n"
-                        "- Keep under 100 words\n"
+                        "- Under 100 words\n"
                         "- Do NOT ask for more information — resolve this directly\n"
+                    )
+
+                elif "CLEAR WEATHER ESCALATION" in (external_context or ""):
+                    alert_instructions = (
+                        "\nSITUATION: Weather is normal, order being escalated.\n"
+                        "Your response MUST:\n"
+                        "- Start with ☀️ emoji\n"
+                        "- Briefly mention weather was checked and is normal\n"
+                        "- Mention the city name and conditions from the data\n"
+                        "- Explain that since weather is not the cause, "
+                        "the team will investigate directly\n"
+                        "- Sound reassuring and professional\n"
+                        "- Under 80 words\n"
                     )
 
                 elif ("WEATHER CHECK" in (external_context or "") and
                       ("normal conditions" in (external_context or "") or
-                       "condições normais" in (external_context or ""))):
+                       "No weather impact" in (external_context or ""))):
                     alert_instructions = (
                         "\nSITUATION: Weather was checked but conditions are NORMAL. "
                         "No weather-related delivery issues in the customer's region.\n"
                         "Your response MUST:\n"
+                        "- Start with ☀️ emoji\n"
                         "- Briefly mention weather was checked and is normal\n"
                         "- Explain that since weather is not the cause, "
                         "the team will investigate the order directly\n"
