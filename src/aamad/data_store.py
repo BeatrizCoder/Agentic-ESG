@@ -84,6 +84,20 @@ if SQLALCHEMY_AVAILABLE:
         hallucination_detected = Column(Boolean, default=False)
         created_at = Column(DateTime, default=datetime.utcnow)
 
+    class PendingActionDB(Base):
+        """SQLAlchemy model for orders awaiting customer action."""
+        __tablename__ = "pending_actions"
+
+        order_number = Column(String(20), primary_key=True)
+        customer_name = Column(String(200), default="")
+        customer_email = Column(String(200), default="")
+        produto = Column(String(200), default="")
+        action_type = Column(String(50), nullable=False)
+        awaiting_info = Column(Text, nullable=False)
+        instructions = Column(Text, nullable=False)
+        deadline = Column(String(20), default="")
+        created_at = Column(String(20), default="")
+
     class SupportTicketDB(Base):
         """SQLAlchemy model for support tickets."""
         __tablename__ = "support_tickets"
@@ -117,6 +131,7 @@ if SQLALCHEMY_AVAILABLE:
         execution_time_ms = Column(Integer, default=0)
         api_tags = Column(JSON, default=list)
         quality_evaluation = Column(JSON, default=dict)
+        pending_action = Column(JSON, default=dict)
 
 
 class SupportTicketData(BaseModel):
@@ -153,6 +168,7 @@ class SupportTicketData(BaseModel):
     cost_usd: float = 0.0
     api_tags: List[str] = []
     quality_evaluation: Dict[str, Any] = {}
+    pending_action: Dict[str, Any] = {}
 
 
 class DataStore:
@@ -168,12 +184,27 @@ class DataStore:
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             Base.metadata.create_all(bind=self.engine)
             self._migrate_add_api_tags()
+            self._migrate_add_pending_action()
             self._seed_refunds()
+            self._seed_pending_actions()
             logger.info("Using %s database for data storage", DATABASE_PROVIDER)
         else:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_data_file()
             logger.info("Using JSON file storage for data persistence")
+
+    def _migrate_add_pending_action(self):
+        """Add pending_action column to existing support_tickets rows."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE support_tickets ADD COLUMN pending_action JSON"
+                    )
+                )
+                conn.commit()
+        except Exception:
+            pass  # Column already exists
 
     def _migrate_add_api_tags(self):
         """Add api_tags and quality_evaluation columns to existing databases."""
@@ -250,6 +281,7 @@ class DataStore:
             wall_time_sec=round((db_ticket.execution_time_ms or 0) / 1000, 3),
             api_tags=db_ticket.api_tags or [],
             quality_evaluation=db_ticket.quality_evaluation or {},
+            pending_action=db_ticket.pending_action or {},
         )
 
     _REFUND_SEED = [
@@ -307,6 +339,115 @@ class DataStore:
          "banco_processou": 0, "motivo_negacao": None, "created_at": "2026-05-15"},
     ]
 
+    _PENDING_ACTION_SEED = [
+        {
+            "order_number": "PA001",
+            "customer_name": "Ana Lima",
+            "customer_email": "ana@email.com",
+            "produto": "Câmera Digital Sony",
+            "action_type": "damaged_product_photo",
+            "awaiting_info": "Fotos do produto danificado (frente, verso e embalagem)",
+            "instructions": (
+                "Precisamos que você nos envie fotos do produto danificado "
+                "(frente, verso e embalagem) para iniciar a análise da garantia. "
+                "Envie as imagens respondendo este e-mail ou pelo nosso portal."
+            ),
+            "deadline": "2026-05-26",
+            "created_at": "2026-05-19",
+        },
+        {
+            "order_number": "PA002",
+            "customer_name": "Bruno Souza",
+            "customer_email": "bruno@email.com",
+            "produto": "Tênis Running Mizuno",
+            "action_type": "expired_return_label",
+            "awaiting_info": "Confirmação para reenvio da etiqueta de devolução",
+            "instructions": (
+                "A etiqueta de devolução do seu pedido expirou. "
+                "Por favor, confirme o endereço de retirada para que possamos "
+                "gerar uma nova etiqueta e agendar a coleta."
+            ),
+            "deadline": "2026-05-23",
+            "created_at": "2026-05-16",
+        },
+        {
+            "order_number": "PA003",
+            "customer_name": "Carla Mendes",
+            "customer_email": "carla@email.com",
+            "produto": "Vestido Floral M",
+            "action_type": "exchange_shipment",
+            "awaiting_info": "Devolução do item original para liberação do envio da troca",
+            "instructions": (
+                "Sua troca foi aprovada! Assim que recebermos a devolução do "
+                "item original, o novo produto será despachado em até 2 dias úteis. "
+                "Utilize a etiqueta de devolução enviada por e-mail."
+            ),
+            "deadline": "2026-05-28",
+            "created_at": "2026-05-18",
+        },
+        {
+            "order_number": "PA004",
+            "customer_name": "Diego Ramos",
+            "customer_email": "diego@email.com",
+            "produto": "Monitor 27\" 4K",
+            "action_type": "billing_dispute",
+            "awaiting_info": "Comprovante bancário da cobrança duplicada",
+            "instructions": (
+                "Identificamos uma possível cobrança duplicada no seu pedido. "
+                "Para abrir a contestação junto ao banco, precisamos do comprovante "
+                "da transação (extrato ou print do aplicativo bancário com data e valor)."
+            ),
+            "deadline": "2026-05-25",
+            "created_at": "2026-05-17",
+        },
+        {
+            "order_number": "PA005",
+            "customer_name": "Elena Costa",
+            "customer_email": "elena@email.com",
+            "produto": "Notebook Lenovo IdeaPad",
+            "action_type": "failed_delivery",
+            "awaiting_info": "Endereço de entrega atualizado para nova tentativa",
+            "instructions": (
+                "Houve 2 tentativas de entrega sem sucesso no seu endereço. "
+                "Por favor, informe um novo endereço de entrega ou indique o "
+                "melhor horário para uma nova tentativa (manhã ou tarde)."
+            ),
+            "deadline": "2026-05-22",
+            "created_at": "2026-05-15",
+        },
+        {
+            "order_number": "PA006",
+            "customer_name": "Felipe Nunes",
+            "customer_email": "felipe@email.com",
+            "produto": "Fone Bluetooth Sony WH-1000XM5",
+            "action_type": "warranty_analysis",
+            "awaiting_info": "Nota fiscal e descrição detalhada do defeito apresentado",
+            "instructions": (
+                "Para dar início à análise de garantia, precisamos da nota fiscal "
+                "de compra e uma descrição detalhada do defeito (quando começou, "
+                "frequência e circunstâncias em que ocorre)."
+            ),
+            "deadline": "2026-05-30",
+            "created_at": "2026-05-19",
+        },
+        {
+            "order_number": "PA007",
+            "customer_name": "Gabriela Torres",
+            "customer_email": "gabi@email.com",
+            "produto": "Kit Skincare Premium",
+            "action_type": "cancellation_return",
+            "awaiting_info": "Confirmação do método de devolução do reembolso",
+            "instructions": (
+                "Seu pedido de cancelamento foi aceito. O estorno será realizado "
+                "no mesmo método de pagamento original em até 10 dias úteis. "
+                "Confirme se o cartão de crédito original ainda está ativo ou "
+                "informe uma conta bancária para depósito."
+            ),
+            "deadline": "2026-05-24",
+            "created_at": "2026-05-16",
+        },
+    ]
+
     def _seed_refunds(self):
         """Insert seed refund records if the table is empty."""
         if not self.use_database or not SQLALCHEMY_AVAILABLE:
@@ -354,6 +495,52 @@ class DataStore:
         finally:
             db.close()
 
+    def _seed_pending_actions(self):
+        """Insert seed pending-action records if the table is empty."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return
+        db = self.SessionLocal()
+        try:
+            count = db.query(PendingActionDB).count()
+            if count == 0:
+                for row in self._PENDING_ACTION_SEED:
+                    db.add(PendingActionDB(**row))
+                db.commit()
+                logger.info("Seeded %d pending action records", len(self._PENDING_ACTION_SEED))
+        except Exception as e:
+            db.rollback()
+            logger.error("Error seeding pending actions: %s", e)
+        finally:
+            db.close()
+
+    def get_pending_action(self, order_number: str) -> Optional[Dict[str, Any]]:
+        """Return pending-action record for an order number, or None if not found."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return None
+        db = self.SessionLocal()
+        try:
+            row = db.query(PendingActionDB).filter(
+                PendingActionDB.order_number == str(order_number)
+            ).first()
+            if not row:
+                return None
+            return {
+                "found": True,
+                "order_number": row.order_number,
+                "customer_name": row.customer_name,
+                "customer_email": row.customer_email,
+                "produto": row.produto,
+                "action_type": row.action_type,
+                "awaiting_info": row.awaiting_info,
+                "instructions": row.instructions,
+                "deadline": row.deadline,
+            }
+        except Exception as e:
+            logger.error("Error fetching pending action for order %s: %s", order_number, e)
+            return None
+        finally:
+            db.close()
+
     def save_ticket(self, ticket_data: SupportTicketData):
         """Save a support ticket."""
         if self.use_database:
@@ -390,6 +577,7 @@ class DataStore:
                     execution_time_ms=ticket_data.execution_time_ms,
                     api_tags=ticket_data.api_tags or [],
                     quality_evaluation=ticket_data.quality_evaluation or {},
+                    pending_action=ticket_data.pending_action or {},
                 )
                 db.merge(db_ticket)  # Use merge to handle updates
                 db.commit()

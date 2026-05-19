@@ -84,3 +84,4 @@ class SupportResponse(BaseModel):
     routing_missing_info: list[str] | None = None
     api_tags: list[str] | None = None
     quality_evaluation: dict | None = None
+    pending_action: dict | None = None

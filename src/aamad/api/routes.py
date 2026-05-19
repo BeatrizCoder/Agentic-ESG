@@ -171,6 +171,7 @@ async def create_support_ticket(
         cost_usd=final_state.cost_usd,
         api_tags=final_state.api_tags,
         quality_evaluation=final_state.quality_evaluation or {},
+        pending_action=final_state.pending_action or {},
     )
 
     # Save to data store
@@ -235,6 +236,7 @@ async def create_support_ticket(
         routing_missing_info=final_state.routing_missing_info or None,
         api_tags=final_state.api_tags or None,
         quality_evaluation=final_state.quality_evaluation or None,
+        pending_action=final_state.pending_action or None,
     )
 
 

@@ -47,6 +47,7 @@ class SupportState(BaseModel):
     auto_resolve_reason: str = ""
     awaiting_weather_context: str = ""
     quality_evaluation: dict = {}
+    pending_action: dict = {}
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({

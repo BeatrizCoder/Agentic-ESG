@@ -2466,6 +2466,15 @@
                 <option value="refund_33333">❌ Pedido 33333 — negado → escala</option>
                 <option value="refund_not_found">🔍 Pedido 99888 — não encontrado</option>
               </optgroup>
+              <optgroup label="⏳ Pending Actions (DB)">
+                <option value="pending_pa001">📸 PA001 — Fotos produto danificado</option>
+                <option value="pending_pa002">🏷️ PA002 — Etiqueta devolução expirada</option>
+                <option value="pending_pa003">🔄 PA003 — Envio da troca aguardando devolução</option>
+                <option value="pending_pa004">💳 PA004 — Disputa de cobrança duplicada</option>
+                <option value="pending_pa005">🚚 PA005 — Entrega falhou 2x → novo endereço</option>
+                <option value="pending_pa006">🛡️ PA006 — Análise de garantia → NF necessária</option>
+                <option value="pending_pa007">↩️ PA007 — Cancelamento → confirmar reembolso</option>
+              </optgroup>
               <optgroup label="🚨 Escalação">
                 <option value="escalation_pt">😡 Quero falar com gerente (PT)</option>
                 <option value="escalation_en">😡 I demand a refund (EN)</option>
@@ -3476,6 +3485,37 @@
     }
 
     function renderResponseTab(ticket) {
+      const pa = ticket.pending_action;
+      const pendingActionCard = (pa && pa.found) ? (() => {
+        const actionTypeLabels = {
+          damaged_product_photo: '📸 Fotos do Produto Danificado',
+          expired_return_label:  '🏷️ Etiqueta de Devolução Expirada',
+          exchange_shipment:     '🔄 Envio da Troca Pendente',
+          billing_dispute:       '💳 Disputa de Cobrança',
+          failed_delivery:       '🚚 Entrega Falhou',
+          warranty_analysis:     '🛡️ Análise de Garantia',
+          cancellation_return:   '↩️ Cancelamento / Reembolso',
+        };
+        const label = actionTypeLabels[pa.action_type] || '⏳ Ação Pendente';
+        return `
+          <div class="warn-card" style="margin-bottom: 14px; border-left: 4px solid #F59E0B;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <h4 style="margin:0; color:#F59E0B;">⏳ Ação Pendente do Cliente</h4>
+              <span style="font-size:0.78rem; background:#F59E0B22; color:#F59E0B; padding:2px 8px; border-radius:10px;">${label}</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap: 8px; font-size:0.85rem; color:var(--text);">
+              <div><span style="color:var(--muted);">Pedido</span><br><strong>${pa.order_number || '—'}</strong></div>
+              <div><span style="color:var(--muted);">Produto</span><br><strong>${pa.produto || '—'}</strong></div>
+              <div><span style="color:var(--muted);">Prazo</span><br><strong>${pa.deadline || '—'}</strong></div>
+              <div><span style="color:var(--muted);">Cliente</span><br><strong>${pa.customer_name || '—'}</strong></div>
+            </div>
+            <div style="margin-top:10px; padding:8px; background:var(--surface); border-radius:6px; font-size:0.83rem; color:var(--text);">
+              <span style="color:var(--muted); font-size:0.78rem; display:block; margin-bottom:4px;">Aguardando do cliente:</span>
+              ${pa.awaiting_info || '—'}
+            </div>
+          </div>`;
+      })() : '';
+
       let confirmAction;
       if (ticket.status === 'awaiting_customer_info') {
         const missingFields = Array.isArray(ticket.routing_missing_info) ? ticket.routing_missing_info : [];
@@ -3692,6 +3732,7 @@
         <div class="card-stack">
           ${caseDetailsCard}
           ${refundInvestigationCard}
+          ${pendingActionCard}
           ${confirmAction}
           ${attachmentCard}
           <p style="margin:6px 0 0;font-size:0.73rem;font-family:'DM Mono',monospace;color:var(--muted);opacity:0.7;line-height:1.5;">
@@ -4713,7 +4754,14 @@
       cep_plus_weather: { name:'beatriz costa', email:'beatriz@demo.com', phone:'41999999999', inquiry:'Meu pedido não chegou, CEP 80010-000, Curitiba' },
       refund_frustrated: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'JÁ FAZ DUAS SEMANAS QUE PEDI O REEMBOLSO DO PEDIDO 55555 E NÃO RECEBI NADA, ABSURDO!' },
       billing_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'I do not recognize this charge on my credit card, please investigate' },
-      mixed_language: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'What is your política de devolução? I need to return my order' }
+      mixed_language: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'What is your política de devolução? I need to return my order' },
+      pending_pa001: { name:'Ana Lima', email:'ana@email.com', phone:'', inquiry:'Olá, entrei em contato sobre o pedido PA001, produto danificado' },
+      pending_pa002: { name:'Bruno Souza', email:'bruno@email.com', phone:'', inquiry:'Boa tarde, meu pedido PA002 de tênis precisa de devolução' },
+      pending_pa003: { name:'Carla Mendes', email:'carla@email.com', phone:'', inquiry:'Quero saber o status da minha troca, pedido PA003' },
+      pending_pa004: { name:'Diego Ramos', email:'diego@email.com', phone:'', inquiry:'Identifiquei uma cobrança duplicada no pedido PA004' },
+      pending_pa005: { name:'Elena Costa', email:'elena@email.com', phone:'', inquiry:'Meu pedido PA005 não foi entregue, segundo aviso' },
+      pending_pa006: { name:'Felipe Nunes', email:'felipe@email.com', phone:'', inquiry:'Quero acionar a garantia do produto do pedido PA006' },
+      pending_pa007: { name:'Gabriela Torres', email:'gabi@email.com', phone:'', inquiry:'Cancelei o pedido PA007, preciso do reembolso' }
     };
 
     function willEscalate(inquiry) {

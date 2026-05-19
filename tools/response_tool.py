@@ -145,6 +145,77 @@ class ResponseTool(BaseSupportTool):
                         "- Do NOT ask for more information — resolve this directly\n"
                     )
 
+                elif "PENDING ACTION FOUND" in (external_context or ""):
+                    action_type = ""
+                    if "damaged_product_photo" in (external_context or ""):
+                        action_type = "damaged_product_photo"
+                    elif "expired_return_label" in (external_context or ""):
+                        action_type = "expired_return_label"
+                    elif "exchange_shipment" in (external_context or ""):
+                        action_type = "exchange_shipment"
+                    elif "billing_dispute" in (external_context or ""):
+                        action_type = "billing_dispute"
+                    elif "failed_delivery" in (external_context or ""):
+                        action_type = "failed_delivery"
+                    elif "warranty_analysis" in (external_context or ""):
+                        action_type = "warranty_analysis"
+                    elif "cancellation_return" in (external_context or ""):
+                        action_type = "cancellation_return"
+
+                    type_hints = {
+                        "damaged_product_photo": (
+                            "- Ask for photos of damaged product (front, back, packaging)\n"
+                            "- Mention that photos are required to start warranty analysis\n"
+                            "- Suggest sending via reply email or customer portal\n"
+                        ),
+                        "expired_return_label": (
+                            "- Mention the return label has expired\n"
+                            "- Ask the customer to confirm their pickup address\n"
+                            "- Explain a new label will be generated once address is confirmed\n"
+                        ),
+                        "exchange_shipment": (
+                            "- Confirm the exchange was approved\n"
+                            "- Explain the new item will ship once the original is returned\n"
+                            "- Remind the customer to use the return label already sent by email\n"
+                        ),
+                        "billing_dispute": (
+                            "- Acknowledge the possible duplicate charge concern\n"
+                            "- Ask for bank statement or transaction screenshot with date and amount\n"
+                            "- Explain this is required to open the dispute with the bank\n"
+                        ),
+                        "failed_delivery": (
+                            "- Mention there were 2 failed delivery attempts\n"
+                            "- Ask for an updated delivery address or preferred time (morning/afternoon)\n"
+                            "- Assure a new delivery attempt will be scheduled\n"
+                        ),
+                        "warranty_analysis": (
+                            "- Explain warranty analysis will begin once documents are received\n"
+                            "- Ask for purchase invoice (nota fiscal) and detailed defect description\n"
+                            "- Ask when the defect started and how often it occurs\n"
+                        ),
+                        "cancellation_return": (
+                            "- Confirm the cancellation was accepted\n"
+                            "- Mention refund will be via original payment method in up to 10 business days\n"
+                            "- Ask if the original card is still active or if they prefer a bank deposit\n"
+                        ),
+                    }
+                    specific_hint = type_hints.get(action_type, (
+                        "- Clearly explain what information is needed from the customer\n"
+                        "- Provide the deadline if available\n"
+                    ))
+                    alert_instructions = (
+                        "\nSITUATION: This order has a pending action awaiting the customer's "
+                        "response. Use the instructions from the real-time data above.\n"
+                        "Your response MUST:\n"
+                        "- Greet the customer by name if available\n"
+                        "- Reference the EXACT order number\n"
+                        f"{specific_hint}"
+                        "- Mention the deadline if provided in the data\n"
+                        "- Be warm and action-oriented — give clear next steps\n"
+                        "- Keep under 120 words\n"
+                        "- Do NOT resolve the issue — the customer must act first\n"
+                    )
+
                 routing_block = ""
                 if routing_action == "resolve":
                     routing_block = (

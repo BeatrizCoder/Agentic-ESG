@@ -20,6 +20,36 @@ class SupportFlow(SupportFlowStepsMixin, Flow[SupportState]):
         self._start_time: float = time.time()
         self._cache_hit: bool = False
         self._inquiry_hash: str = ''
+        # FlowMeta only scans the direct class namespace, missing mixin methods.
+        # _flow_post_init (called above) populates self._methods from dir(self),
+        # so we can now rebuild _start_methods and _listeners from it.
+        self._register_mixin_methods()
+
+    def _register_mixin_methods(self) -> None:
+        """Re-register @start() / @listen() methods that FlowMeta missed (mixin origin)."""
+        OR_CONDITION = "OR"
+        # Work on fresh instance-level copies so we don't mutate class vars
+        start_methods: list = list(self.__class__._start_methods)
+        listeners: dict = dict(self.__class__._listeners)
+
+        for method_name, method in self._methods.items():
+            is_start = getattr(method, "__is_start_method__", False)
+            trigger = getattr(method, "__trigger_methods__", None)
+            trigger_cond = getattr(method, "__trigger_condition__", None)
+            cond_type = getattr(method, "__condition_type__", OR_CONDITION) or OR_CONDITION
+
+            if is_start and method_name not in start_methods:
+                start_methods.append(method_name)
+
+            if trigger and method_name not in listeners:
+                if trigger_cond is not None:
+                    listeners[method_name] = trigger_cond
+                else:
+                    listeners[method_name] = (cond_type, list(trigger))
+
+        # Assign instance-level overrides so we don't pollute the class
+        object.__setattr__(self, "_start_methods", start_methods)
+        object.__setattr__(self, "_listeners", listeners)
 
 
 # ── Legacy SupportCrew (non-Flow implementation, kept for reference) ──────────

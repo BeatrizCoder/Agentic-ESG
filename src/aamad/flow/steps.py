@@ -316,11 +316,45 @@ class SupportFlowStepsMixin:
         logger.debug("enrich_with_external_data: inquiry=%s", self.state.inquiry[:50])
         logger.debug("external_context before: %r", self.state.external_context)
 
-        if not ENABLE_EXTERNAL_APIS:
-            logger.debug("enrich_with_external_data: ENABLE_EXTERNAL_APIS=False, skipping")
-            return "Skipped (external APIs disabled)"
-
         context_parts = []
+
+        # ── Pending-action lookup (local DB — always runs, tool owns pattern matching) ──
+        try:
+            from tools.pending_action_tool import pending_action_tool
+            pa_result = await asyncio.to_thread(
+                pending_action_tool._run, self.state.inquiry
+            )
+            self.state.pending_action = pa_result
+            self.state.tools_used.append("Pending Action Tool")
+            if pa_result.get("found"):
+                self.state.api_tags.append("pending_action")
+                pa_lines = [
+                    f"PENDING ACTION FOUND - Pedido {pa_result['order_number']}:",
+                    f"Action type: {pa_result.get('action_type', '')}",
+                    f"Awaiting: {pa_result.get('awaiting_info', '')}",
+                    f"Instructions: {pa_result.get('instructions', '')}",
+                ]
+                if pa_result.get("deadline"):
+                    pa_lines.append(f"Deadline: {pa_result['deadline']}")
+                context_parts.append("\n".join(pa_lines))
+                self.log_step("Pending Action Agent", {
+                    "order_number": pa_result["order_number"],
+                    "action_type": pa_result.get("action_type"),
+                    "awaiting_info": pa_result.get("awaiting_info"),
+                })
+                logger.info(
+                    "enrich: pending action found order=%s type=%s",
+                    pa_result["order_number"], pa_result.get("action_type"),
+                )
+        except Exception as e:
+            logger.error("enrich: pending_action_tool error: %s", e)
+
+        if context_parts:
+            self.state.external_context = "\n".join(context_parts)
+
+        if not ENABLE_EXTERNAL_APIS:
+            logger.debug("enrich_with_external_data: ENABLE_EXTERNAL_APIS=False, skipping external APIs")
+            return f"External enrichment done: {len(context_parts)} data point(s) (external APIs disabled)"
 
         # ── Detect CEP in inquiry (cheap, no I/O) ──
         cep_match = re.search(r'\b(\d{5}-?\d{3})\b', self.state.inquiry)
@@ -835,6 +869,25 @@ class SupportFlowStepsMixin:
                 "refund_status": refund_status,
                 "auto_resolved": False,
                 "hitl": True,
+            })
+
+        elif (self.state.pending_action and self.state.pending_action.get("found")):
+            # PRIORITY 4b: pending action awaiting customer response
+            pa = self.state.pending_action
+            is_pt = self._is_portuguese(self.state.inquiry)
+            self.state.escalation_required = True
+            self.state.routing_action = "awaiting"
+            self.state.auto_resolve_reason = "pending_action"
+            self.state.escalation_reason = (
+                f"Aguardando cliente: {pa.get('awaiting_info', '')}"
+                if is_pt else
+                f"Awaiting customer: {pa.get('awaiting_info', '')}"
+            )
+            self.log_step("Routing Engine", {
+                "override": "pending_action",
+                "order_number": pa.get("order_number"),
+                "action_type": pa.get("action_type"),
+                "awaiting_info": pa.get("awaiting_info"),
             })
 
         else:
