@@ -182,7 +182,21 @@ class DataStore:
         self.use_database = DATABASE_PROVIDER.lower() in ("postgres", "sqlite") and SQLALCHEMY_AVAILABLE
 
         if self.use_database:
-            self.engine = create_engine(DATABASE_URL)
+            is_postgres = DATABASE_URL.startswith("postgresql")
+            if is_postgres:
+                self.engine = create_engine(
+                    DATABASE_URL,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_pre_ping=True,
+                )
+                logger.info("Using PostgreSQL database")
+            else:
+                self.engine = create_engine(
+                    DATABASE_URL,
+                    connect_args={"check_same_thread": False},
+                )
+                logger.info("Using SQLite database")
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             self._migrate_pending_actions_v2()
             Base.metadata.create_all(bind=self.engine)
@@ -190,7 +204,7 @@ class DataStore:
             self._migrate_add_pending_action()
             self._seed_refunds()
             self._seed_pending_actions()
-            logger.info("Using %s database for data storage", DATABASE_PROVIDER)
+            logger.info("Database tables created/verified")
         else:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_data_file()

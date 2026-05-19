@@ -19,6 +19,10 @@ ENABLE_REDIS_CACHE: bool = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "
 DATABASE_PROVIDER: str = os.getenv("DATABASE_PROVIDER", "sqlite")  # sqlite or postgres
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///src/aamad/data/tickets.db")
 
+# SQLAlchemy requires "postgresql://" — Heroku/Neon may return "postgres://"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Redis configuration
 REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
