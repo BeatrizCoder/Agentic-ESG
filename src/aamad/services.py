@@ -1,6 +1,7 @@
 """Service modules for Knowledge, Memory, Prompt, and Skill management."""
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -9,6 +10,8 @@ from datetime import datetime
 import glob
 
 from .config import ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, ENABLE_PROMPT_TEMPLATES, KNOWLEDGE_DIR, PROMPTS_DIR, MEMORY_FILE, SKILLS_DIR
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeService:
@@ -21,7 +24,7 @@ class KnowledgeService:
 
     def _load_documents(self):
         if not self.knowledge_dir.exists():
-            print("Warning: knowledge/ directory not found")
+            logger.warning("Knowledge directory not found")
             return
 
         for md_file in self.knowledge_dir.glob("*.md"):
@@ -35,7 +38,7 @@ class KnowledgeService:
                 "full_content": content
             }
 
-        print(f"KnowledgeService: loaded {len(self.documents)} knowledge documents")
+        logger.info("KnowledgeService: loaded %d knowledge documents", len(self.documents))
 
     def _parse_sections(self, content: str) -> list[dict]:
         sections = []

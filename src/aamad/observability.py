@@ -1,3 +1,4 @@
+import logging
 import time
 import uuid
 from datetime import datetime
@@ -6,6 +7,8 @@ from dataclasses import dataclass, field, asdict
 import json
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,7 +70,7 @@ class ObservabilityService:
                 json.dumps(data, indent=2, ensure_ascii=False)
             )
         except Exception as e:
-            print(f"ObservabilityService: failed to save events: {e}")
+            logger.error("ObservabilityService: failed to save events: %s", e, exc_info=True)
 
     def record(self, event: ObservabilityEvent) -> None:
         """Record a single observability event."""

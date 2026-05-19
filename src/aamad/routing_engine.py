@@ -1,7 +1,10 @@
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def normalize(text: str) -> str:
@@ -236,20 +239,18 @@ def route_ticket(
     sentiment: str,
     urgency: str,
 ) -> RoutingDecision:
-    print(f"DEBUG route_ticket input: '{inquiry[:200]}'")
+    logger.debug("route_ticket input: %r", inquiry[:200])
 
     norm_inquiry  = normalize(inquiry)
     clean_inquiry = _clean_for_routing(inquiry)
 
-    print(f"DEBUG route_ticket clean: '{clean_inquiry[:200]}'")
+    logger.debug("route_ticket clean: %r", clean_inquiry[:200])
 
     has_order   = _has_pattern(clean_inquiry, ORDER_NUMBER_PATTERNS)
     has_email   = _has_pattern(clean_inquiry, EMAIL_PATTERNS)
     has_invoice = _has_pattern(clean_inquiry, INVOICE_PATTERNS)
 
-    print(f"DEBUG has_order: {has_order}")
-    print(f"DEBUG has_email: {has_email}")
-    print(f"DEBUG category: {category}")
+    logger.debug("has_order=%s has_email=%s category=%s", has_order, has_email, category)
 
     esc_keyword = _find_explicit_escalation(clean_inquiry)
 
