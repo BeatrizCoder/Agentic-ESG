@@ -2467,13 +2467,13 @@
                 <option value="refund_not_found">🔍 Pedido 99888 — não encontrado</option>
               </optgroup>
               <optgroup label="⏳ Pending Actions (DB)">
-                <option value="pending_pa001">📸 PA001 — Fotos produto danificado</option>
-                <option value="pending_pa002">🏷️ PA002 — Etiqueta devolução expirada</option>
-                <option value="pending_pa003">🔄 PA003 — Envio da troca aguardando devolução</option>
-                <option value="pending_pa004">💳 PA004 — Disputa de cobrança duplicada</option>
-                <option value="pending_pa005">🚚 PA005 — Entrega falhou 2x → novo endereço</option>
-                <option value="pending_pa006">🛡️ PA006 — Análise de garantia → NF necessária</option>
-                <option value="pending_pa007">↩️ PA007 — Cancelamento → confirmar reembolso</option>
+                <option value="pending_photo">📸 Pedido 77701 — produto danificado → foto</option>
+                <option value="pending_label">📦 Pedido 77702 — etiqueta expirada → nova</option>
+                <option value="pending_ship">🚚 Pedido 77703 — troca → enviar produto</option>
+                <option value="pending_docs">📄 Pedido 77704 — disputa → comprovante</option>
+                <option value="pending_delivery">🏠 Pedido 77705 — entrega falhou → reagendar</option>
+                <option value="pending_warranty">🔧 Pedido 77706 — garantia → laudo técnico</option>
+                <option value="pending_return">↩️ Pedido 77707 — cancelado → devolver hoje!</option>
               </optgroup>
               <optgroup label="🚨 Escalação">
                 <option value="escalation_pt">😡 Quero falar com gerente (PT)</option>
@@ -3484,37 +3484,38 @@
       return renderResponseTab(ticket);
     }
 
+    function urgencyColor(urgency) {
+      const colors = {
+        high:   'rgba(239,68,68,0.15)',
+        medium: 'rgba(251,191,36,0.15)',
+        low:    'rgba(16,185,129,0.15)',
+      };
+      return colors[urgency] || colors.medium;
+    }
+
     function renderResponseTab(ticket) {
       const pa = ticket.pending_action;
-      const pendingActionCard = (pa && pa.found) ? (() => {
-        const actionTypeLabels = {
-          damaged_product_photo: '📸 Fotos do Produto Danificado',
-          expired_return_label:  '🏷️ Etiqueta de Devolução Expirada',
-          exchange_shipment:     '🔄 Envio da Troca Pendente',
-          billing_dispute:       '💳 Disputa de Cobrança',
-          failed_delivery:       '🚚 Entrega Falhou',
-          warranty_analysis:     '🛡️ Análise de Garantia',
-          cancellation_return:   '↩️ Cancelamento / Reembolso',
-        };
-        const label = actionTypeLabels[pa.action_type] || '⏳ Ação Pendente';
-        return `
-          <div class="warn-card" style="margin-bottom: 14px; border-left: 4px solid #F59E0B;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-              <h4 style="margin:0; color:#F59E0B;">⏳ Ação Pendente do Cliente</h4>
-              <span style="font-size:0.78rem; background:#F59E0B22; color:#F59E0B; padding:2px 8px; border-radius:10px;">${label}</span>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap: 8px; font-size:0.85rem; color:var(--text);">
-              <div><span style="color:var(--muted);">Pedido</span><br><strong>${pa.order_number || '—'}</strong></div>
-              <div><span style="color:var(--muted);">Produto</span><br><strong>${pa.produto || '—'}</strong></div>
-              <div><span style="color:var(--muted);">Prazo</span><br><strong>${pa.deadline || '—'}</strong></div>
-              <div><span style="color:var(--muted);">Cliente</span><br><strong>${pa.customer_name || '—'}</strong></div>
-            </div>
-            <div style="margin-top:10px; padding:8px; background:var(--surface); border-radius:6px; font-size:0.83rem; color:var(--text);">
-              <span style="color:var(--muted); font-size:0.78rem; display:block; margin-bottom:4px;">Aguardando do cliente:</span>
-              ${pa.awaiting_info || '—'}
-            </div>
-          </div>`;
-      })() : '';
+      const pendingActionCard = (pa && pa.found) ? `
+        <div style="
+          background:rgba(251,191,36,0.06);
+          border:1px solid rgba(251,191,36,0.2);
+          border-left:3px solid #FBBF24;
+          border-radius:8px;
+          padding:14px 16px;
+          margin-bottom:16px;
+        ">
+          <div style="font-size:11px;font-family:var(--mono);color:#FBBF24;text-transform:uppercase;margin-bottom:8px;">⏳ Pending Action</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:600">${pa.product || '—'}</span>
+            <span style="font-size:12px;color:var(--muted)">Ticket: ${pa.ticket_id || '—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:6px">${pa.description || '—'}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:11px;padding:2px 8px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);color:#FBBF24;border-radius:999px;font-family:var(--mono);">${pa.status || '—'}</span>
+            <span style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--muted);border-radius:999px;font-family:var(--mono);">Prazo: ${pa.deadline || '—'}</span>
+            <span style="font-size:11px;padding:2px 8px;background:${urgencyColor(pa.urgency)};border-radius:999px;font-family:var(--mono);color:var(--text)">${pa.urgency || '—'}</span>
+          </div>
+        </div>` : '';
 
       let confirmAction;
       if (ticket.status === 'awaiting_customer_info') {
@@ -4755,13 +4756,13 @@
       refund_frustrated: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'JÁ FAZ DUAS SEMANAS QUE PEDI O REEMBOLSO DO PEDIDO 55555 E NÃO RECEBI NADA, ABSURDO!' },
       billing_en: { name:'John Smith', email:'john@demo.com', phone:'', inquiry:'I do not recognize this charge on my credit card, please investigate' },
       mixed_language: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'What is your política de devolução? I need to return my order' },
-      pending_pa001: { name:'Ana Lima', email:'ana@email.com', phone:'', inquiry:'Olá, entrei em contato sobre o pedido PA001, produto danificado' },
-      pending_pa002: { name:'Bruno Souza', email:'bruno@email.com', phone:'', inquiry:'Boa tarde, meu pedido PA002 de tênis precisa de devolução' },
-      pending_pa003: { name:'Carla Mendes', email:'carla@email.com', phone:'', inquiry:'Quero saber o status da minha troca, pedido PA003' },
-      pending_pa004: { name:'Diego Ramos', email:'diego@email.com', phone:'', inquiry:'Identifiquei uma cobrança duplicada no pedido PA004' },
-      pending_pa005: { name:'Elena Costa', email:'elena@email.com', phone:'', inquiry:'Meu pedido PA005 não foi entregue, segundo aviso' },
-      pending_pa006: { name:'Felipe Nunes', email:'felipe@email.com', phone:'', inquiry:'Quero acionar a garantia do produto do pedido PA006' },
-      pending_pa007: { name:'Gabriela Torres', email:'gabi@email.com', phone:'', inquiry:'Cancelei o pedido PA007, preciso do reembolso' }
+      pending_photo:    { name:'beatriz costa', email:'beatriz@demo.com', phone:'11999999999', inquiry:'Meu pedido 77701 chegou com defeito, o que preciso fazer?' },
+      pending_label:    { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Quero fazer a devolução do pedido 77702' },
+      pending_ship:     { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Minha troca do pedido 77703 foi aprovada, e agora?' },
+      pending_docs:     { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Quero saber sobre a contestação do pedido 77704' },
+      pending_delivery: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Meu monitor pedido 77705 não foi entregue' },
+      pending_warranty: { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Qual o status da garantia do meu fone pedido 77706?' },
+      pending_return:   { name:'beatriz costa', email:'beatriz@demo.com', phone:'', inquiry:'Cancelei o pedido 77707, como faço a devolução?' }
     };
 
     function willEscalate(inquiry) {
@@ -4793,6 +4794,12 @@
       const hasOrderNumber = /\bpedido\s*\d{4,8}\b|\border\s*\d{4,8}\b|#\d{4,8}/.test(lower);
       if (hasRefund && hasOrderNumber) {
         console.log('willEscalate: refund+order → skip modal');
+        return false;
+      }
+
+      // Exception 3b: Any explicit order number → backend lookup handles it
+      if (hasOrderNumber) {
+        console.log('willEscalate: order number detected → backend handles it');
         return false;
       }
 

@@ -322,29 +322,45 @@ class SupportFlowStepsMixin:
         try:
             from tools.pending_action_tool import pending_action_tool
             pa_result = await asyncio.to_thread(
-                pending_action_tool._run, self.state.inquiry
+                pending_action_tool.run, self.state.inquiry
             )
             self.state.pending_action = pa_result
             self.state.tools_used.append("Pending Action Tool")
             if pa_result.get("found"):
                 self.state.api_tags.append("pending_action")
-                pa_lines = [
-                    f"PENDING ACTION FOUND - Pedido {pa_result['order_number']}:",
-                    f"Action type: {pa_result.get('action_type', '')}",
-                    f"Awaiting: {pa_result.get('awaiting_info', '')}",
-                    f"Instructions: {pa_result.get('instructions', '')}",
-                ]
-                if pa_result.get("deadline"):
-                    pa_lines.append(f"Deadline: {pa_result['deadline']}")
-                context_parts.append("\n".join(pa_lines))
-                self.log_step("Pending Action Agent", {
-                    "order_number": pa_result["order_number"],
-                    "action_type": pa_result.get("action_type"),
-                    "awaiting_info": pa_result.get("awaiting_info"),
+                status = pa_result.get("status", "")
+                product = pa_result.get("product", "")
+                valor = pa_result.get("valor", 0)
+                ticket_id = pa_result.get("ticket_id", "")
+                deadline = pa_result.get("deadline", "")
+                action = pa_result.get("action_required", "")
+                description = pa_result.get("description", "")
+                urgency = pa_result.get("urgency", "medium")
+                additional = pa_result.get("additional_info", {})
+                context_parts.append(
+                    f"PENDING ACTION FOUND:"
+                    f"\n  Order: #{pa_result.get('order_number')}"
+                    f"\n  Product: {product}"
+                    f"\n  Value: R${valor:.2f}"
+                    f"\n  Existing ticket: {ticket_id}"
+                    f"\n  Status: {status}"
+                    f"\n  Action required: {action}"
+                    f"\n  Description: {description}"
+                    f"\n  Deadline: {deadline}"
+                    f"\n  Urgency: {urgency}"
+                    f"\n  Details: {additional}"
+                )
+                self.log_step("Pending Action Tool", {
+                    "order_number": pa_result.get("order_number"),
+                    "status": status,
+                    "ticket_id": ticket_id,
+                    "action_required": action,
+                    "urgency": urgency,
+                    "latency_ms": pa_result.get("latency_ms"),
                 })
                 logger.info(
-                    "enrich: pending action found order=%s type=%s",
-                    pa_result["order_number"], pa_result.get("action_type"),
+                    "enrich: pending action found order=%s status=%s",
+                    pa_result.get("order_number"), status,
                 )
         except Exception as e:
             logger.error("enrich: pending_action_tool error: %s", e)
@@ -874,20 +890,20 @@ class SupportFlowStepsMixin:
         elif (self.state.pending_action and self.state.pending_action.get("found")):
             # PRIORITY 4b: pending action awaiting customer response
             pa = self.state.pending_action
-            is_pt = self._is_portuguese(self.state.inquiry)
             self.state.escalation_required = True
             self.state.routing_action = "awaiting"
             self.state.auto_resolve_reason = "pending_action"
             self.state.escalation_reason = (
-                f"Aguardando cliente: {pa.get('awaiting_info', '')}"
-                if is_pt else
-                f"Awaiting customer: {pa.get('awaiting_info', '')}"
+                f"Pending action {pa.get('status', '')} "
+                f"requires {pa.get('action_required', '')}"
             )
             self.log_step("Routing Engine", {
                 "override": "pending_action",
                 "order_number": pa.get("order_number"),
-                "action_type": pa.get("action_type"),
-                "awaiting_info": pa.get("awaiting_info"),
+                "ticket_id": pa.get("ticket_id"),
+                "status": pa.get("status"),
+                "action_required": pa.get("action_required"),
+                "urgency": pa.get("urgency"),
             })
 
         else:

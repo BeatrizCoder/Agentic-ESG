@@ -1,57 +1,68 @@
 """Pending-action lookup tool — detects order numbers and returns awaiting context."""
 
 import re
+import time
 import logging
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-_ORDER_PATTERN = re.compile(r"\b(PA\d{3}|\d{5})\b")
+_ORDER_PATTERNS = [
+    r'pedido\s*[:#]?\s*(\d{4,8})',
+    r'order\s*[:#]?\s*(\d{4,8})',
+    r'n[uú]mero\s+(?:do\s+)?pedido\s*[:#]?\s*(\d{4,8})',
+    r'#(\d{4,8})',
+    r'\border\s+#?(\d{4,8})\b',
+]
 
 
-class PendingActionInput(BaseModel):
-    inquiry: str = Field(
-        description="Full customer inquiry text. The tool will extract any order "
-                    "number present and look up whether there is a pending action "
-                    "awaiting the customer for that order."
-    )
+class PendingActionTool:
+    """
+    Looks up pending actions for order numbers.
+    Detects if a customer's order has an open case requiring their action.
+    """
 
+    name = "Pending Action Tool"
 
-class PendingActionTool(BaseTool):
-    name: str = "Pending Action Tool"
-    description: str = (
-        "Looks up whether a customer order has a pending action awaiting the "
-        "customer's response (e.g. photos of damaged product, return label "
-        "confirmation, billing dispute evidence). "
-        "Input: customer inquiry text. "
-        "Output: pending action details or not-found result."
-    )
-    args_schema: type[BaseModel] = PendingActionInput
+    def _extract_order_number(self, text: str) -> str | None:
+        clean = re.sub(
+            r'\nPhone:.*|\nEmail:.*|\nName:.*|\n---.*$',
+            '', text, flags=re.IGNORECASE | re.DOTALL
+        )
+        for pattern in _ORDER_PATTERNS:
+            match = re.search(pattern, clean, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        return None
 
-    def _run(self, inquiry: str) -> dict:
-        match = _ORDER_PATTERN.search(inquiry)
-        if not match:
-            return {"found": False, "reason": "no_order_number"}
+    def run(self, inquiry: str) -> dict:
+        start_time = time.time()
+        order_number = self._extract_order_number(inquiry)
 
-        order_number = match.group(1)
-        logger.info("PendingActionTool: looking up order %s", order_number)
+        if not order_number:
+            return {"found": False, "reason": "no_order_number", "latency_ms": 0}
+
+        logger.info("PendingActionTool: checking order %s", order_number)
 
         try:
             from aamad.data_store import data_store
             result = data_store.get_pending_action(order_number)
         except Exception as e:
             logger.error("PendingActionTool: DB lookup failed: %s", e)
-            return {"found": False, "order_number": order_number, "reason": "db_error", "error": str(e)}
+            latency_ms = round((time.time() - start_time) * 1000, 2)
+            return {"found": False, "order_number": order_number, "reason": "db_error", "latency_ms": latency_ms}
 
-        if result:
-            logger.info(
-                "PendingActionTool: found pending action type=%s for order %s",
-                result.get("action_type"), order_number,
-            )
-            return result
+        latency_ms = round((time.time() - start_time) * 1000, 2)
 
-        return {"found": False, "order_number": order_number, "reason": "no_pending_action"}
+        if not result:
+            logger.info("PendingActionTool: no pending action for %s", order_number)
+            return {"found": False, "order_number": order_number, "latency_ms": latency_ms}
+
+        logger.info(
+            "PendingActionTool: found %s → %s",
+            order_number, result.get("status"),
+        )
+        result["latency_ms"] = latency_ms
+        return result
 
 
 pending_action_tool = PendingActionTool()

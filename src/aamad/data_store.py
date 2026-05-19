@@ -84,19 +84,21 @@ if SQLALCHEMY_AVAILABLE:
         hallucination_detected = Column(Boolean, default=False)
         created_at = Column(DateTime, default=datetime.utcnow)
 
-    class PendingActionDB(Base):
+    class PendingAction(Base):
         """SQLAlchemy model for orders awaiting customer action."""
         __tablename__ = "pending_actions"
 
         order_number = Column(String(20), primary_key=True)
-        customer_name = Column(String(200), default="")
-        customer_email = Column(String(200), default="")
-        produto = Column(String(200), default="")
-        action_type = Column(String(50), nullable=False)
-        awaiting_info = Column(Text, nullable=False)
-        instructions = Column(Text, nullable=False)
-        deadline = Column(String(20), default="")
-        created_at = Column(String(20), default="")
+        ticket_id = Column(String(50), nullable=False)
+        status = Column(String(50), nullable=False)
+        action_required = Column(String(50), nullable=False)
+        product = Column(String(200), nullable=False)
+        valor = Column(Float, nullable=False)
+        description = Column(Text, nullable=False)
+        opened_at = Column(String(20), nullable=False)
+        deadline = Column(String(20), nullable=True)
+        urgency = Column(String(20), default="medium")
+        additional_info = Column(Text, default="{}")
 
     class SupportTicketDB(Base):
         """SQLAlchemy model for support tickets."""
@@ -182,6 +184,7 @@ class DataStore:
         if self.use_database:
             self.engine = create_engine(DATABASE_URL)
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+            self._migrate_pending_actions_v2()
             Base.metadata.create_all(bind=self.engine)
             self._migrate_add_api_tags()
             self._migrate_add_pending_action()
@@ -192,6 +195,21 @@ class DataStore:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_data_file()
             logger.info("Using JSON file storage for data persistence")
+
+    def _migrate_pending_actions_v2(self):
+        """Drop pending_actions table if it has the old v1 schema (action_type column)."""
+        try:
+            from sqlalchemy import inspect as _inspect, text as _text
+            insp = _inspect(self.engine)
+            if 'pending_actions' in insp.get_table_names():
+                col_names = [c['name'] for c in insp.get_columns('pending_actions')]
+                if 'action_type' in col_names:
+                    with self.engine.connect() as conn:
+                        conn.execute(_text("DROP TABLE pending_actions"))
+                        conn.commit()
+                    logger.info("Dropped pending_actions v1 table (schema migration to v2)")
+        except Exception as e:
+            logger.warning("pending_actions v2 migration check failed: %s", e)
 
     def _migrate_add_pending_action(self):
         """Add pending_action column to existing support_tickets rows."""
@@ -341,110 +359,169 @@ class DataStore:
 
     _PENDING_ACTION_SEED = [
         {
-            "order_number": "PA001",
-            "customer_name": "Ana Lima",
-            "customer_email": "ana@email.com",
-            "produto": "Câmera Digital Sony",
-            "action_type": "damaged_product_photo",
-            "awaiting_info": "Fotos do produto danificado (frente, verso e embalagem)",
-            "instructions": (
-                "Precisamos que você nos envie fotos do produto danificado "
-                "(frente, verso e embalagem) para iniciar a análise da garantia. "
-                "Envie as imagens respondendo este e-mail ou pelo nosso portal."
+            "order_number": "77701",
+            "ticket_id": "ESC-2026-7701",
+            "status": "AWAITING_PHOTO",
+            "action_required": "photo_upload",
+            "product": "Tênis Nike Air Max",
+            "valor": 450.00,
+            "description": (
+                "Produto chegou com solado rachado. "
+                "Caso aberto e aprovado para troca/reembolso. "
+                "Aguardando foto do defeito para prosseguir."
             ),
-            "deadline": "2026-05-26",
-            "created_at": "2026-05-19",
-        },
-        {
-            "order_number": "PA002",
-            "customer_name": "Bruno Souza",
-            "customer_email": "bruno@email.com",
-            "produto": "Tênis Running Mizuno",
-            "action_type": "expired_return_label",
-            "awaiting_info": "Confirmação para reenvio da etiqueta de devolução",
-            "instructions": (
-                "A etiqueta de devolução do seu pedido expirou. "
-                "Por favor, confirme o endereço de retirada para que possamos "
-                "gerar uma nova etiqueta e agendar a coleta."
-            ),
-            "deadline": "2026-05-23",
-            "created_at": "2026-05-16",
-        },
-        {
-            "order_number": "PA003",
-            "customer_name": "Carla Mendes",
-            "customer_email": "carla@email.com",
-            "produto": "Vestido Floral M",
-            "action_type": "exchange_shipment",
-            "awaiting_info": "Devolução do item original para liberação do envio da troca",
-            "instructions": (
-                "Sua troca foi aprovada! Assim que recebermos a devolução do "
-                "item original, o novo produto será despachado em até 2 dias úteis. "
-                "Utilize a etiqueta de devolução enviada por e-mail."
-            ),
-            "deadline": "2026-05-28",
-            "created_at": "2026-05-18",
-        },
-        {
-            "order_number": "PA004",
-            "customer_name": "Diego Ramos",
-            "customer_email": "diego@email.com",
-            "produto": "Monitor 27\" 4K",
-            "action_type": "billing_dispute",
-            "awaiting_info": "Comprovante bancário da cobrança duplicada",
-            "instructions": (
-                "Identificamos uma possível cobrança duplicada no seu pedido. "
-                "Para abrir a contestação junto ao banco, precisamos do comprovante "
-                "da transação (extrato ou print do aplicativo bancário com data e valor)."
-            ),
-            "deadline": "2026-05-25",
-            "created_at": "2026-05-17",
-        },
-        {
-            "order_number": "PA005",
-            "customer_name": "Elena Costa",
-            "customer_email": "elena@email.com",
-            "produto": "Notebook Lenovo IdeaPad",
-            "action_type": "failed_delivery",
-            "awaiting_info": "Endereço de entrega atualizado para nova tentativa",
-            "instructions": (
-                "Houve 2 tentativas de entrega sem sucesso no seu endereço. "
-                "Por favor, informe um novo endereço de entrega ou indique o "
-                "melhor horário para uma nova tentativa (manhã ou tarde)."
-            ),
-            "deadline": "2026-05-22",
-            "created_at": "2026-05-15",
-        },
-        {
-            "order_number": "PA006",
-            "customer_name": "Felipe Nunes",
-            "customer_email": "felipe@email.com",
-            "produto": "Fone Bluetooth Sony WH-1000XM5",
-            "action_type": "warranty_analysis",
-            "awaiting_info": "Nota fiscal e descrição detalhada do defeito apresentado",
-            "instructions": (
-                "Para dar início à análise de garantia, precisamos da nota fiscal "
-                "de compra e uma descrição detalhada do defeito (quando começou, "
-                "frequência e circunstâncias em que ocorre)."
-            ),
-            "deadline": "2026-05-30",
-            "created_at": "2026-05-19",
-        },
-        {
-            "order_number": "PA007",
-            "customer_name": "Gabriela Torres",
-            "customer_email": "gabi@email.com",
-            "produto": "Kit Skincare Premium",
-            "action_type": "cancellation_return",
-            "awaiting_info": "Confirmação do método de devolução do reembolso",
-            "instructions": (
-                "Seu pedido de cancelamento foi aceito. O estorno será realizado "
-                "no mesmo método de pagamento original em até 10 dias úteis. "
-                "Confirme se o cartão de crédito original ainda está ativo ou "
-                "informe uma conta bancária para depósito."
-            ),
+            "opened_at": "2026-05-10",
             "deadline": "2026-05-24",
-            "created_at": "2026-05-16",
+            "urgency": "high",
+            "additional_info": json.dumps({
+                "defect": "solado rachado",
+                "resolution": "troca ou reembolso",
+                "photos_needed": 2,
+                "instructions": "Fotografe o defeito com boa iluminação",
+            }),
+        },
+        {
+            "order_number": "77702",
+            "ticket_id": "DEV-2026-7702",
+            "status": "LABEL_EXPIRED",
+            "action_required": "generate_new_label",
+            "product": "Smartwatch Samsung Galaxy Watch 6",
+            "valor": 899.00,
+            "description": (
+                "Devolução solicitada e aprovada. "
+                "Etiqueta dos Correios gerada em 29/04 expirou em 19/05. "
+                "Cliente precisa gerar uma nova etiqueta pelo sistema."
+            ),
+            "opened_at": "2026-04-29",
+            "deadline": "2026-05-30",
+            "urgency": "high",
+            "additional_info": json.dumps({
+                "label_generated": "2026-04-29",
+                "label_expired": "2026-05-19",
+                "return_reason": "produto com defeito",
+                "new_label_url": "app.supportai.com/devolucoes/nova-etiqueta",
+            }),
+        },
+        {
+            "order_number": "77703",
+            "ticket_id": "TRK-2026-7703",
+            "status": "AWAITING_RETURN_SHIPMENT",
+            "action_required": "ship_product",
+            "product": "Notebook Dell Inspiron 15",
+            "valor": 3200.00,
+            "description": (
+                "Troca aprovada por defeito de fábrica. "
+                "Cliente precisa enviar o produto de volta. "
+                "Prazo de 7 dias já expirou em 17/05."
+            ),
+            "opened_at": "2026-05-10",
+            "deadline": "2026-05-17",
+            "urgency": "high",
+            "additional_info": json.dumps({
+                "exchange_approved": "2026-05-10",
+                "deadline_expired": True,
+                "defect": "tela piscando ao iniciar",
+                "shipping_instructions": "Use a embalagem original se possível",
+                "pickup_available": True,
+            }),
+        },
+        {
+            "order_number": "77704",
+            "ticket_id": "BIL-2026-7704",
+            "status": "AWAITING_DOCUMENTATION",
+            "action_required": "send_proof",
+            "product": "iPhone 15 Case Premium",
+            "valor": 189.00,
+            "description": (
+                "Contestação de cobrança duplicada aberta em 05/05. "
+                "Aguardando comprovante de pagamento (extrato bancário) "
+                "para prosseguir com o estorno."
+            ),
+            "opened_at": "2026-05-05",
+            "deadline": "2026-05-26",
+            "urgency": "medium",
+            "additional_info": json.dumps({
+                "dispute_reason": "cobrança duplicada",
+                "amount_disputed": 189.00,
+                "documents_needed": [
+                    "Extrato bancário do período",
+                    "Comprovante de pagamento",
+                ],
+                "dispute_opened": "2026-05-05",
+            }),
+        },
+        {
+            "order_number": "77705",
+            "ticket_id": "DEL-2026-7705",
+            "status": "DELIVERY_FAILED",
+            "action_required": "reschedule_delivery",
+            "product": "Monitor LG 27 4K UltraFine",
+            "valor": 2100.00,
+            "description": (
+                "2 tentativas de entrega sem sucesso. "
+                "Última tentativa: 16/05. "
+                "Produto retorna ao estoque em 25/05 "
+                "se não houver reagendamento."
+            ),
+            "opened_at": "2026-05-14",
+            "deadline": "2026-05-25",
+            "urgency": "high",
+            "additional_info": json.dumps({
+                "attempts": 2,
+                "last_attempt": "2026-05-16",
+                "return_deadline": "2026-05-25",
+                "pickup_available": True,
+                "cd_address": "Av. Marginal Tietê, 1000 - São Paulo",
+                "reschedule_url": "app.supportai.com/entregas/reagendar",
+            }),
+        },
+        {
+            "order_number": "77706",
+            "ticket_id": "WAR-2026-7706",
+            "status": "UNDER_TECHNICAL_ANALYSIS",
+            "action_required": "wait_for_report",
+            "product": "Fone Sony WH-1000XM5",
+            "valor": 1650.00,
+            "description": (
+                "Produto enviado para assistência técnica em 08/05. "
+                "Defeito: cancelamento de ruído não funciona. "
+                "Laudo técnico previsto para 22/05."
+            ),
+            "opened_at": "2026-05-08",
+            "deadline": "2026-05-22",
+            "urgency": "low",
+            "additional_info": json.dumps({
+                "defect": "cancelamento de ruído ativo não funciona",
+                "sent_to_service": "2026-05-08",
+                "report_deadline": "2026-05-22",
+                "warranty_valid": True,
+                "service_center": "Sony Assistência Técnica SP",
+                "protocol": "SOA-2026-77706",
+            }),
+        },
+        {
+            "order_number": "77707",
+            "ticket_id": "CAN-2026-7707",
+            "status": "AWAITING_RETURN",
+            "action_required": "return_product",
+            "product": "Cafeteira Nespresso Vertuo Plus",
+            "valor": 620.00,
+            "description": (
+                "Cancelamento aprovado em 12/05. "
+                "Prazo para devolução do produto: até 19/05 (hoje!). "
+                "Reembolso de R$620,00 liberado após recebimento."
+            ),
+            "opened_at": "2026-05-12",
+            "deadline": "2026-05-19",
+            "urgency": "high",
+            "additional_info": json.dumps({
+                "cancellation_approved": "2026-05-12",
+                "return_deadline": "2026-05-19",
+                "deadline_today": True,
+                "refund_amount": 620.00,
+                "refund_after_receipt": True,
+                "return_label_url": "app.supportai.com/cancelamentos/etiqueta",
+            }),
         },
     ]
 
@@ -501,10 +578,10 @@ class DataStore:
             return
         db = self.SessionLocal()
         try:
-            count = db.query(PendingActionDB).count()
+            count = db.query(PendingAction).count()
             if count == 0:
                 for row in self._PENDING_ACTION_SEED:
-                    db.add(PendingActionDB(**row))
+                    db.add(PendingAction(**row))
                 db.commit()
                 logger.info("Seeded %d pending action records", len(self._PENDING_ACTION_SEED))
         except Exception as e:
@@ -519,21 +596,24 @@ class DataStore:
             return None
         db = self.SessionLocal()
         try:
-            row = db.query(PendingActionDB).filter(
-                PendingActionDB.order_number == str(order_number)
+            row = db.query(PendingAction).filter(
+                PendingAction.order_number == str(order_number)
             ).first()
             if not row:
                 return None
             return {
                 "found": True,
                 "order_number": row.order_number,
-                "customer_name": row.customer_name,
-                "customer_email": row.customer_email,
-                "produto": row.produto,
-                "action_type": row.action_type,
-                "awaiting_info": row.awaiting_info,
-                "instructions": row.instructions,
+                "ticket_id": row.ticket_id,
+                "status": row.status,
+                "action_required": row.action_required,
+                "product": row.product,
+                "valor": row.valor,
+                "description": row.description,
+                "opened_at": row.opened_at,
                 "deadline": row.deadline,
+                "urgency": row.urgency,
+                "additional_info": json.loads(row.additional_info or "{}"),
             }
         except Exception as e:
             logger.error("Error fetching pending action for order %s: %s", order_number, e)
