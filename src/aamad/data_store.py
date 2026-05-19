@@ -42,6 +42,48 @@ if SQLALCHEMY_AVAILABLE:
         motivo_negacao = Column(Text)
         created_at = Column(String(20))
 
+    class ObservabilityEventDB(Base):
+        """SQLAlchemy model for per-step observability events."""
+        __tablename__ = "observability_events"
+
+        id = Column(Integer, primary_key=True, autoincrement=True)
+        reference_id = Column(String, index=True, nullable=False)
+        step_name = Column(String, nullable=False)
+        agent_name = Column(String, default="")
+        tool_name = Column(String, default="")
+        timestamp = Column(DateTime, default=datetime.utcnow)
+        latency_ms = Column(Float, default=0.0)
+        input_tokens = Column(Integer, default=0)
+        output_tokens = Column(Integer, default=0)
+        total_tokens = Column(Integer, default=0)
+        cost_usd = Column(Float, default=0.0)
+        model = Column(String, default="")
+        execution_mode = Column(String, default="deterministic")
+        cache_used = Column(Boolean, default=False)
+        status = Column(String, default="success")
+        success = Column(Boolean, default=True)
+        error = Column(String, default="")
+        details = Column(Text, default="{}")
+        created_at = Column(DateTime, default=datetime.utcnow)
+
+    class TicketObservabilityDB(Base):
+        """SQLAlchemy model for per-ticket observability summary."""
+        __tablename__ = "ticket_observability"
+
+        reference_id = Column(String, primary_key=True)
+        total_tokens = Column(Integer, default=0)
+        total_cost_usd = Column(Float, default=0.0)
+        wall_time_sec = Column(Float, default=0.0)
+        step_count = Column(Integer, default=0)
+        llm_calls = Column(Integer, default=0)
+        deterministic_calls = Column(Integer, default=0)
+        api_calls = Column(Integer, default=0)
+        knowledge_snippets = Column(Integer, default=0)
+        quality_grade = Column(String, default="")
+        quality_overall = Column(Float, default=0.0)
+        hallucination_detected = Column(Boolean, default=False)
+        created_at = Column(DateTime, default=datetime.utcnow)
+
     class SupportTicketDB(Base):
         """SQLAlchemy model for support tickets."""
         __tablename__ = "support_tickets"
@@ -414,6 +456,234 @@ class DataStore:
                 self._save_tickets(tickets)
                 return True
             return False
+
+    # ── Observability persistence ─────────────────────────────────────────────
+
+    def save_observability_event(
+        self,
+        reference_id: str,
+        step_name: str,
+        agent_name: str = "",
+        tool_name: str = "",
+        latency_ms: float = 0.0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        cost_usd: float = 0.0,
+        model: str = "",
+        execution_mode: str = "deterministic",
+        cache_used: bool = False,
+        status: str = "success",
+        error: str = "",
+        details: dict = None,
+    ) -> None:
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return
+        with self.SessionLocal() as session:
+            event = ObservabilityEventDB(
+                reference_id=reference_id,
+                step_name=step_name,
+                agent_name=agent_name,
+                tool_name=tool_name,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                cost_usd=cost_usd,
+                model=model,
+                execution_mode=execution_mode,
+                cache_used=cache_used,
+                status=status,
+                success=(status == "success"),
+                error=error,
+                details=json.dumps(details or {}),
+            )
+            session.add(event)
+            session.commit()
+
+    def remap_observability_events(self, old_ref: str, new_ref: str) -> None:
+        if not self.use_database or not SQLALCHEMY_AVAILABLE or old_ref == new_ref:
+            return
+        from sqlalchemy import text as _text
+        with self.SessionLocal() as session:
+            session.execute(
+                _text(
+                    "UPDATE observability_events "
+                    "SET reference_id = :new WHERE reference_id = :old"
+                ),
+                {"new": new_ref, "old": old_ref},
+            )
+            session.commit()
+
+    def save_ticket_observability(
+        self,
+        reference_id: str,
+        total_tokens: int,
+        total_cost_usd: float,
+        wall_time_sec: float,
+        step_count: int,
+        llm_calls: int,
+        deterministic_calls: int,
+        api_calls: int,
+        knowledge_snippets: int = 0,
+        quality_grade: str = "",
+        quality_overall: float = 0.0,
+        hallucination_detected: bool = False,
+    ) -> None:
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return
+        with self.SessionLocal() as session:
+            obs = TicketObservabilityDB(
+                reference_id=reference_id,
+                total_tokens=total_tokens,
+                total_cost_usd=total_cost_usd,
+                wall_time_sec=wall_time_sec,
+                step_count=step_count,
+                llm_calls=llm_calls,
+                deterministic_calls=deterministic_calls,
+                api_calls=api_calls,
+                knowledge_snippets=knowledge_snippets,
+                quality_grade=quality_grade,
+                quality_overall=quality_overall,
+                hallucination_detected=hallucination_detected,
+            )
+            session.merge(obs)
+            session.commit()
+
+    def get_observability_by_ticket(self, reference_id: str) -> List[Dict[str, Any]]:
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        with self.SessionLocal() as session:
+            events = (
+                session.query(ObservabilityEventDB)
+                .filter(ObservabilityEventDB.reference_id == reference_id)
+                .order_by(ObservabilityEventDB.timestamp)
+                .all()
+            )
+            return [
+                {
+                    "step_name": e.step_name,
+                    "agent_name": e.agent_name,
+                    "tool_name": e.tool_name,
+                    "latency_ms": e.latency_ms,
+                    "input_tokens": e.input_tokens,
+                    "output_tokens": e.output_tokens,
+                    "total_tokens": e.total_tokens,
+                    "cost_usd": e.cost_usd,
+                    "model": e.model,
+                    "execution_mode": e.execution_mode,
+                    "cache_used": e.cache_used,
+                    "status": e.status,
+                    "success": e.success,
+                    "error": e.error,
+                    "details": json.loads(e.details or "{}"),
+                    "timestamp": e.timestamp.isoformat() if e.timestamp else "",
+                }
+                for e in events
+            ]
+
+    def get_observability_summary(self) -> Dict[str, Any]:
+        """Aggregate observability metrics across all tickets via SQL."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return {}
+        from sqlalchemy import func
+        with self.SessionLocal() as session:
+            # Per-event aggregates
+            total_events = session.query(ObservabilityEventDB).count()
+            total_tickets = (
+                session.query(ObservabilityEventDB.reference_id)
+                .distinct()
+                .count()
+            )
+            avg_latency = (
+                session.query(func.avg(ObservabilityEventDB.latency_ms)).scalar() or 0.0
+            )
+            total_tokens = (
+                session.query(func.sum(ObservabilityEventDB.total_tokens)).scalar() or 0
+            )
+            total_cost = (
+                session.query(func.sum(ObservabilityEventDB.cost_usd)).scalar() or 0.0
+            )
+            llm_calls = (
+                session.query(ObservabilityEventDB)
+                .filter(ObservabilityEventDB.execution_mode == "llm")
+                .count()
+            )
+            det_calls = (
+                session.query(ObservabilityEventDB)
+                .filter(ObservabilityEventDB.execution_mode == "deterministic")
+                .count()
+            )
+            cache_hits = (
+                session.query(ObservabilityEventDB)
+                .filter(ObservabilityEventDB.cache_used == True)
+                .count()
+            )
+            errors = (
+                session.query(ObservabilityEventDB)
+                .filter(ObservabilityEventDB.success == False)
+                .count()
+            )
+
+            # Per-ticket aggregates (for hallucination rate)
+            total_evaluated = (
+                session.query(TicketObservabilityDB)
+                .filter(TicketObservabilityDB.quality_grade != "")
+                .count()
+            )
+            hallucinated = (
+                session.query(TicketObservabilityDB)
+                .filter(TicketObservabilityDB.hallucination_detected == True)
+                .count()
+            )
+            avg_wall_time = (
+                session.query(func.avg(TicketObservabilityDB.wall_time_sec)).scalar() or 0.0
+            )
+
+            # Per-agent metrics
+            rows = session.query(
+                ObservabilityEventDB.agent_name,
+                ObservabilityEventDB.tool_name,
+                func.count(ObservabilityEventDB.id).label("calls"),
+                func.avg(ObservabilityEventDB.latency_ms).label("avg_latency"),
+                func.sum(ObservabilityEventDB.total_tokens).label("total_tokens"),
+                func.sum(ObservabilityEventDB.cost_usd).label("total_cost"),
+            ).group_by(
+                ObservabilityEventDB.agent_name, ObservabilityEventDB.tool_name
+            ).all()
+
+            agent_performance: Dict[str, Any] = {}
+            tool_usage: Dict[str, int] = {}
+            for row in rows:
+                name = row.agent_name or row.tool_name or "unknown"
+                agent_performance[name] = {
+                    "calls": row.calls,
+                    "avg_latency_ms": round(row.avg_latency or 0, 2),
+                    "total_tokens": row.total_tokens or 0,
+                    "total_cost_usd": round(row.total_cost or 0, 6),
+                }
+                if row.tool_name:
+                    tool_usage[row.tool_name] = (
+                        tool_usage.get(row.tool_name, 0) + row.calls
+                    )
+
+            return {
+                "total_events": total_events,
+                "total_tickets": total_tickets,
+                "avg_latency_ms": round(avg_latency, 2),
+                "llm_calls": llm_calls,
+                "deterministic_calls": det_calls,
+                "cache_hits": cache_hits,
+                "errors": errors,
+                "total_estimated_tokens": total_tokens,
+                "total_cost_usd": round(total_cost, 6),
+                "hallucination_rate": round(
+                    hallucinated / total_evaluated * 100, 1
+                ) if total_evaluated > 0 else 0.0,
+                "total_evaluated": total_evaluated,
+                "avg_wall_time_sec": round(avg_wall_time, 2),
+                "agent_performance": agent_performance,
+                "tool_usage": tool_usage,
+            }
 
     def get_all_tickets(self) -> List[SupportTicketData]:
         """Get all support tickets."""

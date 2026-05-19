@@ -176,6 +176,13 @@ async def create_support_ticket(
     # Save to data store
     data_store.save_ticket(ticket_data)
 
+    # Write per-ticket observability summary to SQLite
+    _svc.observability_service.finalize_ticket(
+        reference_id=reference_id,
+        wall_time_sec=wall_time,
+        quality_evaluation=final_state.quality_evaluation or {},
+    )
+
     # Handle integrations if enabled
     if ENABLE_MOCK_INTEGRATIONS:
         try:
@@ -387,7 +394,7 @@ async def get_ticket_metrics(
 
 @router.get("/api/observability/summary")
 async def get_observability_summary(_=Depends(verify_api_key)) -> dict:
-    """Get aggregate observability metrics."""
+    """Get aggregate observability metrics (SQLite-backed)."""
     return _svc.observability_service.get_summary()
 
 
@@ -396,20 +403,27 @@ async def get_ticket_observability(
     reference_id: str,
     _=Depends(verify_api_key),
 ) -> dict:
-    """Get structured observability events for a ticket."""
+    """Get structured observability events for a ticket (SQLite-backed)."""
     events = _svc.observability_service.get_events(reference_id)
     if not events:
         raise HTTPException(
             status_code=404,
             detail="No observability events found for this ticket",
         )
+    total_tokens = sum(
+        e.get("total_tokens") or e.get("estimated_tokens", 0) for e in events
+    )
+    llm_calls = sum(
+        1 for e in events
+        if e.get("execution_mode") == "llm" or e.get("llm_used", False)
+    )
     return {
         "reference_id": reference_id,
         "events": events,
         "total_events": len(events),
-        "total_latency_ms": sum(e["latency_ms"] for e in events),
-        "llm_calls": sum(1 for e in events if e["llm_used"]),
-        "total_tokens": sum(e["estimated_tokens"] for e in events),
+        "total_latency_ms": sum(e.get("latency_ms", 0) for e in events),
+        "llm_calls": llm_calls,
+        "total_tokens": total_tokens,
     }
 
 

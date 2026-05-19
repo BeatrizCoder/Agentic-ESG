@@ -10,6 +10,21 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Lazy import to avoid circular-import at module load time.
+# Accessed via _get_data_store() below.
+_data_store = None
+
+
+def _get_data_store():
+    global _data_store
+    if _data_store is None:
+        try:
+            from .data_store import data_store as _ds
+            _data_store = _ds
+        except Exception:
+            pass
+    return _data_store
+
 
 @dataclass
 class ObservabilityEvent:
@@ -73,11 +88,32 @@ class ObservabilityService:
             logger.error("ObservabilityService: failed to save events: %s", e, exc_info=True)
 
     def record(self, event: ObservabilityEvent) -> None:
-        """Record a single observability event."""
+        """Record a single observability event (in-memory + SQLite)."""
         if event.reference_id not in self.events:
             self.events[event.reference_id] = []
         self.events[event.reference_id].append(event)
         self._save_events()
+        # Persist to SQLite
+        ds = _get_data_store()
+        if ds and getattr(ds, "use_database", False):
+            try:
+                ds.save_observability_event(
+                    reference_id=event.reference_id,
+                    step_name=event.agent_name or event.tool_name or event.event_type,
+                    agent_name=event.agent_name,
+                    tool_name=event.tool_name,
+                    latency_ms=event.latency_ms,
+                    input_tokens=event.input_tokens,
+                    output_tokens=event.output_tokens,
+                    cost_usd=event.cost_usd,
+                    execution_mode=event.execution_mode,
+                    cache_used=event.cache_used,
+                    status=event.status,
+                    error=event.error,
+                    details=event.to_dict(),
+                )
+            except Exception as e:
+                logger.error("Failed to persist observability event to SQLite: %s", e)
 
     def record_tool_execution(
         self,
@@ -126,20 +162,73 @@ class ObservabilityService:
         return event
 
     def remap_events(self, old_key: str, new_key: str) -> None:
-        """Move all events stored under old_key to new_key."""
+        """Move all events stored under old_key to new_key (in-memory + SQLite)."""
         if old_key in self.events and old_key != new_key:
             self.events[new_key] = self.events.pop(old_key)
             self._save_events()
+        ds = _get_data_store()
+        if ds and getattr(ds, "use_database", False):
+            try:
+                ds.remap_observability_events(old_key, new_key)
+            except Exception as e:
+                logger.error("Failed to remap observability events in SQLite: %s", e)
 
     def get_events(self, reference_id: str) -> list[dict]:
-        """Get all events for a ticket."""
-        return [
-            e.to_dict()
-            for e in self.events.get(reference_id, [])
-        ]
+        """Get all events for a ticket — SQLite when available, else in-memory."""
+        ds = _get_data_store()
+        if ds and getattr(ds, "use_database", False):
+            try:
+                db_events = ds.get_observability_by_ticket(reference_id)
+                if db_events:
+                    return db_events
+            except Exception as e:
+                logger.error("Failed to read observability from SQLite: %s", e)
+        return [e.to_dict() for e in self.events.get(reference_id, [])]
+
+    def finalize_ticket(
+        self,
+        reference_id: str,
+        wall_time_sec: float,
+        quality_evaluation: dict = None,
+    ) -> None:
+        """Write per-ticket summary row to SQLite after all steps complete."""
+        ds = _get_data_store()
+        if not ds or not getattr(ds, "use_database", False):
+            return
+        try:
+            events = ds.get_observability_by_ticket(reference_id)
+            total_tokens = sum(e["total_tokens"] for e in events)
+            total_cost = sum(e["cost_usd"] for e in events)
+            llm_calls = sum(1 for e in events if e["execution_mode"] == "llm")
+            det_calls = sum(1 for e in events if e["execution_mode"] == "deterministic")
+            api_calls = sum(1 for e in events if e["execution_mode"] == "api")
+            quality = quality_evaluation or {}
+            ds.save_ticket_observability(
+                reference_id=reference_id,
+                total_tokens=total_tokens,
+                total_cost_usd=total_cost,
+                wall_time_sec=wall_time_sec,
+                step_count=len(events),
+                llm_calls=llm_calls,
+                deterministic_calls=det_calls,
+                api_calls=api_calls,
+                quality_grade=quality.get("grade", ""),
+                quality_overall=float(quality.get("overall", 0.0)),
+                hallucination_detected=bool(quality.get("hallucination_detected", False)),
+            )
+        except Exception as e:
+            logger.error("Failed to finalize ticket observability in SQLite: %s", e)
 
     def get_summary(self) -> dict:
-        """Aggregate metrics across all tickets."""
+        """Aggregate metrics — SQLite when available, else in-memory."""
+        ds = _get_data_store()
+        if ds and getattr(ds, "use_database", False):
+            try:
+                return ds.get_observability_summary()
+            except Exception as e:
+                logger.error("Failed to read observability summary from SQLite: %s", e)
+
+        # ── In-memory fallback ────────────────────────────────────────────────
         all_events = [
             e for events in self.events.values()
             for e in events
