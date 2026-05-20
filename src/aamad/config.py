@@ -11,7 +11,7 @@ ENABLE_MEMORY: bool = os.getenv("ENABLE_MEMORY", "false").lower() == "true"
 ENABLE_CREWAI_KNOWLEDGE: bool = os.getenv("ENABLE_CREWAI_KNOWLEDGE", "false").lower() == "true"
 ENABLE_PROMPT_TEMPLATES: bool = os.getenv("ENABLE_PROMPT_TEMPLATES", "true").lower() == "true"
 ENABLE_MCP: bool = os.getenv("ENABLE_MCP", "false").lower() == "true"
-ENABLE_EXTERNAL_APIS: bool = os.getenv("ENABLE_EXTERNAL_APIS", "false").lower() == "true"
+ENABLE_EXTERNAL_APIS: bool = os.getenv("ENABLE_EXTERNAL_APIS", "true").lower() == "true"
 ENABLE_MOCK_INTEGRATIONS: bool = os.getenv("ENABLE_MOCK_INTEGRATIONS", "true").lower() == "true"
 ENABLE_REDIS_CACHE: bool = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 
