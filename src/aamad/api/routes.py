@@ -380,16 +380,28 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
     not_helpful_count = 0
     total_feedback = 0
     for ticket in tickets:
-        feedback = getattr(ticket, "feedback", None) or {}
-        if feedback:
-            total_feedback += 1
-            if feedback.get("helpful") is True:
-                helpful_count += 1
-            elif feedback.get("helpful") is False:
-                not_helpful_count += 1
+        feedback = getattr(ticket, "feedback", None)
+        if not feedback:
+            continue
+        total_feedback += 1
+        # Support string format ("positive"/"negative") and legacy JSON dict
+        if feedback in ("positive", "helpful") or (
+            isinstance(feedback, dict) and (
+                feedback.get("helpful") is True
+                or feedback.get("value") == "positive"
+            )
+        ):
+            helpful_count += 1
+        elif feedback in ("negative", "not_helpful") or (
+            isinstance(feedback, dict) and (
+                feedback.get("helpful") is False
+                or feedback.get("value") == "negative"
+            )
+        ):
+            not_helpful_count += 1
 
     csat_score = (
-        round((helpful_count / total_feedback) * 100)
+        round((helpful_count / total_feedback) * 100, 1)
         if total_feedback > 0 else None
     )
     obs_summary = _svc.observability_service.get_summary()
@@ -467,19 +479,22 @@ async def get_ticket_observability(
 @router.post("/api/support/{reference_id}/feedback")
 async def submit_feedback(reference_id: str, feedback: FeedbackRequest):
     """Submit feedback for a support ticket."""
+    logger.info(
+        "Feedback received: ref=%s helpful=%s reason=%s",
+        reference_id, feedback.helpful, feedback.feedback_reason,
+    )
+
     ticket = data_store.get_ticket(reference_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    feedback_data = {
-        "helpful": feedback.helpful,
-        "comments": feedback.comments,
-        "approval_status": feedback.approval_status,
-        "submitted_at": datetime.now().isoformat(),
-    }
-    data_store.update_ticket_status(reference_id, ticket.status, feedback_data)
-
-    return {"message": "Feedback submitted successfully", "reference_id": reference_id}
+    result = data_store.save_feedback(
+        reference_id=reference_id,
+        helpful=feedback.helpful,
+        feedback_reason=feedback.feedback_reason or feedback.comments,
+    )
+    logger.info("Feedback saved: ref=%s result=%s", reference_id, result)
+    return {"success": True, "message": "Feedback submitted successfully", "reference_id": reference_id}
 
 
 @router.post("/api/support/{reference_id}/approve")

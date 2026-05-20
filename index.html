@@ -2365,13 +2365,14 @@
              'dev-key-change-in-production';
     }
 
-    function initOperatorDashboard() {
+    async function initOperatorDashboard() {
       if (!state.apiKey && !localStorage.getItem('operator_api_key')) {
         state.apiKey = 'dev-key-change-in-production';
         localStorage.setItem('operator_api_key', 'dev-key-change-in-production');
         console.log('Dev API key set automatically');
       }
-      loadHistoricalTickets();
+      await loadTicketsFromDB();
+      render();
       loadMetrics();
     }
 
@@ -4690,8 +4691,9 @@
 
       document.querySelectorAll('[data-feedback="true"][data-helpful="true"]').forEach(button => {
         button.addEventListener('click', () => {
-          const ticket = state.tickets.find(t => !t._source);
-          if (ticket) sendFeedback(ticket.reference_id, true);
+          const refId = state.activeTicketId ||
+            (state.tickets.find(t => !t._source) || {}).reference_id;
+          if (refId) submitFeedback(refId, true, null);
           state.feedbackDone = 'helpful';
           render();
         });
@@ -4705,11 +4707,12 @@
 
       document.getElementById('not-helpful-submit')
         ?.addEventListener('click', () => {
-          const ticket = state.tickets.find(t => !t._source);
+          const refId = state.activeTicketId ||
+            (state.tickets.find(t => !t._source) || {}).reference_id;
           const selected = document.querySelector('input[name="not-helpful-reason"]:checked');
           const reason = selected ? selected.value : 'not_specified';
           const extraComment = document.getElementById('not-helpful-details')?.value || '';
-          if (ticket) sendFeedback(ticket.reference_id, false, reason, extraComment);
+          if (refId) sendFeedback(refId, false, reason, extraComment);
           state.feedbackDone = 'not-helpful';
           state.notHelpfulFormVisible = false;
           render();
@@ -5559,35 +5562,64 @@
       return `${seconds}s`;
     }
 
-    function sendFeedback(referenceId, helpful, reason, extraComment = '') {
+    async function submitFeedback(referenceId, isHelpful, reason) {
+      const apiKey = getApiKey();
+      const url = `${BACKEND_URL}/api/support/${referenceId}/feedback`;
+
+      console.log('submitFeedback:', {
+        referenceId,
+        isHelpful,
+        url,
+        hasApiKey: !!apiKey,
+      });
+
+      // Update local state immediately so Analytics reflects it
       const ticket = state.tickets.find(item => item.reference_id === referenceId);
-      if (!ticket) return;
-      const parts = [];
-      if (reason) parts.push(`Reason: ${reason}`);
-      if (extraComment && extraComment.trim()) parts.push(`Comment: ${extraComment.trim()}`);
-      const comments = parts.join('\n');
-      // Always update local state so Analytics can read it immediately
-      ticket.feedback = { helpful, comments };
+      if (ticket) {
+        ticket.feedback = isHelpful ? 'positive' : 'negative';
+      }
+
       if (!state.useBackend) {
-        state.feedbackStatus = helpful ? 'Feedback registrado localmente.' : 'Feedback negativo registrado localmente.';
+        state.feedbackStatus = isHelpful ? 'Feedback registrado localmente.' : 'Feedback negativo registrado localmente.';
+        showToast(isHelpful ? '👍 Obrigado!' : '👎 Feedback registrado');
         render();
         return;
       }
-      fetch(`${state.backendUrl}/${referenceId}/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ helpful, comments }),
-      }).then(response => {
-        if (response.ok) {
-          state.feedbackStatus = helpful ? 'Feedback enviado com sucesso.' : 'Feedback negativo enviado.';
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+          },
+          body: JSON.stringify({
+            helpful: isHelpful,
+            feedback_reason: reason || null,
+          }),
+        });
+
+        console.log('feedback response:', res.status);
+
+        if (res.ok) {
+          console.log('✅ Feedback saved!');
+          state.feedbackStatus = isHelpful ? 'Feedback enviado com sucesso.' : 'Feedback negativo enviado.';
+          showToast(isHelpful ? '👍 Obrigado!' : '👎 Feedback registrado');
         } else {
+          console.error('❌ Feedback failed:', res.status);
           state.feedbackStatus = 'Não foi possível enviar feedback para o backend.';
         }
         render();
-      }).catch(() => {
+      } catch (e) {
+        console.error('submitFeedback error:', e);
         state.feedbackStatus = 'Falha no envio do feedback. Verifique a conexão.';
         render();
-      });
+      }
+    }
+
+    function sendFeedback(referenceId, helpful, reason, extraComment = '') {
+      const feedbackReason = reason || (extraComment ? `Comment: ${extraComment.trim()}` : null);
+      submitFeedback(referenceId, helpful, feedbackReason);
     }
 
     function openModal(title, message, confirmLabel, onConfirm) {
@@ -7173,15 +7205,34 @@
       }
     }
 
-    async function loadHistoricalTickets() {
-      if (!state.useBackend) return;
+    async function loadTicketsFromDB() {
+      const apiKey = getApiKey();
+      const url = BACKEND_URL + '/api/tickets';
+
+      console.log('loadTicketsFromDB:', {
+        url,
+        hasApiKey: !!apiKey,
+        apiKey: apiKey ? 'set' : 'EMPTY',
+        useBackend: state.useBackend,
+      });
+
+      if (!state.useBackend) return [];
+
       try {
-        const ticketsUrl = state.backendUrl.replace('/api/support', '/api/tickets');
-        const resp = await fetch(ticketsUrl, { headers: { 'X-API-Key': getApiKey() } });
-        if (!resp.ok) return;
-        const dbTickets = await resp.json();
+        const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+
+        console.log('tickets response status:', res.status);
+
+        if (!res.ok) {
+          console.error('tickets fetch failed:', res.status);
+          return [];
+        }
+
+        const tickets = await res.json();
+        console.log('tickets loaded:', tickets.length);
+
         const existingIds = new Set(state.tickets.map(t => t.reference_id));
-        for (const t of dbTickets) {
+        for (const t of tickets) {
           if (!existingIds.has(t.reference_id)) {
             t._source = 'db';
             t.timestamp = t.created_at ? new Date(t.created_at).toLocaleTimeString() : '—';
@@ -7189,8 +7240,18 @@
           }
         }
         lastRefreshTime = new Date().toLocaleTimeString();
-        render();
-      } catch (e) { handleConnectionError(e); }
+        return tickets;
+
+      } catch (e) {
+        console.error('loadTicketsFromDB error:', e);
+        handleConnectionError(e);
+        return [];
+      }
+    }
+
+    async function loadHistoricalTickets() {
+      await loadTicketsFromDB();
+      render();
     }
 
     function syntaxHighlight(json) {
@@ -7384,9 +7445,19 @@
     });
 
     render();
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!state.apiKey) {
+        state.apiKey = getApiKey();
+      }
+      await loadTicketsFromDB();
+      await loadMetrics();
+      render();
+      console.log('App initialized:', {
+        tickets: state.tickets.length,
+        apiKey: state.apiKey ? 'set' : 'missing',
+      });
+    });
     initDatasetMode();
-    loadHistoricalTickets();
-    loadMetrics();
     fetchObservability();
     startAnalyticsRefresh();
     setInterval(checkBackendHealth, 15000);

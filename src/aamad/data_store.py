@@ -770,6 +770,49 @@ class DataStore:
                 return True
             return False
 
+    def save_feedback(
+        self,
+        reference_id: str,
+        helpful: bool,
+        feedback_reason: str = None,
+    ) -> bool:
+        """Save CSAT feedback for a ticket. Stores 'positive'/'negative' in feedback column."""
+        value = "positive" if helpful else "negative"
+        if self.use_database:
+            db = self.SessionLocal()
+            try:
+                db_ticket = (
+                    db.query(SupportTicketDB)
+                    .filter(SupportTicketDB.reference_id == reference_id)
+                    .first()
+                )
+                if not db_ticket:
+                    logger.warning("save_feedback: ticket not found: %s", reference_id)
+                    return False
+                db_ticket.feedback = value
+                if feedback_reason:
+                    db_ticket.feedback = {"value": value, "reason": feedback_reason}
+                db_ticket.updated_at = datetime.now()
+                db.commit()
+                logger.info(
+                    "Feedback saved: %s → %s", reference_id, value
+                )
+                return True
+            except Exception as e:
+                db.rollback()
+                logger.error("Database error saving feedback: %s", e)
+                return False
+            finally:
+                db.close()
+        else:
+            tickets = self._load_tickets()
+            if reference_id in tickets:
+                tickets[reference_id]["feedback"] = value
+                tickets[reference_id]["updated_at"] = datetime.now().isoformat()
+                self._save_tickets(tickets)
+                return True
+            return False
+
     # ── Observability persistence ─────────────────────────────────────────────
 
     def save_observability_event(

@@ -11,6 +11,7 @@ class SupportTicket(BaseModel):
 class FeedbackRequest(BaseModel):
     helpful: bool
     comments: Optional[str] = None
+    feedback_reason: Optional[str] = None
     approval_status: Optional[str] = Field(None, description="approved/rejected/needs_revision")
 
 
