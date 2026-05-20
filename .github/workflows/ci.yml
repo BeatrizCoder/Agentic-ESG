@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check src/ tools/ --ignore E501,F841,E702,E712,E701
+
+      - name: Check imports
+        run: |
+          python3 -c "from src.aamad.api.routes import router; print('✅ routes OK')"
+          python3 -c "from src.aamad.flow.support_flow import SupportFlow; print('✅ flow OK')"
+          python3 -c "from src.aamad.agents.definitions import classification_agent; print('✅ agents OK')"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: sqlite:///./test.db
+          OPENWEATHER_API_KEY: test
+          INTERNAL_API_KEY: test-key
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          pytest tests/ -v --tb=short \
+            --ignore=tests/test_backend.py \
+            --ignore=tests/test_frontend.py \
+            --ignore=tests/test_tools.py
+        env:
+          PYTHONPATH: src:.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: sqlite:///./test.db
+          OPENWEATHER_API_KEY: test
+          INTERNAL_API_KEY: test-key

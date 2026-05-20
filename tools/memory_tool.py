@@ -1,6 +1,6 @@
 """Memory management tool for storing interactions."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from . import BaseSupportTool
 
 

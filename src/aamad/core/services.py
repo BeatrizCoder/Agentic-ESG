@@ -10,7 +10,6 @@ setup is needed by callers.
 import logging
 from typing import Dict, Any
 
-from ..config import ENABLE_MEMORY, ENABLE_MOCK_INTEGRATIONS
 from ..services import KnowledgeService, MemoryService, PromptService, SkillService
 from ..observability import ObservabilityService
 from ..tool_registry import ToolRegistry

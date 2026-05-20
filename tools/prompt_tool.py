@@ -1,6 +1,6 @@
 """Prompt management tool for template handling."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from . import BaseSupportTool
 
 

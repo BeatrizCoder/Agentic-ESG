@@ -18,7 +18,6 @@ from crewai.flow.flow import start, listen
 from ..config import ENABLE_EXTERNAL_APIS, ENABLE_MEMORY, DEFAULT_CONFIG
 from ..routing_engine import route_ticket
 from ..core import services as _svc
-from .state import SupportState
 from tools.refund_lookup_tool import is_refund_inquiry, extract_order_number
 
 logger = logging.getLogger(__name__)

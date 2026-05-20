@@ -1,8 +1,7 @@
 """Tool registry and execution governance for the support system."""
 
 import time
-from typing import Dict, Any, List, Optional, Callable
-from functools import lru_cache
+from typing import Dict, Any, List
 import logging
 
 logger = logging.getLogger(__name__)

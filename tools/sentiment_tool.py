@@ -53,7 +53,8 @@ class SentimentTool(BaseSupportTool):
                     ],
                     messages=[{"role": "user", "content": f'Customer inquiry: "{clean_inq}"'}]
                 )
-                import json, re
+                import json
+                import re
                 raw = result.content[0].text.strip()
                 raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
                 parsed = json.loads(raw)

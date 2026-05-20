@@ -3,13 +3,13 @@
 import time
 import logging
 import random
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from . import BaseSupportTool
 from pydantic import BaseModel, Field
 
 from src.aamad.config import (
-    WEATHER_API_KEY, INTEGRATION_CONFIG,
-    ENABLE_EXTERNAL_APIS, ENABLE_MOCK_INTEGRATIONS
+    INTEGRATION_CONFIG,
+    ENABLE_MOCK_INTEGRATIONS
 )
 
 logger = logging.getLogger(__name__)

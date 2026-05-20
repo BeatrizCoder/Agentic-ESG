@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import json
 import time
-import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -621,7 +620,7 @@ def call_backend(inquiry: str, backend_url: str) -> dict[str, Any]:
 
 def local_analyze(inquiry: str) -> dict[str, Any]:
     """Deterministic fallback when no backend is available."""
-    import unicodedata, random as rng
+    import random as rng
 
     def norm(t): return t.lower().strip()
     cat_kw = {

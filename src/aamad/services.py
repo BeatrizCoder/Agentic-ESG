@@ -3,13 +3,12 @@
 import json
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import glob
 
-from .config import ENABLE_MEMORY, ENABLE_CREWAI_KNOWLEDGE, ENABLE_PROMPT_TEMPLATES, KNOWLEDGE_DIR, PROMPTS_DIR, MEMORY_FILE, SKILLS_DIR
+from .config import ENABLE_MEMORY, ENABLE_PROMPT_TEMPLATES, PROMPTS_DIR, MEMORY_FILE, SKILLS_DIR
 
 logger = logging.getLogger(__name__)
 

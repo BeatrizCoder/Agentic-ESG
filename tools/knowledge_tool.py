@@ -1,6 +1,5 @@
 """Knowledge retrieval tool for support categories."""
 
-from typing import Dict, Any, Optional
 from . import BaseSupportTool
 
 

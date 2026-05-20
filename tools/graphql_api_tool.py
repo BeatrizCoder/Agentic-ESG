@@ -7,8 +7,8 @@ from . import BaseSupportTool
 from pydantic import BaseModel, Field
 
 from src.aamad.config import (
-    EXTERNAL_API_KEY, INTEGRATION_CONFIG,
-    ENABLE_EXTERNAL_APIS, ENABLE_MOCK_INTEGRATIONS
+    INTEGRATION_CONFIG,
+    ENABLE_MOCK_INTEGRATIONS
 )
 
 logger = logging.getLogger(__name__)

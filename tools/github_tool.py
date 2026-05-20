@@ -3,13 +3,13 @@
 import time
 import logging
 import random
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from . import BaseSupportTool
 from pydantic import BaseModel, Field
 
 from src.aamad.config import (
-    GITHUB_TOKEN, INTEGRATION_CONFIG,
-    ENABLE_EXTERNAL_APIS, ENABLE_MOCK_INTEGRATIONS
+    INTEGRATION_CONFIG,
+    ENABLE_MOCK_INTEGRATIONS
 )
 
 logger = logging.getLogger(__name__)
