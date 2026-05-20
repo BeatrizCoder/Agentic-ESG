@@ -77,10 +77,10 @@ def _get_ticket_count(mode: str) -> int:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict[str, str]:
-    return {"status": "ok", "service": "aamad backend"}
+    return {"status": "ok", "service": "aamad backend", "timestamp": datetime.now().isoformat()}
 
 
 @router.post("/api/support", response_model=SupportResponse)
