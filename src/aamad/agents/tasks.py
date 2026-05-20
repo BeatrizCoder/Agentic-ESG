@@ -121,15 +121,51 @@ Mention the city/address from the external context.
 Apologise sincerely for the delay and give an adjusted delivery window.
 Use 🚛 emoji once.
 """
-    elif "REFUND DATA" in external_context:
-        external_instructions = """
+    elif "REFUND DATA FROM DATABASE" in external_context:
+        import re
+
+        order_match = re.search(r'Order: #?(\w+)', external_context)
+        product_match = re.search(r'Product: (.+?)(?:\n|$)', external_context)
+        amount_match = re.search(r'Amount: R\$?([\d,.]+)', external_context)
+        status_match = re.search(r'Status: (.+?)(?:\n|$)', external_context)
+        approved_match = re.search(r'Approved: (.+?)(?:\n|$)', external_context)
+        bank_match = re.search(r'Bank processed: (.+?)(?:\n|$)', external_context)
+        expected_match = re.search(r'Expected credit: (.+?)(?:\n|$)', external_context)
+
+        order = order_match.group(1) if order_match else "?"
+        product = product_match.group(1).strip() if product_match else "?"
+        amount = amount_match.group(1) if amount_match else "?"
+        status = status_match.group(1).strip() if status_match else "?"
+        approved = approved_match.group(1).strip() if approved_match else ""
+        bank_processed = bank_match.group(1).strip() if bank_match else ""
+        expected = expected_match.group(1).strip() if expected_match else ""
+
+        mandatory_fields = f"""  ✓ Order number: #{order}
+  ✓ Product name: {product}
+  ✓ Amount: R${amount}
+  ✓ Status: {status}"""
+        if approved and approved != "not yet":
+            mandatory_fields += f"\n  ✓ Approved on: {approved}"
+        if bank_processed:
+            mandatory_fields += f"\n  ✓ Bank processed: {bank_processed}"
+        if expected and expected != "TBD":
+            mandatory_fields += f"\n  ✓ Expected credit: {expected}"
+
+        external_instructions = f"""
 REFUND DATA RETRIEVED FROM DATABASE. This ticket is FULLY RESOLVED.
-CRITICAL RULE — failure to follow this will break the customer experience:
-  - DO NOT say "vou encaminhar", "vou conectá-lo", "equipe especializada", "especialista em billing" or ANY transfer language.
-  - DO NOT suggest a human will follow up or investigate.
-  - The response ends HERE — no escalation path exists.
-Inform the customer of their refund status using the exact order number, amount and dates from the data.
+
+CRITICAL RULES:
+  - DO NOT say "vou encaminhar", "equipe especializada" or ANY transfer language
+  - DO NOT suggest a human will follow up
+  - The response ends HERE — no escalation path exists
+
+MANDATORY — your response MUST mention ALL of these:
+{mandatory_fields}
+
+Use this exact data — do not invent or omit any field.
 Adapt tone to customer sentiment.
+If bank has NOT processed yet: explain banking timeline (5-10 days).
+If bank HAS processed: confirm money was returned.
 """
     elif "PENDING ACTION FOUND" in external_context:
         external_instructions = """

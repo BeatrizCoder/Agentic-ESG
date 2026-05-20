@@ -569,18 +569,25 @@ class SupportFlowStepsMixin:
                 self.state.api_tags.append("refund_lookup")
                 if refund_result.get("found"):
                     self.state.api_tags.append("refund_found")
-                    refund_details = [f"REFUND DATA FOUND - Pedido {order_num}:"]
+                    refund_details = [f"REFUND DATA FROM DATABASE - Order: #{order_num}"]
                     refund_details.append(f"Status: {refund_result.get('status', '')}")
-                    if refund_result.get("amount"):
-                        refund_details.append(f"Amount: {refund_result['amount']}")
-                    if refund_result.get("product_name"):
-                        refund_details.append(f"Product: {refund_result['product_name']}")
-                    if refund_result.get("approval_date"):
-                        refund_details.append(f"Approval date: {refund_result['approval_date']}")
-                    if refund_result.get("bank_deadline"):
-                        refund_details.append(f"Bank deadline: {refund_result['bank_deadline']}")
-                    if refund_result.get("eta_days"):
-                        refund_details.append(f"ETA: {refund_result['eta_days']} business days")
+                    produto = refund_result.get("produto", "")
+                    valor = refund_result.get("valor")
+                    aprovado_em = refund_result.get("aprovado_em", "")
+                    previsao = refund_result.get("previsao_credito", "")
+                    if produto:
+                        refund_details.append(f"Product: {produto}")
+                    if valor is not None:
+                        refund_details.append(f"Amount: R${float(valor):.2f}")
+                    if aprovado_em:
+                        refund_details.append(f"Approved: {aprovado_em}")
+                    if previsao:
+                        refund_details.append(f"Expected credit: {previsao}")
+                    status_val = refund_result.get("status", "")
+                    if status_val == "processado":
+                        refund_details.append("Bank processed: yes")
+                    elif status_val in ("aprovado", "pendente", "em_analise"):
+                        refund_details.append("Bank processed: not yet")
                     context_parts.append("\n".join(refund_details))
                     if refund_result.get("auto_resolve"):
                         self.state.routing_action = "resolve"
