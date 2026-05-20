@@ -44,33 +44,41 @@ def _get_demo_tickets() -> List[SupportTicketData]:
         result = []
         for r in rows:
             r = dict(r)
-            pa_raw = r.get("pending_action") or "{}"
-            try:
-                pa = _json.loads(pa_raw) if isinstance(pa_raw, str) else (pa_raw or {})
-            except Exception:
-                pa = {}
-            qe_raw = r.get("quality_evaluation") or "{}"
-            try:
-                qe = _json.loads(qe_raw) if isinstance(qe_raw, str) else (qe_raw or {})
-            except Exception:
-                qe = {}
+
+            def _j(key, default="[]"):
+                raw = r.get(key) or default
+                try:
+                    return _json.loads(raw) if isinstance(raw, str) else (raw or _json.loads(default))
+                except Exception:
+                    return _json.loads(default)
+
             result.append(SupportTicketData(
-                id=r.get("id", ""),
+                reference_id=r.get("reference_id", ""),
                 run_id=r.get("run_id", ""),
                 inquiry=r.get("inquiry", ""),
                 category=r.get("category", ""),
+                category_confidence=r.get("category_confidence") or 0,
                 sentiment=r.get("sentiment", ""),
+                sentiment_confidence=r.get("sentiment_confidence") or 0,
                 urgency=r.get("urgency", ""),
-                routing_action=r.get("routing_action", ""),
+                articles=_j("articles"),
                 escalation_required=bool(r.get("escalation_required", False)),
+                escalation_reason=r.get("escalation_reason", ""),
+                triggered_keyword=r.get("triggered_keyword"),
                 response=r.get("response", ""),
                 response_confidence=r.get("response_confidence") or 0,
-                quality_evaluation=qe,
-                tools_used=_json.loads(r.get("tools_used") or "[]"),
-                api_tags=_json.loads(r.get("api_tags") or "[]"),
+                quality_evaluation=_j("quality_evaluation", "{}"),
+                steps=_j("steps"),
+                tools_used=_j("tools_used"),
+                api_tags=_j("api_tags"),
                 execution_time_ms=r.get("execution_time_ms") or 0,
                 created_at=r.get("created_at", ""),
-                pending_action=pa,
+                updated_at=r.get("updated_at") or r.get("created_at", ""),
+                pending_action=_j("pending_action", "{}"),
+                knowledge_source=r.get("knowledge_source", ""),
+                memory_saved=bool(r.get("memory_saved", False)),
+                execution_mode=r.get("execution_mode", ""),
+                cache_used=bool(r.get("cache_used", False)),
             ))
         return result
     except Exception as _e:

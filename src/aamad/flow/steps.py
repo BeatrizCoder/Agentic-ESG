@@ -439,6 +439,7 @@ class SupportFlowStepsMixin:
                 logger.debug("logistics alert: %s", alert)
                 if alert:
                     self.state.logistics_alert = alert
+                    self.state.routing_action = "resolve"
                     self.state.api_tags.append("logistics_alert")
                     context_parts.append(
                         f"Validated address: {formatted}"
@@ -978,8 +979,10 @@ class SupportFlowStepsMixin:
         self.state.execution_mode = DEFAULT_CONFIG["execution_mode"]
         self.state.steps = self.steps
 
-        # Populate response cache for identical future inquiries
-        if self._inquiry_hash and not self._cache_hit:
+        # Populate response cache for identical future inquiries.
+        # Skip caching when external tools were called — refund status,
+        # CEP/logistics and weather return real-time data that changes between calls.
+        if self._inquiry_hash and not self._cache_hit and not self.state.external_context:
             _svc.response_cache[self._inquiry_hash] = {
                 'ts': time.time(),
                 'state': {

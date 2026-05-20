@@ -111,17 +111,24 @@ the team will investigate.
 """
     elif "LOGISTICS ALERT" in external_context:
         external_instructions = """
-LOGISTICS ALERT ACTIVE: Fleet maintenance affecting deliveries.
-Mention the validated address/city.
-State +3 business days additional delay.
-Use 🚛 emoji.
+LOGISTICS ALERT ACTIVE. This ticket is FULLY RESOLVED by the logistics explanation.
+CRITICAL RULE — failure to follow this will break the customer experience:
+  - DO NOT say "vou encaminhar", "vou escalar", "equipe especializada", or ANY transfer language.
+  - DO NOT suggest a human will follow up.
+  - The response ends HERE — no escalation path exists.
+Explain: fleet maintenance is causing +3 business days delay in the validated region.
+Mention the city/address from the external context.
+Apologise sincerely for the delay and give an adjusted delivery window.
+Use 🚛 emoji once.
 """
     elif "REFUND DATA" in external_context:
         external_instructions = """
-REFUND DATA RETRIEVED FROM DATABASE. This is an AUTO-RESOLVED ticket.
-DO NOT suggest escalation. DO NOT say "vou encaminhar para nossa equipe"
-or "vou conectá-lo com nosso time". DO NOT mention billing specialists.
-Mention the exact order number, product name, amount and refund status directly.
+REFUND DATA RETRIEVED FROM DATABASE. This ticket is FULLY RESOLVED.
+CRITICAL RULE — failure to follow this will break the customer experience:
+  - DO NOT say "vou encaminhar", "vou conectá-lo", "equipe especializada", "especialista em billing" or ANY transfer language.
+  - DO NOT suggest a human will follow up or investigate.
+  - The response ends HERE — no escalation path exists.
+Inform the customer of their refund status using the exact order number, amount and dates from the data.
 Adapt tone to customer sentiment.
 """
     elif "PENDING ACTION FOUND" in external_context:
