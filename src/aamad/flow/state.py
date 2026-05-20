@@ -48,6 +48,10 @@ class SupportState(BaseModel):
     awaiting_weather_context: str = ""
     quality_evaluation: dict = {}
     pending_action: dict = {}
+    detected_language: str = "pt"
+    ticket_summary: str = ""
+    action_needed: str = ""
+    key_facts: list[str] = []
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({

@@ -13,14 +13,13 @@ import time
 from datetime import datetime
 from typing import Any
 
-from crewai.flow.flow import start, listen, and_
+from crewai.flow.flow import start, listen
 
 from ..config import ENABLE_EXTERNAL_APIS, ENABLE_MEMORY, DEFAULT_CONFIG
 from ..routing_engine import route_ticket
 from ..core import services as _svc
 from .state import SupportState
 from tools.refund_lookup_tool import is_refund_inquiry, extract_order_number
-from tools.quality_evaluator import quality_evaluator
 
 logger = logging.getLogger(__name__)
 
@@ -220,9 +219,14 @@ class SupportFlowStepsMixin:
         return pt_score > en_score
 
     @start()
-    async def classify_inquiry(self):
+    async def classify_and_sentiment(self):
+        """
+        Crew 1: Classification + Sentiment sequential.
+        Uses CrewAI agents with real roles and goals.
+        """
         self._start_time = time.time()
         self.steps = []
+
         # --- Response cache check ---
         inquiry_hash = hashlib.md5(
             self.state.inquiry.lower().strip().encode()
@@ -230,33 +234,42 @@ class SupportFlowStepsMixin:
         self._inquiry_hash = inquiry_hash
         cached_entry = _svc.response_cache.get(inquiry_hash)
         if cached_entry and (time.time() - cached_entry['ts'] < 300):
-            logger.info(f"Cache hit for inquiry hash: {inquiry_hash}")
+            logger.info("Cache hit for inquiry hash: %s", inquiry_hash)
             for k, v in cached_entry['state'].items():
                 setattr(self.state, k, v)
             self.state.cache_used = True
             self._cache_hit = True
             return "Cache hit"
-        # --- Normal path ---
-        result = await self.execute_tool("Classification Tool", self.state.inquiry)
-        self.state.category = result["category"]
-        self.state.category_confidence = result["confidence"]
-        self.state.tools_used.append("Classification Tool")
-        self.state.cache_used = result.get("cached", False)
-        return f"Classified inquiry as {self.state.category}"
 
-    @start()
-    async def analyze_sentiment(self):
-        if self._cache_hit:
-            return "Skipped (cache hit)"
-        result = await self.execute_tool("Sentiment Analysis Tool", self.state.inquiry)
-        self.state.sentiment = result["sentiment"]
-        self.state.sentiment_confidence = result["confidence"]
-        self.state.urgency = result["urgency"]
-        self.state.tools_used.append("Sentiment Analysis Tool")
-        self.state.cache_used = self.state.cache_used or result.get("cached", False)
-        return f"Analyzed sentiment as {self.state.sentiment}"
+        # --- Crew 1: Analysis ---
+        from ..agents.crews import run_analysis_crew
 
-    @listen(and_(classify_inquiry, analyze_sentiment))
+        start = time.time()
+        result = await asyncio.to_thread(run_analysis_crew, self.state.inquiry)
+
+        self.state.category = result.get("category", "General Support")
+        self.state.category_confidence = result.get("confidence", 70)
+        self.state.detected_language = result.get("language", "pt")
+        self.state.sentiment = result.get("sentiment", "Neutral")
+        self.state.urgency = result.get("urgency", "Low")
+        self.state.sentiment_confidence = result.get("sentiment_confidence", 70)
+
+        latency = round((time.time() - start) * 1000, 2)
+
+        self.log_step("Analysis Crew", {
+            "agents": ["Classification Agent", "Sentiment Agent"],
+            "category": self.state.category,
+            "confidence": self.state.category_confidence,
+            "sentiment": self.state.sentiment,
+            "urgency": self.state.urgency,
+            "language": self.state.detected_language,
+            "execution_mode": "crewai_sequential",
+            "latency_ms": latency,
+        })
+
+        return f"Analysis complete: {self.state.category} / {self.state.sentiment}"
+
+    @listen(classify_and_sentiment)
     async def route_inquiry(self):
         decision = route_ticket(
             inquiry=self.state.inquiry,
@@ -589,48 +602,45 @@ class SupportFlowStepsMixin:
 
     @listen(enrich_with_external_data)
     async def generate_response(self):
-        # Simulate agent collaboration
-        self.log_step("Response Generation Agent", {
-            "collaboration": "ask",
-            "target_agent": "Knowledge Retrieval Agent",
-            "question": f"What articles are available for category '{self.state.category}'?",
-            "context": {"current_category": self.state.category},
-        })
+        """
+        Crew 2: Knowledge + Response sequential.
+        Response Agent uses external context for
+        weather/CEP/refund personalized messages.
+        """
+        from ..agents.crews import run_response_crew
 
         logger.debug("knowledge_context: %s", bool(self.state.knowledge_context))
         logger.debug("external_context: %r", self.state.external_context)
 
-        result = await self.execute_tool(
-            "Response Generation Tool",
-            self.state.category,
-            self.state.urgency,
-            len(self.state.articles),
-            self.state.inquiry,
-            self.state.knowledge_context,
-            self.state.routing_action,
-            self.state.external_context,
-        )
-        self.state.response = result["response"]
-        self.state.response_confidence = result["confidence"]
-        self.state.prompt_template_used = result.get("template_used")
-        self.state.token_usage = result.get("token_usage", {})
-        self.state.cost_usd = result.get("cost_usd", 0.0)
-        self.state.tools_used.append("Response Generation Tool")
+        start = time.time()
 
-        self.log_step("Response Generation Agent", {
-            "tool_used": "Response Generation Tool",
-            "category": self.state.category,
-            "urgency": self.state.urgency,
-            "knowledge_context_used": bool(self.state.knowledge_context),
-            "knowledge_sources": self.state.knowledge_sources,
-            "estimated_context_tokens": self.state.estimated_context_tokens,
-            "response_length": len(result.get("response", "")),
-            "confidence": result.get("confidence", 0),
-            "execution_mode": result.get("execution_mode", "unknown"),
-            "input_tokens": result.get("input_tokens"),
-            "output_tokens": result.get("output_tokens"),
-            "total_tokens": result.get("total_tokens"),
-            "cost_usd": result.get("cost_usd"),
+        result = await asyncio.to_thread(
+            run_response_crew,
+            inquiry=self.state.inquiry,
+            category=self.state.category,
+            sentiment=self.state.sentiment,
+            urgency=self.state.urgency,
+            routing_action=self.state.routing_action,
+            knowledge_context=self.state.knowledge_context,
+            external_context=self.state.external_context,
+            detected_language=self.state.detected_language,
+        )
+
+        if result.get("response"):
+            self.state.response = result["response"]
+
+        self.state.response_confidence = 80  # Crew doesn't expose token-level confidence
+        self.state.tools_used.append("Response Crew")
+
+        latency = round((time.time() - start) * 1000, 2)
+
+        self.log_step("Response Crew", {
+            "agents": ["Knowledge Agent", "Response Agent"],
+            "routing_action": self.state.routing_action,
+            "has_external_context": bool(self.state.external_context),
+            "response_length": len(self.state.response or ""),
+            "execution_mode": "crewai_sequential",
+            "latency_ms": latency,
         })
 
         # Validate response with skills
@@ -639,68 +649,9 @@ class SupportFlowStepsMixin:
         )
         self.state.skills_used.extend(skills_validation.get("skills_used", []))
 
-        return f"Generated response with confidence {self.state.response_confidence}%"
+        return f"Generated response ({len(self.state.response)} chars)"
 
     @listen(generate_response)
-    async def evaluate_response_quality(self):
-        """Cross-model quality evaluation: Sonnet judges Haiku responses."""
-        # Skip if no substantive response yet (awaiting/missing-info cases have short canned messages)
-        if not self.state.response or len(self.state.response) < 40:
-            self.log_step("Quality Evaluator Agent", {
-                "skipped": True,
-                "reason": "no substantive response to evaluate",
-            })
-            return "Skipped: no response"
-
-        # Skip explicit escalation-only paths (no AI response generated)
-        if self.state.routing_action == "escalate" and not self.state.external_context:
-            self.log_step("Quality Evaluator Agent", {
-                "skipped": True,
-                "reason": "escalated with no external context",
-            })
-            return "Skipped: pure escalation"
-
-        try:
-            evaluation = await asyncio.to_thread(
-                quality_evaluator.evaluate,
-                inquiry=self.state.inquiry,
-                response=self.state.response,
-                category=self.state.category,
-                routing_action=self.state.routing_action,
-                knowledge_context=self.state.knowledge_context,
-                external_context=self.state.external_context,
-            )
-
-            self.state.quality_evaluation = evaluation
-
-            self.log_step("Quality Evaluator Agent", {
-                "judge_model": evaluation.get("judge_model"),
-                "response_model": evaluation.get("response_model"),
-                "overall": evaluation.get("overall"),
-                "grade": evaluation.get("grade"),
-                "faithfulness": evaluation.get("faithfulness"),
-                "relevance": evaluation.get("relevance"),
-                "empathy": evaluation.get("empathy"),
-                "completeness": evaluation.get("completeness"),
-                "hallucination_detected": evaluation.get("hallucination_detected"),
-                "hallucination_details": evaluation.get("hallucination_details"),
-                "issues": evaluation.get("issues", []),
-                "suggestion": evaluation.get("suggestion"),
-                "cost_usd": evaluation.get("cost_usd", 0),
-                "latency_ms": evaluation.get("latency_ms", 0),
-            })
-
-            return (
-                f"Evaluated: grade={evaluation.get('grade', '?')} "
-                f"overall={evaluation.get('overall', 0)} "
-                f"hallucination={evaluation.get('hallucination_detected', False)}"
-            )
-
-        except Exception as e:
-            logger.error("Quality evaluation failed: %s", e)
-            return f"Evaluation failed: {e}"
-
-    @listen(evaluate_response_quality)
     async def evaluate_escalation(self):
         logger.debug(
             "evaluate_escalation: routing_action=%s refund_data=%s logistics_alert=%s "
@@ -1045,3 +996,57 @@ class SupportFlowStepsMixin:
             }
 
         return f"Escalation {'required' if self.state.escalation_required else 'not required'}"
+
+    @listen(evaluate_escalation)
+    async def evaluate_and_summarize(self):
+        """
+        Crew 3: Summary + Quality Evaluator sequential.
+        Sonnet judges Haiku responses (cross-model).
+        Only runs for auto-resolved tickets.
+        """
+        from ..agents.crews import run_evaluation_crew
+
+        if self.state.routing_action not in ("resolve", "step_by_step"):
+            self.log_step("Evaluation Crew", {
+                "skipped": True,
+                "reason": f"routing={self.state.routing_action}",
+            })
+            return "Skipped: not auto-resolved"
+
+        if not self.state.response:
+            return "Skipped: no response"
+
+        start = time.time()
+
+        result = await asyncio.to_thread(
+            run_evaluation_crew,
+            inquiry=self.state.inquiry,
+            response=self.state.response,
+            category=self.state.category,
+            knowledge_context=self.state.knowledge_context,
+            external_context=self.state.external_context,
+        )
+
+        summary = result.get("summary", {})
+        quality = result.get("quality", {})
+
+        self.state.ticket_summary = summary.get("summary", "")
+        self.state.action_needed = summary.get("action_needed", "")
+        self.state.key_facts = summary.get("key_facts", [])
+        self.state.quality_evaluation = quality
+
+        latency = round((time.time() - start) * 1000, 2)
+
+        self.log_step("Evaluation Crew", {
+            "agents": ["Summary Agent", "Quality Agent (Sonnet)"],
+            "grade": quality.get("grade", "N/A"),
+            "overall": quality.get("overall", 0),
+            "hallucination": quality.get("hallucination_detected", False),
+            "execution_mode": "crewai_sequential",
+            "latency_ms": latency,
+        })
+
+        return (
+            f"Evaluated: grade={quality.get('grade', '?')} "
+            f"hallucination={quality.get('hallucination_detected', False)}"
+        )
