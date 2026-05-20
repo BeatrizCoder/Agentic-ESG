@@ -2109,6 +2109,8 @@
     );
     console.log('Backend URL:', BACKEND_URL);
     const DEFAULT_BACKEND_URL = BACKEND_URL + '/api/support';
+    const isLocalhost = window.location.hostname === 'localhost' ||
+                        window.location.hostname === '127.0.0.1';
     const DEFAULT_API_KEY = window.OPERATOR_API_KEY || '';
     const AGENTS = [
       { label: 'Classifier Agent', key: 'Classifier' },
@@ -2145,7 +2147,7 @@
       activeTicketId: null,
       useBackend: true,
       backendUrl: DEFAULT_BACKEND_URL,
-      apiKey: window.OPERATOR_API_KEY || localStorage.getItem('operator_api_key') || '',
+      apiKey: window.OPERATOR_API_KEY || localStorage.getItem('operator_api_key') || 'dev-key-change-in-production',
       processing: false,
       progressState: AGENTS.map(agent => ({ ...agent, status: 'waiting' })),
       activeTab: 'response',
@@ -2193,6 +2195,8 @@
         localStorage.setItem('operator_api_key', 'dev-key-change-in-production');
         console.log('Dev API key set automatically');
       }
+      loadHistoricalTickets();
+      loadMetrics();
     }
 
     function render() {
@@ -3178,7 +3182,7 @@
           </div>
         </section>
 
-        <div id="dataset-toggle-bar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;margin-bottom:16px;">
+        <div id="dataset-toggle-bar" style="display:${isLocalhost ? 'flex' : 'none'};align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;margin-bottom:16px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:13px;color:var(--muted);">📊 Dataset:</span>
             <div style="display:flex;background:rgba(0,0,0,0.2);border-radius:8px;padding:3px;gap:3px;">
@@ -4773,6 +4777,7 @@
     };
 
     function willEscalate(inquiry) {
+      console.log('willEscalate called with:', inquiry);
       if (!inquiry || !inquiry.trim()) return false;
       const lower = inquiry.toLowerCase();
 
@@ -5038,8 +5043,9 @@
         state.routingAction = ticket.routing_action;
         state.missingInfo = ticket.routing_missing_info || [];
         state.awaitingReferenceId = ticket.reference_id;
-        state.showAwaitingForm = ticket.routing_action === 'awaiting' ||
-                                 ticket.status === 'awaiting_customer_info';
+        state.showAwaitingForm = (ticket.routing_action === 'awaiting' ||
+                                 ticket.status === 'awaiting_customer_info') &&
+                                 !ticket.pending_action?.found;
         if (state.showAwaitingForm) {
           state.originalInquiry = rawInquiry;
         }
@@ -5185,8 +5191,9 @@
         state.showResult = true;
         state.routingAction = ticket.routing_action;
         state.missingInfo = ticket.routing_missing_info || [];
-        state.showAwaitingForm = ticket.routing_action === 'awaiting' ||
-                                 ticket.status === 'awaiting_customer_info';
+        state.showAwaitingForm = (ticket.routing_action === 'awaiting' ||
+                                 ticket.status === 'awaiting_customer_info') &&
+                                 !ticket.pending_action?.found;
         render();
         showToast('✅ Informações recebidas! Sua solicitação foi encaminhada.');
         loadMetrics();
