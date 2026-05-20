@@ -1000,53 +1000,64 @@ class SupportFlowStepsMixin:
     @listen(evaluate_escalation)
     async def evaluate_and_summarize(self):
         """
-        Crew 3: Summary + Quality Evaluator sequential.
-        Sonnet judges Haiku responses (cross-model).
-        Only runs for auto-resolved tickets.
+        Run evaluation in background — don't block response.
+        Customer gets answer faster; operator sees quality
+        metrics shortly after in the dashboard.
         """
-        from ..agents.crews import run_evaluation_crew
-
         if self.state.routing_action not in ("resolve", "step_by_step"):
-            self.log_step("Evaluation Crew", {
-                "skipped": True,
-                "reason": f"routing={self.state.routing_action}",
-            })
-            return "Skipped: not auto-resolved"
+            return "Skipped"
 
         if not self.state.response:
-            return "Skipped: no response"
+            return "Skipped"
 
-        start = time.time()
+        # Import here so closures below don't need module-level refs
+        from ..agents.crews import run_evaluation_crew
+        from ..data_store import data_store as _ds
 
-        result = await asyncio.to_thread(
-            run_evaluation_crew,
-            inquiry=self.state.inquiry,
-            response=self.state.response,
-            category=self.state.category,
-            knowledge_context=self.state.knowledge_context,
-            external_context=self.state.external_context,
-        )
+        # Snapshot state values — self may be GC'd before the task runs
+        # Use run_id (always set at flow start) not reference_id (generated
+        # in routes.py after kickoff_async returns for non-escalated tickets)
+        run_id = self.state.run_id
+        inquiry = self.state.inquiry
+        response = self.state.response
+        category = self.state.category
+        knowledge_context = self.state.knowledge_context
+        external_context = self.state.external_context
 
-        summary = result.get("summary", {})
-        quality = result.get("quality", {})
+        async def _run_background():
+            try:
+                result = await asyncio.to_thread(
+                    run_evaluation_crew,
+                    inquiry=inquiry,
+                    response=response,
+                    category=category,
+                    knowledge_context=knowledge_context,
+                    external_context=external_context,
+                )
+                summary = result.get("summary", {})
+                quality = result.get("quality", {})
+                _ds.update_ticket_quality(
+                    run_id=run_id,
+                    ticket_summary=summary.get("summary", ""),
+                    action_needed=summary.get("action_needed", ""),
+                    key_facts=summary.get("key_facts", []),
+                    quality_evaluation=quality,
+                )
+                logger.info(
+                    "Background evaluation complete: run_id=%s grade=%s",
+                    run_id,
+                    quality.get("grade", "?"),
+                )
+            except Exception as e:
+                logger.error("Background evaluation failed: %s", e)
 
-        self.state.ticket_summary = summary.get("summary", "")
-        self.state.action_needed = summary.get("action_needed", "")
-        self.state.key_facts = summary.get("key_facts", [])
-        self.state.quality_evaluation = quality
-
-        latency = round((time.time() - start) * 1000, 2)
+        # Fire and forget — response is already built, don't block it
+        asyncio.create_task(_run_background())
 
         self.log_step("Evaluation Crew", {
-            "agents": ["Summary Agent", "Quality Agent (Sonnet)"],
-            "grade": quality.get("grade", "N/A"),
-            "overall": quality.get("overall", 0),
-            "hallucination": quality.get("hallucination_detected", False),
-            "execution_mode": "crewai_sequential",
-            "latency_ms": latency,
+            "status": "running_in_background",
+            "run_id": run_id,
+            "note": "Results saved to DB when complete",
         })
 
-        return (
-            f"Evaluated: grade={quality.get('grade', '?')} "
-            f"hallucination={quality.get('hallucination_detected', False)}"
-        )
+        return "Evaluation started in background"

@@ -707,6 +707,37 @@ class DataStore:
                 return SupportTicketData(**ticket_data)
             return None
 
+    def update_ticket_quality(
+        self,
+        run_id: str,
+        ticket_summary: str,
+        action_needed: str,
+        key_facts: list,
+        quality_evaluation: dict,
+    ) -> None:
+        """Persist background evaluation results once the crew finishes.
+
+        Looks up the ticket by run_id (always available) rather than
+        reference_id (which is generated in routes.py after the flow ends).
+        """
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return
+        with self.SessionLocal() as session:
+            ticket = session.query(SupportTicketDB).filter(
+                SupportTicketDB.run_id == run_id
+            ).first()
+            if ticket:
+                # Embed summary fields inside the existing quality_evaluation JSON
+                combined = dict(quality_evaluation)
+                combined["ticket_summary"] = ticket_summary
+                combined["action_needed"] = action_needed
+                combined["key_facts"] = key_facts
+                ticket.quality_evaluation = combined
+                session.commit()
+                logger.info("Quality saved for run_id=%s ref=%s", run_id, ticket.reference_id)
+            else:
+                logger.warning("update_ticket_quality: no ticket found for run_id=%s", run_id)
+
     def update_ticket_status(self, reference_id: str, status: str, feedback: Optional[Dict[str, Any]] = None):
         """Update ticket status and optionally add feedback."""
         if self.use_database:
