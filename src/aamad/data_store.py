@@ -162,7 +162,7 @@ class SupportTicketData(BaseModel):
     status: str = "completed"  # completed, pending_human_review, approved, rejected
     created_at: str
     updated_at: str
-    feedback: Optional[Dict[str, Any]] = None
+    feedback: Optional[Any] = None
     run_id: Optional[str] = None
     execution_time_ms: int = 0
     wall_time_sec: Optional[float] = None
@@ -1074,6 +1074,80 @@ class DataStore:
             # JSON fallback
             all_tickets = self.get_all_tickets()
             return [ticket for ticket in all_tickets if ticket.status == status]
+
+    def get_csat_metrics(self) -> Dict[str, Any]:
+        """Calculate CSAT via raw SQL, handling both JSON-dict and plain-string feedback."""
+        import json as _json
+        from sqlalchemy import text as _text
+
+        empty: Dict[str, Any] = {"csat_score": None, "csat_positive": 0, "csat_negative": 0, "total_feedback": 0}
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return empty
+
+        is_postgres = DATABASE_URL.startswith("postgresql")
+        null_filter = (
+            "AND feedback::text != 'null' AND feedback::text != '\"\"'"
+            if is_postgres
+            else "AND CAST(feedback AS TEXT) != 'null' AND CAST(feedback AS TEXT) != '\"\"'"
+        )
+
+        try:
+            with self.SessionLocal() as session:
+                feedback_data = session.execute(
+                    _text(
+                        f"SELECT feedback FROM support_tickets "
+                        f"WHERE feedback IS NOT NULL {null_filter}"
+                    )
+                ).fetchall()
+        except Exception as e:
+            logger.error("CSAT query error: %s", e)
+            return empty
+
+        positive = 0
+        negative = 0
+
+        for row in feedback_data:
+            try:
+                fb = row[0]
+                if isinstance(fb, dict):
+                    if fb.get("helpful") is True or fb.get("value") == "positive":
+                        positive += 1
+                    elif fb.get("helpful") is False or fb.get("value") == "negative":
+                        negative += 1
+                elif isinstance(fb, str):
+                    try:
+                        parsed = _json.loads(fb)
+                        if isinstance(parsed, dict):
+                            if parsed.get("helpful") is True or parsed.get("value") == "positive":
+                                positive += 1
+                            elif parsed.get("helpful") is False or parsed.get("value") == "negative":
+                                negative += 1
+                        elif isinstance(parsed, bool):
+                            if parsed:
+                                positive += 1
+                            else:
+                                negative += 1
+                    except Exception:
+                        if fb in ("positive", "helpful", "1", "true"):
+                            positive += 1
+                        elif fb in ("negative", "not_helpful", "0", "false"):
+                            negative += 1
+            except Exception as e:
+                logger.warning("CSAT parse error: %s", e)
+                continue
+
+        total_feedback = positive + negative
+        csat = round(positive / total_feedback * 100, 1) if total_feedback > 0 else None
+        logger.info(
+            "CSAT: positive=%d negative=%d total=%d score=%s",
+            positive, negative, total_feedback, csat,
+        )
+        return {
+            "csat_score": csat,
+            "csat_positive": positive,
+            "csat_negative": negative,
+            "total_feedback": total_feedback,
+        }
 
 
 # Global data store instance

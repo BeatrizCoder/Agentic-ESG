@@ -110,6 +110,74 @@ def _get_ticket_count(mode: str) -> int:
         return 0
 
 
+def _get_historical_csat_metrics() -> Dict[str, Any]:
+    """Calculate CSAT from the demo SQLite DB, handling JSON-dict and plain-string feedback."""
+    import json as _json
+    from sqlalchemy import create_engine, text as _text
+    from pathlib import Path as _Path
+
+    empty: Dict[str, Any] = {"csat_score": None, "csat_positive": 0, "csat_negative": 0, "total_feedback": 0}
+    demo_db = _Path("src/aamad/data/demo_dataset.db")
+    if not demo_db.exists():
+        return empty
+    try:
+        engine = create_engine(f"sqlite:///{demo_db}")
+        with engine.connect() as conn:
+            rows = conn.execute(
+                _text(
+                    "SELECT feedback FROM support_tickets "
+                    "WHERE feedback IS NOT NULL "
+                    "AND CAST(feedback AS TEXT) != 'null' "
+                    "AND CAST(feedback AS TEXT) != '\"\"'"
+                )
+            ).fetchall()
+    except Exception as e:
+        logger.warning("Historical CSAT query error: %s", e)
+        return empty
+
+    positive = 0
+    negative = 0
+
+    for row in rows:
+        try:
+            fb = row[0]
+            if isinstance(fb, dict):
+                if fb.get("helpful") is True or fb.get("value") == "positive":
+                    positive += 1
+                elif fb.get("helpful") is False or fb.get("value") == "negative":
+                    negative += 1
+            elif isinstance(fb, str):
+                try:
+                    parsed = _json.loads(fb)
+                    if isinstance(parsed, dict):
+                        if parsed.get("helpful") is True or parsed.get("value") == "positive":
+                            positive += 1
+                        elif parsed.get("helpful") is False or parsed.get("value") == "negative":
+                            negative += 1
+                    elif isinstance(parsed, bool):
+                        if parsed:
+                            positive += 1
+                        else:
+                            negative += 1
+                except Exception:
+                    if fb in ("positive", "helpful", "1", "true"):
+                        positive += 1
+                    elif fb in ("negative", "not_helpful", "0", "false"):
+                        negative += 1
+        except Exception as e:
+            logger.warning("CSAT parse error (historical): %s", e)
+            continue
+
+    total_feedback = positive + negative
+    csat = round(positive / total_feedback * 100, 1) if total_feedback > 0 else None
+    return {
+        "csat_score": csat,
+        "csat_positive": positive,
+        "csat_negative": negative,
+        "total_feedback": total_feedback,
+    }
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.api_route("/health", methods=["GET", "HEAD"])
@@ -376,34 +444,16 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
     fastest = round(min(run_times), 3) if run_times else 0.0
     slowest = round(max(run_times), 3) if run_times else 0.0
 
-    helpful_count = 0
-    not_helpful_count = 0
-    total_feedback = 0
-    for ticket in tickets:
-        feedback = getattr(ticket, "feedback", None)
-        if not feedback:
-            continue
-        total_feedback += 1
-        # Support string format ("positive"/"negative") and legacy JSON dict
-        if feedback in ("positive", "helpful") or (
-            isinstance(feedback, dict) and (
-                feedback.get("helpful") is True
-                or feedback.get("value") == "positive"
-            )
-        ):
-            helpful_count += 1
-        elif feedback in ("negative", "not_helpful") or (
-            isinstance(feedback, dict) and (
-                feedback.get("helpful") is False
-                or feedback.get("value") == "negative"
-            )
-        ):
-            not_helpful_count += 1
+    if _svc.dataset_mode == "historical":
+        csat_metrics = _get_historical_csat_metrics()
+    else:
+        csat_metrics = data_store.get_csat_metrics()
 
-    csat_score = (
-        round((helpful_count / total_feedback) * 100, 1)
-        if total_feedback > 0 else None
-    )
+    csat_score = csat_metrics["csat_score"]
+    helpful_count = csat_metrics["csat_positive"]
+    not_helpful_count = csat_metrics["csat_negative"]
+    total_feedback = csat_metrics["total_feedback"]
+
     obs_summary = _svc.observability_service.get_summary()
 
     return {
@@ -416,8 +466,8 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
         "fastest_run_sec": fastest,
         "slowest_run_sec": slowest,
         "csat_score": csat_score,
-        "helpful_count": helpful_count,
-        "not_helpful_count": not_helpful_count,
+        "csat_positive": helpful_count,
+        "csat_negative": not_helpful_count,
         "total_feedback": total_feedback,
         "feedback_rate": round((total_feedback / total) * 100) if total > 0 else 0,
         "agent_performance": obs_summary.get("agent_performance", {}),
