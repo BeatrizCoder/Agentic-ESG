@@ -118,8 +118,10 @@ Use 🚛 emoji.
 """
     elif "REFUND DATA" in external_context:
         external_instructions = """
-REFUND DATA RETRIEVED FROM DATABASE.
-Mention exact order number, product name and amount.
+REFUND DATA RETRIEVED FROM DATABASE. This is an AUTO-RESOLVED ticket.
+DO NOT suggest escalation. DO NOT say "vou encaminhar para nossa equipe"
+or "vou conectá-lo com nosso time". DO NOT mention billing specialists.
+Mention the exact order number, product name, amount and refund status directly.
 Adapt tone to customer sentiment.
 """
     elif "PENDING ACTION FOUND" in external_context:

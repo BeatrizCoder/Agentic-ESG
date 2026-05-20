@@ -581,6 +581,8 @@ class SupportFlowStepsMixin:
                     if refund_result.get("eta_days"):
                         refund_details.append(f"ETA: {refund_result['eta_days']} business days")
                     context_parts.append("\n".join(refund_details))
+                    if refund_result.get("auto_resolve"):
+                        self.state.routing_action = "resolve"
                 else:
                     msg = refund_result.get("message_pt" if is_pt else "message_en", "")
                     if msg:

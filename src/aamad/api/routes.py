@@ -28,8 +28,8 @@ router = APIRouter()
 
 def _get_demo_tickets() -> List[SupportTicketData]:
     """Read tickets from demo_dataset.db without touching the live database."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
+    import json as _json
+    from sqlalchemy import create_engine, text as _text
     from pathlib import Path as _Path
 
     demo_db = _Path("src/aamad/data/demo_dataset.db")
@@ -37,15 +37,42 @@ def _get_demo_tickets() -> List[SupportTicketData]:
         return []
     try:
         engine = create_engine(f"sqlite:///{demo_db}")
-        DemoSession = sessionmaker(bind=engine)
-        session = DemoSession()
-        try:
-            rows = session.query(SupportTicketDB).order_by(
-                SupportTicketDB.created_at.desc()
-            ).all()
-            return [data_store._db_to_pydantic(r) for r in rows]
-        finally:
-            session.close()
+        with engine.connect() as conn:
+            rows = conn.execute(
+                _text("SELECT * FROM support_tickets ORDER BY created_at DESC")
+            ).mappings().all()
+        result = []
+        for r in rows:
+            r = dict(r)
+            pa_raw = r.get("pending_action") or "{}"
+            try:
+                pa = _json.loads(pa_raw) if isinstance(pa_raw, str) else (pa_raw or {})
+            except Exception:
+                pa = {}
+            qe_raw = r.get("quality_evaluation") or "{}"
+            try:
+                qe = _json.loads(qe_raw) if isinstance(qe_raw, str) else (qe_raw or {})
+            except Exception:
+                qe = {}
+            result.append(SupportTicketData(
+                id=r.get("id", ""),
+                run_id=r.get("run_id", ""),
+                inquiry=r.get("inquiry", ""),
+                category=r.get("category", ""),
+                sentiment=r.get("sentiment", ""),
+                urgency=r.get("urgency", ""),
+                routing_action=r.get("routing_action", ""),
+                escalation_required=bool(r.get("escalation_required", False)),
+                response=r.get("response", ""),
+                response_confidence=r.get("response_confidence") or 0,
+                quality_evaluation=qe,
+                tools_used=_json.loads(r.get("tools_used") or "[]"),
+                api_tags=_json.loads(r.get("api_tags") or "[]"),
+                execution_time_ms=r.get("execution_time_ms") or 0,
+                created_at=r.get("created_at", ""),
+                pending_action=pa,
+            ))
+        return result
     except Exception as _e:
         logger.error(f"Error reading demo dataset: {_e}")
         return []
