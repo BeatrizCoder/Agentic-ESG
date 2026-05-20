@@ -2101,7 +2101,14 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    const DEFAULT_BACKEND_URL = (window.BACKEND_URL || 'https://agentic-support-platform.onrender.com') + '/api/support';
+    const BACKEND_URL = window.BACKEND_URL || (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8000'
+        : 'https://agentic-support-platform.onrender.com'
+    );
+    console.log('Backend URL:', BACKEND_URL);
+    const DEFAULT_BACKEND_URL = BACKEND_URL + '/api/support';
     const DEFAULT_API_KEY = window.OPERATOR_API_KEY || '';
     const AGENTS = [
       { label: 'Classifier Agent', key: 'Classifier' },
