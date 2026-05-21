@@ -1127,6 +1127,11 @@ class DataStore:
                                 positive += 1
                             else:
                                 negative += 1
+                        elif isinstance(parsed, str):
+                            if parsed in ["positive", "helpful", "true", "1"]:
+                                positive += 1
+                            elif parsed in ["negative", "not_helpful", "false", "0"]:
+                                negative += 1
                     except Exception:
                         if fb in ("positive", "helpful", "1", "true"):
                             positive += 1
