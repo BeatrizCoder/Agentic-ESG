@@ -2373,7 +2373,7 @@
       }
       await loadTicketsFromDB();
       render();
-      loadMetrics();
+      initMetricsWithRetry();
     }
 
     function render() {
@@ -7180,12 +7180,37 @@
       try {
         const metricsUrl = state.backendUrl.replace('/api/support', '/api/metrics/summary');
         const resp = await fetch(metricsUrl, { headers: { 'X-API-Key': getApiKey() } });
-        if (!resp.ok) return;
+        if (!resp.ok) {
+          console.warn('Metrics fetch failed:', resp.status);
+          return;
+        }
         const data = await resp.json();
+        console.log('Metrics loaded:', { csat: data.csat_score, total: data.total_runs });
         state.perfMetrics = data;
         state.csatMetrics = data;
         render();
-      } catch (e) { handleConnectionError(e); }
+      } catch (e) {
+        console.warn('loadMetrics error:', e);
+        handleConnectionError(e);
+      }
+    }
+
+    async function initMetricsWithRetry() {
+      await loadMetrics();
+      setTimeout(async () => {
+        if (!state.csatMetrics?.csat_score && state.view === 'operator') {
+          console.log('Retrying metrics load...');
+          await loadMetrics();
+          render();
+        }
+      }, 2000);
+      setTimeout(async () => {
+        if (!state.perfMetrics?.total_runs && state.view === 'operator') {
+          console.log('Final metrics retry...');
+          await loadMetrics();
+          render();
+        }
+      }, 5000);
     }
 
     async function fetchObservability() {
@@ -7450,7 +7475,7 @@
         state.apiKey = getApiKey();
       }
       await loadTicketsFromDB();
-      await loadMetrics();
+      await initMetricsWithRetry();
       render();
       console.log('App initialized:', {
         tickets: state.tickets.length,
@@ -7461,6 +7486,12 @@
     fetchObservability();
     startAnalyticsRefresh();
     setInterval(checkBackendHealth, 15000);
+    setInterval(async () => {
+      if (state.view === 'operator') {
+        await loadMetrics();
+        render();
+      }
+    }, 30000);
     checkBackendHealth();
 
     // ── Mobile sidebar (bottom sheet) ──────────────────────────────────────────
