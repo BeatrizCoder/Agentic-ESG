@@ -2356,6 +2356,7 @@
       connectionStatus: 'connected',
       refundDetailSubmitted: false,
       datasetMode: 'live',
+      demoIndicatorLabel: '',
     };
 
     function getApiKey() {
@@ -2681,6 +2682,18 @@
               </optgroup>
             </select>
           </div>
+          <div id="demo-loaded-indicator" style="
+            display:${state.demoIndicatorLabel ? 'block' : 'none'};
+            font-size:11px;
+            color:#10B981;
+            font-family:var(--mono);
+            margin-top:-6px;
+            margin-bottom:8px;
+            padding:4px 8px;
+            background:rgba(16,185,129,0.1);
+            border-radius:4px;
+            border:1px solid rgba(16,185,129,0.2);
+          ">${escapeHtml(state.demoIndicatorLabel)}</div>
           <div class="field-group">
             <textarea id="inquiryInput" placeholder="e.g. My order hasn't arrived and it's been 7 days. I'm really frustrated and need help urgently.">${escapeHtml(state.lastInquiry)}</textarea>
           </div>
@@ -4451,6 +4464,11 @@
       const submitButton = document.getElementById('submitRequest');
       if (submitButton) {
         submitButton.addEventListener('click', handleSubmitInquiry);
+        submitButton.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          submitButton.click();
+        });
       }
       const newInquiry = document.getElementById('newInquiry');
       if (newInquiry) {
@@ -4901,9 +4919,12 @@
           const submitBtn = document.getElementById('submitRequest');
           if (submitBtn) submitBtn.disabled = false;
 
-          const label = e.target.options[e.target.selectedIndex].text;
-          showToast(`⚡ Loaded: ${label.trim()}`);
-          setTimeout(() => { e.target.value = ''; }, 500);
+          const label = e.target.options[e.target.selectedIndex].text.trim();
+          showToast(`⚡ Loaded: ${label}`);
+          e.target.value = '';
+          state.demoIndicatorLabel = `⚡ Loaded: ${label}`;
+          render();
+          setTimeout(() => { state.demoIndicatorLabel = ''; render(); }, 3000);
         });
       }
 
@@ -5278,6 +5299,8 @@
         return;
       }
 
+      state.originalInquiry = inquiry;
+      state.lastInquiry = inquiry;
       doSubmitInquiry(inquiry);
     }
 
@@ -5370,9 +5393,7 @@
         state.showResult = true;
         state.routingAction = ticket.routing_action;
         state.missingInfo = ticket.routing_missing_info || [];
-        state.showAwaitingForm = (ticket.routing_action === 'awaiting' ||
-                                 ticket.status === 'awaiting_customer_info') &&
-                                 !ticket.pending_action?.found;
+        state.showAwaitingForm = false;
         render();
         showToast('✅ Informações recebidas! Sua solicitação foi encaminhada.');
         loadMetrics();
