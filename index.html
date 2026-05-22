@@ -2767,7 +2767,21 @@
         ` : ''}
 
         ${state.view === 'operator' ? `
-        <details id="demo-controls" style="margin-top:16px;">
+        <div style="padding-top:16px;">
+          <button onclick="logout()" title="Logout" style="
+            width:100%;padding:7px 14px;font-size:13px;min-height:36px;min-width:80px;
+            background:rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.12);
+            border-radius:8px;color:#9CA3AF;cursor:pointer;
+            font-family:var(--mono);font-weight:500;transition:all 0.2s;
+            display:flex;align-items:center;gap:5px;
+          "
+          onmouseover="this.style.background='rgba(239,68,68,0.1)';this.style.borderColor='rgba(239,68,68,0.3)';this.style.color='#F87171'"
+          onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='#9CA3AF'">
+            <span style="font-size:13px">→</span> Logout
+          </button>
+        </div>
+        <details id="demo-controls" style="margin-top:12px;">
           <summary style="font-size:11px;color:var(--muted);cursor:pointer;font-family:var(--mono);user-select:none;list-style:none;display:flex;align-items:center;gap:6px;">
             <span>⚙️</span><span>Demo Controls</span>
           </summary>
@@ -2778,22 +2792,22 @@
             <button id="btn-load-clean" style="padding:8px 12px;font-size:11px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">✨ Load Clean Demo State</button>
           </div>
         </details>
-        ` : ''}
-
+        ` : `
         <div style="margin-top:auto;padding-top:16px;">
           <button onclick="logout()" title="Logout" style="
-            width:100%;padding:8px 12px;font-size:12px;
-            background:rgba(255,255,255,0.04);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:8px;color:#6B7280;cursor:pointer;
-            font-family:var(--mono);transition:all 0.2s;
-            display:flex;align-items:center;gap:6px;
+            width:100%;padding:7px 14px;font-size:13px;min-height:36px;min-width:80px;
+            background:rgba(139,92,246,0.12);
+            border:1px solid rgba(139,92,246,0.35);
+            border-radius:8px;color:#A78BFA;cursor:pointer;
+            font-family:var(--mono);font-weight:500;transition:all 0.2s;
+            display:flex;align-items:center;gap:5px;
           "
-          onmouseover="this.style.color='#EF4444';this.style.borderColor='rgba(239,68,68,0.3)'"
-          onmouseout="this.style.color='#6B7280';this.style.borderColor='rgba(255,255,255,0.08)'">
-            → Logout
+          onmouseover="this.style.background='rgba(139,92,246,0.25)';this.style.borderColor='rgba(139,92,246,0.6)';this.style.color='#C4B5FD'"
+          onmouseout="this.style.background='rgba(139,92,246,0.12)';this.style.borderColor='rgba(139,92,246,0.35)';this.style.color='#A78BFA'">
+            <span style="font-size:13px">→</span> Logout
           </button>
         </div>
+        `}
 
       `;
 
