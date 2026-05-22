@@ -2630,6 +2630,7 @@
       humanRequestedFilter: false,
       modal: null,
       lastInquiry: '',
+      demoScenarioKey: '',
       feedbackStatus: null,
       feedbackSubmitted: false,
       perfMetrics: null,
@@ -5185,11 +5186,13 @@
 
       const demoPicker = document.getElementById('demo-scenario-picker');
       if (demoPicker) {
+        if (state.demoScenarioKey) demoPicker.value = state.demoScenarioKey;
         demoPicker.addEventListener('change', (e) => {
           const key = e.target.value;
           if (!key) return;
           const s = DEMO_SCENARIOS[key];
           if (!s) return;
+          state.demoScenarioKey = key;
 
           // Fill intake fields using their actual IDs
           const nameEl  = document.getElementById('customerName');
