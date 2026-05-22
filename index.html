@@ -2655,6 +2655,8 @@
       connectionStatus: 'connected',
       refundDetailSubmitted: false,
       datasetMode: 'live',
+      resolutionTime: null,
+      costForecast: null,
     };
 
     function getApiKey() {
@@ -6367,6 +6369,29 @@
         ${renderAgentHealth(tickets)}
         ${renderQualityEvaluation(tickets)}
         ${renderAgentPerformanceTable()}
+
+        <div style="display:flex;align-items:center;gap:14px;margin-top:36px;margin-bottom:6px;">
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+          <span style="font-size:0.72rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;">Cost & Performance</span>
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+        </div>
+
+        <div class="panel-card" style="margin-top:16px;padding:28px 32px;">
+          <div style="margin-bottom:18px;">
+            <div style="font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:4px;">⏱️ Resolution Time by Category</div>
+            <div style="font-size:0.78rem;color:var(--muted);">Average pipeline execution time per category</div>
+          </div>
+          ${renderResolutionTime()}
+        </div>
+
+        <div class="panel-card" style="margin-top:16px;padding:28px 32px;">
+          <div style="margin-bottom:18px;">
+            <div style="font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:4px;">💰 Cost Forecasting</div>
+            <div style="font-size:0.78rem;color:var(--muted);">Projected AI costs based on current usage · $0.0031 per ticket</div>
+          </div>
+          ${renderCostForecast()}
+        </div>
+
         <div style="height: 40px;"></div>
       `;
     }
@@ -7541,6 +7566,140 @@
       `;
     }
 
+    function renderResolutionTime() {
+      const data = state.resolutionTime;
+      if (!data?.length) return '<div style="color:var(--muted);font-size:13px;">No timing data yet — process tickets to populate.</div>';
+
+      const maxTime = Math.max(...data.map(d => d.avg_time_sec));
+      const fastest = data[data.length - 1];
+      const slowest = data[0];
+      const ratio = slowest && fastest && fastest.avg_time_sec > 0
+        ? (slowest.avg_time_sec / fastest.avg_time_sec).toFixed(1)
+        : null;
+
+      const bars = data.map(d => {
+        const pct = Math.round((d.avg_time_sec / maxTime) * 100);
+        const color = d.avg_time_sec < 8 ? '#10B981' : d.avg_time_sec < 12 ? '#FBBF24' : '#EF4444';
+        return `
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+              <span style="font-size:12px;color:var(--text);">${d.category}</span>
+              <span style="font-size:12px;font-family:var(--mono);color:${color};">${d.avg_time_sec}s · ${d.ticket_count} ticket${d.ticket_count !== 1 ? 's' : ''}</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${color};border-radius:999px;transition:width 0.5s ease;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const insight = ratio && parseFloat(ratio) > 1.2
+        ? `<div style="margin-top:14px;padding:10px 14px;background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:12px;color:#FBBF24;">
+             💡 <strong>${slowest.category}</strong> tickets take ${ratio}x longer than <strong>${fastest.category}</strong>
+           </div>`
+        : '';
+
+      return `
+        ${bars}
+        <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:#10B981;font-family:var(--mono);">⚡ Fastest: ${fastest.category} (${fastest.avg_time_sec}s)</span>
+          <span style="font-size:11px;color:#EF4444;font-family:var(--mono);">🐢 Slowest: ${slowest.category} (${slowest.avg_time_sec}s)</span>
+        </div>
+        ${insight}
+      `;
+    }
+
+    function renderCostForecast() {
+      const d = state.costForecast;
+      if (!d?.projections) return '<div style="color:var(--muted);font-size:13px;">No forecast data yet.</div>';
+
+      const proj = d.projections;
+      const fmt = v => v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
+      const ticketLabel = (mult) => {
+        const n = Math.round(d.avg_daily_tickets * mult);
+        return n >= 1000 ? `${(n/1000).toFixed(1)}K tickets` : `${n} ticket${n !== 1 ? 's' : ''}`;
+      };
+
+      const projCards = [
+        { label: 'Daily',   value: proj.daily_usd,   tickets: ticketLabel(1) },
+        { label: 'Weekly',  value: proj.weekly_usd,  tickets: ticketLabel(7) },
+        { label: 'Monthly', value: proj.monthly_usd, tickets: ticketLabel(30) },
+        { label: 'Yearly',  value: proj.yearly_usd,  tickets: ticketLabel(365) },
+      ].map(c => `
+        <div style="flex:1;min-width:90px;text-align:center;padding:16px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${c.label}</div>
+          <div style="font-size:20px;font-family:var(--mono);color:#A78BFA;font-weight:600;line-height:1.1;">${fmt(c.value)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">${c.tickets}</div>
+        </div>
+      `).join('');
+
+      const assumptions = d.assumptions || {};
+      const totalCost = d.cost_per_ticket_usd || 0.0031;
+      const breakdownRows = [
+        { label: 'Classification', cost: 0.0002 },
+        { label: 'Sentiment',      cost: 0.0003 },
+        { label: 'Response Gen',   cost: 0.0012 },
+        { label: 'Quality (Sonnet)', cost: 0.0012 },
+        { label: 'Summary',        cost: 0.0002 },
+      ].map(r => {
+        const pct = ((r.cost / totalCost) * 100).toFixed(1);
+        return `
+          <tr>
+            <td style="padding:5px 8px;font-size:12px;color:var(--text);">${r.label}</td>
+            <td style="padding:5px 8px;font-size:12px;font-family:var(--mono);color:#A78BFA;text-align:right;">$${r.cost.toFixed(4)}</td>
+            <td style="padding:5px 8px;font-size:12px;font-family:var(--mono);color:var(--muted);text-align:right;">${pct}%</td>
+          </tr>
+        `;
+      }).join('');
+
+      const categoryRows = (d.by_category || []).map(c => `
+        <tr>
+          <td style="padding:5px 8px;font-size:12px;color:var(--text);">${c.category}</td>
+          <td style="padding:5px 8px;font-size:12px;font-family:var(--mono);color:var(--muted);text-align:right;">${c.tickets}</td>
+          <td style="padding:5px 8px;font-size:12px;font-family:var(--mono);color:#A78BFA;text-align:right;">$${c.avg_cost_usd.toFixed(4)}</td>
+          <td style="padding:5px 8px;font-size:12px;font-family:var(--mono);color:#10B981;text-align:right;">$${c.monthly_projection_usd.toFixed(4)}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">${projCards}</div>
+
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;font-family:var(--mono);">Cost Breakdown per Ticket</div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+              <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:400;">Agent</th>
+              <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:400;">Cost/ticket</th>
+              <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:400;">% of total</th>
+            </tr>
+          </thead>
+          <tbody>${breakdownRows}</tbody>
+          <tfoot>
+            <tr style="border-top:1px solid rgba(255,255,255,0.08);">
+              <td style="padding:6px 8px;font-size:12px;font-weight:600;color:var(--text);">Total</td>
+              <td style="padding:6px 8px;font-size:12px;font-family:var(--mono);font-weight:600;color:#A78BFA;text-align:right;">$${totalCost.toFixed(4)}</td>
+              <td style="padding:6px 8px;font-size:12px;font-family:var(--mono);color:var(--muted);text-align:right;">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        ${categoryRows ? `
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;font-family:var(--mono);">Cost by Category</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+                <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:400;">Category</th>
+                <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:400;">Tickets</th>
+                <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:400;">Avg Cost</th>
+                <th style="padding:5px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:400;">Monthly Est.</th>
+              </tr>
+            </thead>
+            <tbody>${categoryRows}</tbody>
+          </table>
+        ` : ''}
+      `;
+    }
+
     // ─────────────────────────────────────────────
 
     async function loadMetrics() {
@@ -7563,8 +7722,34 @@
       }
     }
 
+    async function loadResolutionTime() {
+      if (!state.useBackend) return;
+      try {
+        const baseUrl = state.backendUrl.replace('/api/support', '');
+        const res = await fetch(`${baseUrl}/api/analytics/resolution-time`, {
+          headers: { 'X-API-Key': getApiKey() }
+        });
+        if (res.ok) state.resolutionTime = await res.json();
+      } catch (e) {
+        console.warn('Resolution time load failed:', e);
+      }
+    }
+
+    async function loadCostForecast() {
+      if (!state.useBackend) return;
+      try {
+        const baseUrl = state.backendUrl.replace('/api/support', '');
+        const res = await fetch(`${baseUrl}/api/analytics/cost-forecast`, {
+          headers: { 'X-API-Key': getApiKey() }
+        });
+        if (res.ok) state.costForecast = await res.json();
+      } catch (e) {
+        console.warn('Cost forecast load failed:', e);
+      }
+    }
+
     async function initMetricsWithRetry() {
-      await loadMetrics();
+      await Promise.all([loadMetrics(), loadResolutionTime(), loadCostForecast()]);
       setTimeout(async () => {
         if (!state.csatMetrics?.csat_score && state.view === 'operator') {
           console.log('Retrying metrics load...');
@@ -7575,7 +7760,7 @@
       setTimeout(async () => {
         if (!state.perfMetrics?.total_runs && state.view === 'operator') {
           console.log('Final metrics retry...');
-          await loadMetrics();
+          await Promise.all([loadMetrics(), loadResolutionTime(), loadCostForecast()]);
           render();
         }
       }, 5000);

@@ -706,6 +706,22 @@ async def set_dataset_mode(payload: dict, _=Depends(verify_api_key)):
     }
 
 
+@router.get("/api/analytics/resolution-time")
+async def get_resolution_time(_=Depends(verify_api_key)):
+    """Average pipeline execution time per category."""
+    return data_store.get_resolution_time_by_category(
+        historical_only=(_svc.dataset_mode == "historical")
+    )
+
+
+@router.get("/api/analytics/cost-forecast")
+async def get_cost_forecast_endpoint(_=Depends(verify_api_key)):
+    """Projected AI costs based on current ticket volume."""
+    return data_store.get_cost_forecast(
+        historical_only=(_svc.dataset_mode == "historical")
+    )
+
+
 @router.delete("/api/tickets/clear")
 async def clear_tickets(_=Depends(verify_api_key)):
     """Delete all tickets and create an automatic backup first."""

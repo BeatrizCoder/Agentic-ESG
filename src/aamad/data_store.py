@@ -1173,5 +1173,131 @@ class DataStore:
         }
 
 
+    def get_resolution_time_by_category(self, historical_only: bool = False) -> list:
+        """Average pipeline execution time per category."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        from sqlalchemy import text as _text
+
+        try:
+            with self.SessionLocal() as session:
+                rows = session.execute(_text("""
+                    SELECT
+                        category,
+                        COUNT(*) AS ticket_count,
+                        AVG(execution_time_ms) AS avg_time_ms,
+                        MIN(execution_time_ms) AS min_time_ms,
+                        MAX(execution_time_ms) AS max_time_ms,
+                        AVG(CASE WHEN escalation_required = TRUE THEN execution_time_ms END) AS avg_escalated_ms,
+                        AVG(CASE WHEN escalation_required = FALSE THEN execution_time_ms END) AS avg_resolved_ms
+                    FROM support_tickets
+                    WHERE execution_time_ms IS NOT NULL
+                      AND execution_time_ms > 0
+                      AND category IS NOT NULL
+                      AND category != ''
+                    GROUP BY category
+                    ORDER BY avg_time_ms DESC
+                """)).fetchall()
+
+            return [
+                {
+                    "category": r[0],
+                    "ticket_count": r[1],
+                    "avg_time_sec": round((r[2] or 0) / 1000, 1),
+                    "min_time_sec": round((r[3] or 0) / 1000, 1),
+                    "max_time_sec": round((r[4] or 0) / 1000, 1),
+                    "avg_escalated_sec": round((r[5] or 0) / 1000, 1) if r[5] else None,
+                    "avg_resolved_sec": round((r[6] or 0) / 1000, 1) if r[6] else None,
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error("Resolution time query error: %s", e)
+            return []
+
+    def get_cost_forecast(self, historical_only: bool = False) -> dict:
+        """Cost forecasting based on ticket volume and per-agent cost assumptions."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return {}
+        from sqlalchemy import text as _text
+
+        is_postgres = DATABASE_URL.startswith("postgresql")
+        interval_expr = (
+            "NOW() - INTERVAL '7 days'" if is_postgres else "datetime('now', '-7 days')"
+        )
+
+        try:
+            with self.SessionLocal() as session:
+                daily_volume = session.execute(_text(f"""
+                    SELECT DATE(created_at) AS day, COUNT(*) AS tickets
+                    FROM support_tickets
+                    WHERE created_at >= {interval_expr}
+                    GROUP BY DATE(created_at)
+                    ORDER BY day DESC
+                """)).fetchall()
+
+                if is_postgres:
+                    category_costs = session.execute(_text("""
+                        SELECT
+                            category,
+                            COUNT(*) AS tickets,
+                            AVG(
+                                CASE WHEN quality_evaluation IS NOT NULL
+                                      AND quality_evaluation::text NOT IN ('null', '{}')
+                                THEN (quality_evaluation->>'cost_usd')::float
+                                END
+                            ) AS avg_cost_usd
+                        FROM support_tickets
+                        WHERE category IS NOT NULL AND category != ''
+                        GROUP BY category
+                    """)).fetchall()
+                else:
+                    category_costs = session.execute(_text("""
+                        SELECT category, COUNT(*) AS tickets, NULL AS avg_cost_usd
+                        FROM support_tickets
+                        WHERE category IS NOT NULL AND category != ''
+                        GROUP BY category
+                    """)).fetchall()
+
+        except Exception as e:
+            logger.error("Cost forecast query error: %s", e)
+            return {}
+
+        base_cost_per_ticket = 0.0031
+        total_7days = sum(r[1] for r in daily_volume)
+        avg_daily = round(total_7days / 7, 1) if daily_volume else 0
+
+        category_data = []
+        for r in category_costs:
+            cost = float(r[2]) if r[2] else base_cost_per_ticket
+            category_data.append({
+                "category": r[0],
+                "tickets": r[1],
+                "avg_cost_usd": round(cost, 6),
+                "monthly_projection_usd": round(cost * avg_daily * 30, 4),
+            })
+
+        return {
+            "avg_daily_tickets": avg_daily,
+            "cost_per_ticket_usd": base_cost_per_ticket,
+            "projections": {
+                "daily_usd": round(avg_daily * base_cost_per_ticket, 4),
+                "weekly_usd": round(avg_daily * 7 * base_cost_per_ticket, 4),
+                "monthly_usd": round(avg_daily * 30 * base_cost_per_ticket, 4),
+                "yearly_usd": round(avg_daily * 365 * base_cost_per_ticket, 4),
+            },
+            "by_category": category_data,
+            "daily_volume": [{"day": str(r[0]), "tickets": r[1]} for r in daily_volume],
+            "assumptions": {
+                "classification_cost": "$0.0002/ticket",
+                "sentiment_cost": "$0.0003/ticket",
+                "response_cost": "$0.0012/ticket",
+                "quality_eval_cost": "$0.0012/ticket (Sonnet)",
+                "summary_cost": "$0.0002/ticket",
+                "total_base": "$0.0031/ticket",
+            },
+        }
+
+
 # Global data store instance
 data_store = DataStore()
