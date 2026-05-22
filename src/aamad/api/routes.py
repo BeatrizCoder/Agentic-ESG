@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text as sa_text
 
 from pydantic import BaseModel
@@ -16,11 +17,13 @@ from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS
 from ..core import services as _svc
 from ..data_store import data_store, SupportTicketData, SupportTicketDB
 from ..flow.support_flow import SupportFlow
-from ..auth import create_guest_token, verify_token
+from ..auth import create_guest_token, verify_token, optional_token
 from .models import (
     FeedbackRequest, RunMetrics, StatusResponse,
     StepsResponse, SupportResponse, SupportTicket, TraceResponse,
 )
+from ..exports.excel_export import generate_excel_report
+from ..exports.pdf_export import generate_pdf_report
 
 logger = logging.getLogger(__name__)
 
@@ -231,8 +234,11 @@ async def health(request: Request) -> dict[str, str]:
 @router.post("/api/support", response_model=SupportResponse)
 @limiter.limit("10/minute")
 async def create_support_ticket(
-    request: Request, ticket: SupportTicket
+    request: Request,
+    ticket: SupportTicket,
+    user=Depends(optional_token),
 ) -> SupportResponse:
+    user_id = user.get("sub", "anonymous") if user else "anonymous"
     inquiry = ticket.inquiry.strip()
     if not inquiry:
         raise HTTPException(status_code=400, detail="Inquiry text cannot be empty.")
@@ -317,6 +323,7 @@ async def create_support_ticket(
         api_tags=final_state.api_tags,
         quality_evaluation=final_state.quality_evaluation or {},
         pending_action=final_state.pending_action or {},
+        user_id=user_id,
     )
 
     # Save to data store
@@ -657,12 +664,16 @@ async def await_customer_info(reference_id: str, _=Depends(verify_api_key)):
 
 
 @router.get("/api/tickets")
-async def get_all_tickets_endpoint(_=Depends(verify_api_key)):
-    """Get all tickets from the current dataset mode."""
+async def get_all_tickets_endpoint(
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+):
+    """Get all tickets from the current dataset mode, filtered by user in live mode."""
     if _svc.dataset_mode == "historical":
         tickets = _get_demo_tickets()
     else:
-        tickets = data_store.get_all_tickets()
+        user_id = user.get("sub", "anonymous") if user else "anonymous"
+        tickets = data_store.get_user_tickets(user_id)
         tickets = sorted(tickets, key=lambda t: t.created_at, reverse=True)
     return [ticket.model_dump() for ticket in tickets]
 
@@ -719,6 +730,129 @@ async def get_cost_forecast_endpoint(_=Depends(verify_api_key)):
     """Projected AI costs based on current ticket volume."""
     return data_store.get_cost_forecast(
         historical_only=(_svc.dataset_mode == "historical")
+    )
+
+
+def _build_export_metrics(tickets: list, historical: bool) -> dict:
+    """Compute metrics dict for export functions from a ticket list."""
+    from collections import Counter
+    total = len(tickets)
+    if not total:
+        return {
+            "total_runs": 0, "resolved": 0, "escalated": 0,
+            "csat_score": None, "by_category": [],
+        }
+
+    escalated = sum(1 for t in tickets if (
+        t.escalation_required if hasattr(t, "escalation_required")
+        else t.get("escalation_required", False)
+    ))
+    resolved = total - escalated
+
+    cat_counter: Counter = Counter()
+    for t in tickets:
+        cat = t.category if hasattr(t, "category") else t.get("category", "")
+        cat_counter[cat] += 1
+
+    by_category = [
+        {"category": cat, "count": count}
+        for cat, count in cat_counter.most_common()
+    ]
+
+    if historical:
+        csat = _get_historical_csat_metrics()
+    else:
+        csat = data_store.get_csat_metrics()
+
+    return {
+        "total_runs": total,
+        "resolved": resolved,
+        "escalated": escalated,
+        "csat_score": csat.get("csat_score"),
+        "helpful_count": csat.get("csat_positive", 0),
+        "not_helpful_count": csat.get("csat_negative", 0),
+        "by_category": by_category,
+    }
+
+
+def _obs_to_agent_list(obs_summary: dict) -> list:
+    """Convert observability agent_performance dict to list for exports."""
+    result = []
+    for name, data in (obs_summary.get("agent_performance") or {}).items():
+        result.append({
+            "agent_name": name,
+            "step_name": name,
+            "calls": data.get("calls", 0),
+            "avg_latency_ms": data.get("avg_latency_ms", 0),
+            "avg_input_tokens": 0,
+            "avg_output_tokens": 0,
+            "avg_cost_usd": round(
+                data.get("total_cost_usd", 0) / data.get("calls", 1), 8
+            ) if data.get("calls") else 0,
+            "execution_mode": "llm",
+        })
+    return result
+
+
+@router.get("/api/export/excel")
+async def export_excel(
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+):
+    """Export analytics report as Excel (.xlsx)."""
+    historical = _svc.dataset_mode == "historical"
+    user_id = user.get("sub", "anonymous") if user else "anonymous"
+
+    tickets = _get_demo_tickets() if historical else data_store.get_user_tickets(user_id)
+    metrics = _build_export_metrics(tickets, historical)
+    obs     = _svc.observability_service.get_summary()
+    agent_metrics = _obs_to_agent_list(obs)
+
+    buffer = generate_excel_report(
+        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets],
+        metrics=metrics,
+        agent_metrics=agent_metrics,
+        cost_forecast=data_store.get_cost_forecast(historical_only=historical),
+        resolution_time=data_store.get_resolution_time_by_category(historical_only=historical),
+        period="Historical Dataset" if historical else "My Tickets",
+    )
+
+    filename = f"agentic_support_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/api/export/pdf")
+async def export_pdf(
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+):
+    """Export analytics report as PDF."""
+    historical = _svc.dataset_mode == "historical"
+    user_id = user.get("sub", "anonymous") if user else "anonymous"
+
+    tickets = _get_demo_tickets() if historical else data_store.get_user_tickets(user_id)
+    metrics = _build_export_metrics(tickets, historical)
+    obs     = _svc.observability_service.get_summary()
+    agent_metrics = _obs_to_agent_list(obs)
+
+    buffer = generate_pdf_report(
+        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets],
+        metrics=metrics,
+        agent_metrics=agent_metrics,
+        cost_forecast=data_store.get_cost_forecast(historical_only=historical),
+        resolution_time=data_store.get_resolution_time_by_category(historical_only=historical),
+        period="Historical Dataset" if historical else "My Tickets",
+    )
+
+    filename = f"agentic_support_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

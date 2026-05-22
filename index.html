@@ -1612,6 +1612,25 @@
       gap: 14px;
     }
 
+    .ag-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+    .ag-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+    .ag-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+
     .perf-metrics-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2243,11 +2262,40 @@
         color: white !important;
         padding: 0 !important;
       }
+
+      /* Analytics metric grids — 2 columns on mobile */
+      .ag-grid-4, .ag-grid-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      .ag-grid-2 {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* Customer portal — Analyze Request button pinned to bottom */
+      body.customer-view #submitRequest {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        z-index: 999 !important;
+        margin: 0 !important;
+        padding: 16px !important;
+      }
+
+      body.customer-view .form-card {
+        padding-bottom: 72px !important;
+      }
     }
 
     /* Extra-small screens */
     @media (max-width: 480px) {
       .metrics-row {
+        grid-template-columns: 1fr !important;
+      }
+
+      .ag-grid-4, .ag-grid-3, .ag-grid-2 {
         grid-template-columns: 1fr !important;
       }
 
@@ -4080,6 +4128,12 @@
           </div>
         `;
       } else {
+        const isHumanApproved = (
+          ticket._human_approved === true ||
+          (ticket.status === 'completed' &&
+           ticket.escalation_required === false &&
+           ticket.routing_action !== 'resolve')
+        );
         const needsHumanReview = (
           ticket.status === 'pending_human_review' ||
           ticket.escalation_required === true ||
@@ -4091,7 +4145,30 @@
           ticket.routing_action === 'step_by_step'
         );
 
-        if (needsHumanReview) {
+        if (isHumanApproved) {
+          confirmAction = `
+            <div style="
+              display:flex;align-items:center;gap:8px;
+              padding:12px 16px;
+              background:rgba(16,185,129,0.08);
+              border:1px solid rgba(16,185,129,0.2);
+              border-radius:10px;margin-bottom:16px;
+            ">
+              <span style="font-size:18px">✅</span>
+              <div>
+                <div style="
+                  font-size:13px;font-weight:600;
+                  color:#10B981;
+                ">Resolved by human review</div>
+                <div style="
+                  font-size:11px;color:var(--muted);
+                  font-family:var(--mono);
+                ">Approved by operator</div>
+              </div>
+            </div>
+            ${ticket.response ? `<div class="response-bubble">${formatResponseText(ticket.response)}</div>` : ''}
+          `;
+        } else if (needsHumanReview) {
           const awaitBtn = ticket.response ? `
             <button class="button-outline-yellow" data-action="await-customer" data-id="${ticket.reference_id}">⏳ Awaiting Customer Info</button>
           ` : '';
@@ -6046,29 +6123,59 @@
       });
     }
 
-    function approveTicket(referenceId) {
-      const ticket = state.tickets.find(t => t.reference_id === referenceId);
-      if (!ticket) return;
+    async function approveTicket(referenceId) {
+      const btn = event?.target;
+      if (btn) {
+        btn.textContent = '⏳ Approving...';
+        btn.disabled = true;
+      }
+
       if (!state.useBackend) {
-        ticket.escalation_required = false;
-        state.feedbackStatus = 'Ticket aprovado localmente.';
+        const ticket = state.tickets.find(t => t.reference_id === referenceId);
+        if (ticket) {
+          ticket.status = 'completed';
+          ticket.escalation_required = false;
+          ticket.routing_action = 'resolve';
+          ticket._human_approved = true;
+          ticket._approved_at = new Date().toISOString();
+        }
+        showToast('✅ Ticket approved and resolved!');
         render();
         return;
       }
-      fetch(`${state.backendUrl}/${referenceId}/approve`, { method: 'POST', headers: { 'X-API-Key': getApiKey() } })
-        .then(response => {
-          if (response.ok) {
+
+      try {
+        const res = await fetch(
+          `${state.backendUrl}/${referenceId}/approve`,
+          { method: 'POST', headers: { 'X-API-Key': getApiKey() } }
+        );
+
+        if (res.ok) {
+          const ticket = state.tickets.find(t => t.reference_id === referenceId);
+          if (ticket) {
+            ticket.status = 'completed';
             ticket.escalation_required = false;
-            state.feedbackStatus = 'Ticket aprovado e resolvido.';
-          } else {
-            state.feedbackStatus = 'Falha ao aprovar ticket no backend.';
+            ticket.routing_action = 'resolve';
+            ticket._human_approved = true;
+            ticket._approved_at = new Date().toISOString();
           }
+          showToast('✅ Ticket approved and resolved!');
           render();
-        }).catch(err => {
-          handleConnectionError(err);
-          state.feedbackStatus = 'Erro de conexão ao aprovar ticket.';
-          render();
-        });
+        } else {
+          showToast('❌ Failed to approve ticket');
+          if (btn) {
+            btn.textContent = '✅ Approve & Resolve';
+            btn.disabled = false;
+          }
+        }
+      } catch (e) {
+        console.error('approveTicket error:', e);
+        showToast('❌ Connection error');
+        if (btn) {
+          btn.textContent = '✅ Approve & Resolve';
+          btn.disabled = false;
+        }
+      }
     }
 
     function rejectTicket(referenceId) {
@@ -6119,6 +6226,82 @@
           state.feedbackStatus = 'Erro de conexão ao atualizar ticket.';
           render();
         });
+    }
+
+    // ─────────────────────────────────────────────
+    // EXPORT FUNCTIONS
+    // ─────────────────────────────────────────────
+
+    async function exportExcel(evt) {
+      const btn = (evt || event).target.closest('button');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '⏳ Generating Excel...';
+      btn.disabled = true;
+
+      try {
+        const baseUrl = BACKEND_URL;
+        const res = await fetch(`${baseUrl}/api/export/excel`, {
+          headers: {
+            'X-API-Key': getApiKey(),
+            'Authorization': `Bearer ${state.jwtToken || ''}`,
+          },
+        });
+
+        if (res.ok) {
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href     = url;
+          a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.xlsx`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('✅ Excel report downloaded!');
+        } else {
+          showToast('❌ Export failed');
+        }
+      } catch (e) {
+        console.error('Excel export error:', e);
+        showToast('❌ Connection error');
+      } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled  = false;
+      }
+    }
+
+    async function exportPDF(evt) {
+      const btn = (evt || event).target.closest('button');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '⏳ Generating PDF...';
+      btn.disabled = true;
+
+      try {
+        const baseUrl = BACKEND_URL;
+        const res = await fetch(`${baseUrl}/api/export/pdf`, {
+          headers: {
+            'X-API-Key': getApiKey(),
+            'Authorization': `Bearer ${state.jwtToken || ''}`,
+          },
+        });
+
+        if (res.ok) {
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href     = url;
+          a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('✅ PDF report downloaded!');
+        } else {
+          showToast('❌ Export failed');
+        }
+      } catch (e) {
+        console.error('PDF export error:', e);
+        showToast('❌ Connection error');
+      } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled  = false;
+      }
     }
 
     // ─────────────────────────────────────────────
@@ -6353,6 +6536,32 @@
             <h1 class="hero-title" style="font-size: clamp(2rem, 3vw, 2.8rem); margin-top: 12px;">Analytics</h1>
             <p class="hero-copy">Insights from ${tickets.length} processed ticket${tickets.length !== 1 ? 's' : ''}.</p>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+            <button onclick="exportExcel(event)" style="
+              display:flex;align-items:center;gap:6px;
+              padding:8px 16px;
+              background:rgba(5,150,105,0.1);
+              border:1px solid rgba(5,150,105,0.3);
+              border-radius:8px;color:#10B981;
+              font-size:13px;font-weight:500;cursor:pointer;
+              font-family:var(--mono);transition:all 0.2s;
+            " onmouseover="this.style.background='rgba(5,150,105,0.2)'"
+               onmouseout="this.style.background='rgba(5,150,105,0.1)'">
+              📊 Export Excel
+            </button>
+            <button onclick="exportPDF(event)" style="
+              display:flex;align-items:center;gap:6px;
+              padding:8px 16px;
+              background:rgba(124,58,237,0.1);
+              border:1px solid rgba(124,58,237,0.3);
+              border-radius:8px;color:#A78BFA;
+              font-size:13px;font-weight:500;cursor:pointer;
+              font-family:var(--mono);transition:all 0.2s;
+            " onmouseover="this.style.background='rgba(124,58,237,0.2)'"
+               onmouseout="this.style.background='rgba(124,58,237,0.1)'">
+              📄 Export PDF
+            </button>
+          </div>
         </section>
 
         ${renderAnalyticsKPIs(tickets)}
@@ -6542,7 +6751,7 @@
         return `
           <div class="panel-card" style="margin-top: 20px; padding: 28px 32px;">
             <h3 style="margin: 0 0 20px; font-size: 0.88rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em;">Customer Satisfaction (CSAT)</h3>
-            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+            <div class="ag-grid-4" style="gap:16px;">
               ${['CSAT Score', 'Feedback Received', 'Response Rate'].map(label => `
                 <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:24px 18px; text-align:center;">
                   <div style="font-size:1.5rem; font-family:'DM Mono',monospace; color:var(--muted); margin-bottom:10px;">—</div>
@@ -6570,7 +6779,7 @@
       return `
         <div class="panel-card" style="margin-top: 20px; padding: 28px 32px;">
           <h3 style="margin: 0 0 20px; font-size: 0.88rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em;">Customer Satisfaction (CSAT)</h3>
-          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+          <div class="ag-grid-4" style="gap:16px;">
 
             <!-- Card 1: CSAT Score -->
             <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:24px 18px; text-align:center;">
@@ -6780,7 +6989,7 @@
             const hallNote = evaluated.length > 0 ? `${hallucinated.length} of ${evaluated.length} evaluated` : 'Process tickets to populate';
             const hallBorder = hallRate !== null && hallRate > 0 ? '#EF4444' : hallRate === 0 ? '#10B981' : CYAN;
             return `
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch;">
+            <div class="ag-grid-4">
               ${card(CYAN, classStatus, '🎯', 'Classification Accuracy', classAcc + '%',
                 'Accuracy in categorizing customer issues', 'Target: &gt;80%', classPill, 0)}
               ${card(CYAN, timeStatus, '⚡', 'Avg Response Time',
@@ -6804,7 +7013,7 @@
           })()}
 
           ${rowHeader(VIOLET, 'Operational Metrics', 'Business efficiency of the support pipeline')}
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:stretch;">
+          <div class="ag-grid-3">
             ${card(VIOLET, 'green', '💰', 'Cost per Ticket', '~$' + avgCostUsd.toFixed(6),
               'AI processing cost per ticket',
               `${costLabel} · vs ~$8.50 human`, '🟢 Cost Efficient', 180)}
@@ -6815,7 +7024,7 @@
           </div>
 
           ${rowHeader(EMERALD, 'Pipeline Metrics', 'Technical health of the agent pipeline')}
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:stretch;">
+          <div class="ag-grid-3">
             ${card(EMERALD, kbStatus, '📚', 'Knowledge Base Coverage', kbPct + '%',
               'Tickets matched to knowledge base articles',
               `${withArticles} ticket${withArticles !== 1 ? 's' : ''} had relevant articles`, kbPill, 360)}
@@ -6884,7 +7093,7 @@
 
             return `
               ${rowHeader(AMBER, 'External API Health', 'Performance of integrated external services')}
-              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;align-items:stretch;">
+              <div class="ag-grid-2">
                 ${card(AMBER, cepStatus, '📮', 'ViaCEP Latency', cepVal,
                   'Average response time for address validation API', cepNote, cepPill, 540)}
                 ${card(AMBER, wxStatus, '🌦️', 'OpenWeather Latency', wxVal,
@@ -6972,7 +7181,7 @@
           </div>
           <p style="margin:0 0 18px;font-size:0.81rem;color:var(--muted);">Cross-model evaluation: claude-sonnet-4-6 judges claude-haiku-4-5 responses</p>
 
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+          <div class="ag-grid-4" style="margin-bottom:20px;">
             ${scoreDimCards}
           </div>
 
@@ -7089,7 +7298,7 @@
       const totalCostUsd  = obs?.total_real_cost_usd   || obs?.total_cost_usd || 0;
 
       const miniCards = `
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;">
+        <div class="ag-grid-4" style="margin-bottom:22px;">
 
           <div class="metric-card" style="padding:18px 20px;gap:6px;">
             <div style="font-size:1.3rem;">⚡</div>

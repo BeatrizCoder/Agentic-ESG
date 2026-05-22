@@ -134,6 +134,7 @@ if SQLALCHEMY_AVAILABLE:
         api_tags = Column(JSON, default=list)
         quality_evaluation = Column(JSON, default=dict)
         pending_action = Column(JSON, default=dict)
+        user_id = Column(String, default="anonymous")
 
 
 class SupportTicketData(BaseModel):
@@ -171,6 +172,7 @@ class SupportTicketData(BaseModel):
     api_tags: List[str] = []
     quality_evaluation: Dict[str, Any] = {}
     pending_action: Dict[str, Any] = {}
+    user_id: str = "anonymous"
 
 
 class DataStore:
@@ -202,6 +204,7 @@ class DataStore:
             Base.metadata.create_all(bind=self.engine)
             self._migrate_add_api_tags()
             self._migrate_add_pending_action()
+            self._migrate_add_user_id()
             self._seed_refunds()
             self._seed_pending_actions()
             logger.info("Database tables created/verified")
@@ -232,6 +235,19 @@ class DataStore:
                 conn.execute(
                     __import__("sqlalchemy").text(
                         "ALTER TABLE support_tickets ADD COLUMN pending_action JSON"
+                    )
+                )
+                conn.commit()
+        except Exception:
+            pass  # Column already exists
+
+    def _migrate_add_user_id(self):
+        """Add user_id column to existing support_tickets rows."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE support_tickets ADD COLUMN user_id VARCHAR(200) DEFAULT 'anonymous'"
                     )
                 )
                 conn.commit()
@@ -314,6 +330,7 @@ class DataStore:
             api_tags=db_ticket.api_tags or [],
             quality_evaluation=db_ticket.quality_evaluation or {},
             pending_action=db_ticket.pending_action or {},
+            user_id=db_ticket.user_id or "anonymous",
         )
 
     _REFUND_SEED = [
@@ -672,6 +689,7 @@ class DataStore:
                     api_tags=ticket_data.api_tags or [],
                     quality_evaluation=ticket_data.quality_evaluation or {},
                     pending_action=ticket_data.pending_action or {},
+                    user_id=ticket_data.user_id,
                 )
                 db.merge(db_ticket)  # Use merge to handle updates
                 db.commit()
@@ -1057,6 +1075,19 @@ class DataStore:
             # JSON fallback
             tickets = self._load_tickets()
             return [SupportTicketData(**data) for data in tickets.values()]
+
+    def get_user_tickets(self, user_id: str) -> List[SupportTicketData]:
+        """Get tickets for a specific user only."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        with self.SessionLocal() as session:
+            db_tickets = (
+                session.query(SupportTicketDB)
+                .filter(SupportTicketDB.user_id == user_id)
+                .order_by(SupportTicketDB.created_at.desc())
+                .all()
+            )
+            return [self._db_to_pydantic(t) for t in db_tickets]
 
     def get_tickets_by_status(self, status: str) -> List[SupportTicketData]:
         """Get tickets by status."""

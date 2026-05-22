@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 from jose import JWTError, jwt
 from fastapi import HTTPException, Security
@@ -39,3 +40,19 @@ def verify_token(
     except JWTError as e:
         logger.warning("Invalid JWT: %s", e)
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def optional_token(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> Optional[dict]:
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+        )
+        return payload
+    except JWTError:
+        return None
