@@ -2262,6 +2262,304 @@
   </style>
 </head>
 <body>
+
+<!-- ══════════════════════════════════
+     LOGIN SCREEN
+     ══════════════════════════════════ -->
+<div id="login-screen" style="
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #13111C 0%, #1E1B2E 50%, #13111C 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  font-family: var(--font, 'Inter', sans-serif);
+">
+  <div style="
+    width: 100%;
+    max-width: 440px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 24px;
+    padding: 40px 36px;
+    text-align: center;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5),
+                0 0 0 1px rgba(139,92,246,0.1);
+  ">
+    <div style="
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #7C3AED, #4F46E5);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 24px rgba(124,58,237,0.4);
+    ">🤖</div>
+    <h1 style="font-size:22px;font-weight:700;color:white;margin:0 0 6px;letter-spacing:-0.5px;">Agentic Support Platform</h1>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 8px;">Multi-agent AI customer support demo</p>
+    <p style="font-size:12px;color:#4B5563;margin:0 0 32px;font-style:italic;">Powered by CrewAI · Claude Haiku 4.5 · FastAPI</p>
+    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,0.3),transparent);margin-bottom:28px;"></div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px;text-align:left;">
+      <!-- Terms row -->
+      <div id="terms-row" style="
+        display:flex;align-items:center;gap:12px;
+        padding:14px 16px;
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:12px;
+        transition:border-color 0.2s;
+      ">
+        <div id="terms-check" style="
+          width:22px;height:22px;border-radius:6px;
+          border:2px solid rgba(255,255,255,0.15);
+          display:flex;align-items:center;justify-content:center;
+          flex-shrink:0;transition:all 0.2s;font-size:13px;
+        "></div>
+        <div style="flex:1;">
+          <div style="font-size:13px;color:#D1D5DB;font-weight:500;margin-bottom:2px;">Terms of Service / Termos de Uso</div>
+          <div style="font-size:11px;color:#6B7280;">Must read before accepting / Leia antes de aceitar</div>
+        </div>
+        <button onclick="openAuthModal('terms')" style="
+          padding:6px 12px;
+          background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);
+          border-radius:8px;color:#A78BFA;font-size:12px;cursor:pointer;
+          font-family:inherit;white-space:nowrap;flex-shrink:0;
+        ">Read / Ler →</button>
+      </div>
+      <!-- Privacy row -->
+      <div id="privacy-row" style="
+        display:flex;align-items:center;gap:12px;
+        padding:14px 16px;
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:12px;
+        transition:border-color 0.2s;
+      ">
+        <div id="privacy-check" style="
+          width:22px;height:22px;border-radius:6px;
+          border:2px solid rgba(255,255,255,0.15);
+          display:flex;align-items:center;justify-content:center;
+          flex-shrink:0;transition:all 0.2s;font-size:13px;
+        "></div>
+        <div style="flex:1;">
+          <div style="font-size:13px;color:#D1D5DB;font-weight:500;margin-bottom:2px;">Privacy Policy / Política de Privacidade</div>
+          <div style="font-size:11px;color:#6B7280;">LGPD compliant · AWS São Paulo</div>
+        </div>
+        <button onclick="openAuthModal('privacy')" style="
+          padding:6px 12px;
+          background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);
+          border-radius:8px;color:#A78BFA;font-size:12px;cursor:pointer;
+          font-family:inherit;white-space:nowrap;flex-shrink:0;
+        ">Read / Ler →</button>
+      </div>
+    </div>
+    <button id="btn-guest-login" onclick="guestLogin()" disabled style="
+      width:100%;padding:15px;
+      background:linear-gradient(135deg,#7C3AED,#4F46E5);
+      border:none;border-radius:12px;color:white;
+      font-size:15px;font-weight:600;cursor:not-allowed;
+      font-family:inherit;opacity:0.4;transition:all 0.3s;letter-spacing:0.3px;
+    ">🎭 Access Demo / Acessar Demo</button>
+    <p style="margin-top:20px;font-size:11px;color:#374151;line-height:1.6;">
+      This platform processes data via Anthropic AI.<br>
+      Esta plataforma processa dados via Anthropic AI.<br>
+      For demo purposes only / Apenas para demonstração.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     TERMS MODAL
+     ══════════════════════════════════ -->
+<div id="terms-modal" style="
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);
+  z-index:10000;align-items:center;justify-content:center;padding:20px;
+">
+  <div style="
+    width:100%;max-width:620px;max-height:85vh;
+    background:#1A1625;border:1px solid rgba(139,92,246,0.25);
+    border-radius:20px;display:flex;flex-direction:column;
+    box-shadow:0 25px 60px rgba(0,0,0,0.6);overflow:hidden;
+  ">
+    <div style="
+      padding:24px 28px 20px;
+      background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(79,70,229,0.1));
+      border-bottom:1px solid rgba(255,255,255,0.07);flex-shrink:0;
+    ">
+      <div style="font-size:20px;font-weight:700;color:white;margin-bottom:4px;">📋 Terms of Service</div>
+      <div style="font-size:13px;color:#6B7280;">Termos de Uso — Agentic Support Platform</div>
+    </div>
+    <div id="terms-content" onscroll="checkScroll('terms')" style="
+      flex:1;overflow-y:auto;padding:24px 28px;color:#9CA3AF;font-size:13px;line-height:1.8;
+    ">
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">1. Demo Platform / Plataforma de Demonstração</h3>
+        <p style="margin:0">EN: This platform is provided exclusively for demonstration and educational purposes. It showcases a multi-agent AI architecture built with CrewAI, FastAPI, and Claude AI. It is not intended for production use with real sensitive customer data.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Esta plataforma é fornecida exclusivamente para fins de demonstração e educação. Ela demonstra uma arquitetura multi-agente de IA construída com CrewAI, FastAPI e Claude AI. Não é destinada ao uso em produção com dados reais de clientes.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">2. Acceptable Use / Uso Aceitável</h3>
+        <p style="margin:0">EN: You agree to use this platform only for testing and demonstration purposes. You must not submit real personal data, confidential business information, or any content that violates applicable laws.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Você concorda em usar esta plataforma apenas para fins de teste e demonstração. Não envie dados pessoais reais, informações comerciais confidenciais ou qualquer conteúdo que viole as leis aplicáveis.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">3. AI Processing / Processamento por IA</h3>
+        <p style="margin:0">EN: All inquiries submitted are processed by Anthropic's Claude AI models. By using this platform, you acknowledge that your inputs are sent to Anthropic's API for processing according to their terms of service at anthropic.com/legal.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Todas as consultas enviadas são processadas pelos modelos Claude AI da Anthropic. Ao usar esta plataforma, você reconhece que suas entradas são enviadas à API da Anthropic de acordo com os termos de serviço deles em anthropic.com/legal.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">4. Availability / Disponibilidade</h3>
+        <p style="margin:0">EN: The platform runs on free-tier cloud services (Render, Neon, Vercel). No uptime guarantee is provided. The service may be temporarily unavailable due to cold starts or maintenance.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: A plataforma é executada em serviços de nuvem gratuitos (Render, Neon, Vercel). Nenhuma garantia de disponibilidade é fornecida. O serviço pode ficar temporariamente indisponível devido a cold starts ou manutenção.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">5. Intellectual Property / Propriedade Intelectual</h3>
+        <p style="margin:0">EN: The platform code and architecture are the intellectual property of the developer. The project is open source on GitHub for educational purposes. Commercial use requires explicit permission.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: O código e a arquitetura da plataforma são propriedade intelectual da desenvolvedora. O projeto é open source no GitHub para fins educacionais. O uso comercial requer permissão explícita.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">6. Limitation of Liability / Limitação de Responsabilidade</h3>
+        <p style="margin:0">EN: The developer is not liable for any direct, indirect, or consequential damages arising from the use of this demonstration platform. Use at your own risk.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: A desenvolvedora não é responsável por quaisquer danos diretos, indiretos ou consequenciais decorrentes do uso desta plataforma de demonstração. Use por sua conta e risco.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">7. Changes / Alterações</h3>
+        <p style="margin:0">EN: These terms may be updated at any time. Continued use of the platform constitutes acceptance of the updated terms.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Estes termos podem ser atualizados a qualquer momento. O uso continuado da plataforma constitui aceitação dos termos atualizados.</p>
+      </div>
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);font-size:11px;color:#4B5563;">
+        Last updated / Última atualização: May 2026<br>
+        Contact / Contato: beatrizcostaleal1996@gmail.com
+      </div>
+    </div>
+    <div style="
+      padding:20px 28px;border-top:1px solid rgba(255,255,255,0.07);
+      background:rgba(0,0,0,0.2);flex-shrink:0;display:flex;gap:12px;align-items:center;
+    ">
+      <button onclick="closeAuthModal('terms')" style="
+        padding:10px 16px;background:transparent;
+        border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+        color:#6B7280;font-size:13px;cursor:pointer;font-family:inherit;
+      ">Close / Fechar</button>
+      <button id="terms-accept-btn" onclick="acceptDoc('terms')" disabled style="
+        flex:1;padding:10px 16px;
+        background:linear-gradient(135deg,#7C3AED,#4F46E5);
+        border:none;border-radius:8px;color:white;
+        font-size:13px;font-weight:600;cursor:not-allowed;
+        font-family:inherit;opacity:0.4;transition:all 0.3s;
+      ">↓ Scroll to enable / Role para habilitar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PRIVACY MODAL
+     ══════════════════════════════════ -->
+<div id="privacy-modal" style="
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);
+  z-index:10000;align-items:center;justify-content:center;padding:20px;
+">
+  <div style="
+    width:100%;max-width:620px;max-height:85vh;
+    background:#1A1625;border:1px solid rgba(139,92,246,0.25);
+    border-radius:20px;display:flex;flex-direction:column;
+    box-shadow:0 25px 60px rgba(0,0,0,0.6);overflow:hidden;
+  ">
+    <div style="
+      padding:24px 28px 20px;
+      background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(79,70,229,0.1));
+      border-bottom:1px solid rgba(255,255,255,0.07);flex-shrink:0;
+    ">
+      <div style="font-size:20px;font-weight:700;color:white;margin-bottom:4px;">🔒 Privacy Policy</div>
+      <div style="font-size:13px;color:#6B7280;">Política de Privacidade — LGPD Compliant</div>
+    </div>
+    <div id="privacy-content" onscroll="checkScroll('privacy')" style="
+      flex:1;overflow-y:auto;padding:24px 28px;color:#9CA3AF;font-size:13px;line-height:1.8;
+    ">
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data Controller / Controladora de Dados</h3>
+        <p style="margin:0">EN: Beatriz Costa — beatrizcostaleal1996@gmail.com<br>This platform is a personal portfolio project.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Beatriz Costa — beatrizcostaleal1996@gmail.com<br>Esta plataforma é um projeto de portfólio pessoal.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data We Collect / Dados que Coletamos</h3>
+        <p style="margin:0">EN: We collect only the minimum necessary: support inquiries you submit, usage metrics (response time, category), and session tokens for authentication. We do NOT collect real names, phone numbers, or payment information.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Coletamos apenas o mínimo necessário: consultas de suporte que você envia, métricas de uso (tempo de resposta, categoria) e tokens de sessão para autenticação. NÃO coletamos nomes reais, telefones ou informações de pagamento.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">How We Use Your Data / Como Usamos Seus Dados</h3>
+        <p style="margin:0">EN: Your data is used exclusively to: (1) Process support inquiries via AI, (2) Display analytics in the operator dashboard, (3) Improve platform performance. We never sell, share, or use your data for marketing.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Seus dados são usados exclusivamente para: (1) Processar consultas de suporte via IA, (2) Exibir análises no painel do operador, (3) Melhorar o desempenho da plataforma. Nunca vendemos, compartilhamos ou usamos seus dados para marketing.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Third Party Services / Serviços de Terceiros</h3>
+        <p style="margin:0">EN: Your inquiries are processed by:</p>
+        <ul style="margin:8px 0;padding-left:20px">
+          <li>Anthropic (AI processing) — anthropic.com/legal</li>
+          <li>OpenWeatherMap (weather data) — openweathermap.org</li>
+          <li>Neon (database) — neon.tech/privacy</li>
+          <li>Render (backend hosting) — render.com/privacy</li>
+          <li>Vercel (frontend hosting) — vercel.com/legal/privacy</li>
+        </ul>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Suas consultas são processadas por: Anthropic (processamento IA), OpenWeatherMap (dados climáticos), Neon (banco de dados), Render (hospedagem backend), Vercel (hospedagem frontend).</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data Storage / Armazenamento de Dados</h3>
+        <p style="margin:0">EN: All data is stored in PostgreSQL (Neon) hosted on AWS São Paulo (sa-east-1), in compliance with LGPD data residency requirements. Data is encrypted at rest and in transit.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Todos os dados são armazenados em PostgreSQL (Neon) hospedado na AWS São Paulo (sa-east-1), em conformidade com os requisitos de residência de dados da LGPD. Os dados são criptografados em repouso e em trânsito.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data Retention / Retenção de Dados</h3>
+        <p style="margin:0">EN: Demo data is retained for a maximum of 30 days and then permanently deleted. Session tokens expire after 24 hours.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Dados de demonstração são retidos por no máximo 30 dias e depois excluídos permanentemente. Tokens de sessão expiram após 24 horas.</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Your Rights / Seus Direitos (LGPD Art. 18)</h3>
+        <p style="margin:0">EN: You have the right to:</p>
+        <ul style="margin:8px 0;padding-left:20px">
+          <li>Access your data / Acessar seus dados</li>
+          <li>Correct inaccurate data / Corrigir dados incorretos</li>
+          <li>Delete your data / Excluir seus dados</li>
+          <li>Withdraw consent / Retirar consentimento</li>
+          <li>Data portability / Portabilidade de dados</li>
+        </ul>
+        <p style="margin:8px 0 0">EN: To exercise your rights, contact: beatrizcostaleal1996@gmail.com</p>
+        <p style="margin:4px 0 0;color:#6B7280;font-style:italic">PT: Para exercer seus direitos, entre em contato: beatrizcostaleal1996@gmail.com</p>
+      </div>
+      <div style="margin-bottom:20px">
+        <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Legal Basis / Base Legal (LGPD)</h3>
+        <p style="margin:0">EN: Processing is based on your explicit consent (Art. 7, I, LGPD). You may withdraw consent at any time by contacting us.</p>
+        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: O tratamento é baseado no seu consentimento explícito (Art. 7º, I, LGPD). Você pode retirar o consentimento a qualquer momento entrando em contato conosco.</p>
+      </div>
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);font-size:11px;color:#4B5563;">
+        Last updated / Última atualização: May 2026<br>
+        DPA / Encarregado: beatrizcostaleal1996@gmail.com
+      </div>
+    </div>
+    <div style="
+      padding:20px 28px;border-top:1px solid rgba(255,255,255,0.07);
+      background:rgba(0,0,0,0.2);flex-shrink:0;display:flex;gap:12px;align-items:center;
+    ">
+      <button onclick="closeAuthModal('privacy')" style="
+        padding:10px 16px;background:transparent;
+        border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+        color:#6B7280;font-size:13px;cursor:pointer;font-family:inherit;
+      ">Close / Fechar</button>
+      <button id="privacy-accept-btn" onclick="acceptDoc('privacy')" disabled style="
+        flex:1;padding:10px 16px;
+        background:linear-gradient(135deg,#7C3AED,#4F46E5);
+        border:none;border-radius:8px;color:white;
+        font-size:13px;font-weight:600;cursor:not-allowed;
+        font-family:inherit;opacity:0.4;transition:all 0.3s;
+      ">↓ Scroll to enable / Role para habilitar</button>
+    </div>
+  </div>
+</div>
+
   <div id="app">
     <aside id="sidebar"></aside>
     <main id="mainContent"></main>
@@ -2480,6 +2778,21 @@
           </div>
         </details>
         ` : ''}
+
+        <div style="margin-top:auto;padding-top:16px;">
+          <button onclick="logout()" title="Logout" style="
+            width:100%;padding:8px 12px;font-size:12px;
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.08);
+            border-radius:8px;color:#6B7280;cursor:pointer;
+            font-family:var(--mono);transition:all 0.2s;
+            display:flex;align-items:center;gap:6px;
+          "
+          onmouseover="this.style.color='#EF4444';this.style.borderColor='rgba(239,68,68,0.3)'"
+          onmouseout="this.style.color='#6B7280';this.style.borderColor='rgba(255,255,255,0.08)'">
+            → Logout
+          </button>
+        </div>
 
       `;
 
@@ -7515,6 +7828,183 @@
         sidebar.classList.remove('mobile-open');
         overlay.classList.remove('active');
       }
+    });
+
+    // ── AUTH ──────────────────────────────────────────────────────────────────
+    const _accepted = { terms: false, privacy: false };
+
+    function openAuthModal(type) {
+      const modal = document.getElementById(`${type}-modal`);
+      if (!modal) return;
+      modal.style.display = 'flex';
+      const content = document.getElementById(`${type}-content`);
+      if (content) content.scrollTop = 0;
+      const btn = document.getElementById(`${type}-accept-btn`);
+      if (btn && !_accepted[type]) {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.style.cursor = 'not-allowed';
+        btn.textContent = '↓ Scroll to enable / Role para habilitar';
+      }
+    }
+
+    function closeAuthModal(type) {
+      const modal = document.getElementById(`${type}-modal`);
+      if (modal) modal.style.display = 'none';
+    }
+
+    function checkScroll(type) {
+      if (_accepted[type]) return;
+      const content = document.getElementById(`${type}-content`);
+      const btn = document.getElementById(`${type}-accept-btn`);
+      if (!content || !btn) return;
+      const nearBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 50;
+      if (nearBottom) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.textContent = type === 'terms'
+          ? '✓ I Accept Terms / Aceito os Termos'
+          : '✓ I Accept Privacy Policy / Aceito a Política';
+      }
+    }
+
+    function acceptDoc(type) {
+      _accepted[type] = true;
+      const checkEl = document.getElementById(`${type}-check`);
+      const rowEl = document.getElementById(`${type}-row`);
+      if (checkEl) {
+        checkEl.textContent = '✓';
+        checkEl.style.background = 'linear-gradient(135deg,#7C3AED,#4F46E5)';
+        checkEl.style.border = 'none';
+        checkEl.style.color = 'white';
+      }
+      if (rowEl) {
+        rowEl.style.borderColor = 'rgba(124,58,237,0.4)';
+        rowEl.style.background = 'rgba(124,58,237,0.08)';
+      }
+      const btn = document.getElementById(`${type}-accept-btn`);
+      if (btn) {
+        btn.textContent = '✓ Accepted / Aceito';
+        btn.style.background = 'linear-gradient(135deg,#059669,#047857)';
+      }
+      setTimeout(() => closeAuthModal(type), 800);
+      updateLoginButton();
+    }
+
+    function updateLoginButton() {
+      const btn = document.getElementById('btn-guest-login');
+      if (!btn) return;
+      const allAccepted = _accepted.terms && _accepted.privacy;
+      btn.disabled = !allAccepted;
+      btn.style.opacity = allAccepted ? '1' : '0.4';
+      btn.style.cursor = allAccepted ? 'pointer' : 'not-allowed';
+    }
+
+    async function guestLogin() {
+      if (!_accepted.terms || !_accepted.privacy) return;
+      const btn = document.getElementById('btn-guest-login');
+      if (btn) { btn.textContent = '⏳ Entering... / Entrando...'; btn.disabled = true; btn.style.cursor = 'not-allowed'; }
+      try {
+        const baseUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : 'http://localhost:8000').replace('/api/support', '');
+        const res = await fetch(`${baseUrl}/auth/guest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accepted_terms: true, accepted_privacy: true }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem('jwt_token', data.access_token);
+          if (typeof state !== 'undefined') {
+            state.jwtToken = data.access_token;
+            state.authenticated = true;
+            state.currentUser = data.user;
+          }
+          const loginScreen = document.getElementById('login-screen');
+          if (loginScreen) {
+            loginScreen.style.transition = 'opacity 0.4s ease';
+            loginScreen.style.opacity = '0';
+            setTimeout(() => { loginScreen.style.display = 'none'; }, 400);
+          }
+          if (typeof loadTicketsFromDB === 'function') await loadTicketsFromDB();
+          if (typeof loadMetrics === 'function') await loadMetrics();
+          if (typeof render === 'function') render();
+        } else {
+          const err = await res.json();
+          showToastLogin(err.detail || 'Login failed');
+          if (btn) { btn.textContent = '🎭 Access Demo / Acessar Demo'; btn.disabled = false; btn.style.cursor = 'pointer'; }
+        }
+      } catch (e) {
+        console.error('guestLogin error:', e);
+        showToastLogin('Connection error. Check your internet.');
+        if (btn) { btn.textContent = '🎭 Access Demo / Acessar Demo'; btn.disabled = false; btn.style.cursor = 'pointer'; }
+      }
+    }
+
+    async function checkAuth() {
+      const token = localStorage.getItem('jwt_token');
+      if (!token) { showLoginScreen(); return; }
+      try {
+        const baseUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : 'http://localhost:8000').replace('/api/support', '');
+        const res = await fetch(`${baseUrl}/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const user = await res.json();
+          if (typeof state !== 'undefined') { state.authenticated = true; state.jwtToken = token; state.currentUser = user; }
+          hideLoginScreen();
+        } else {
+          localStorage.removeItem('jwt_token');
+          showLoginScreen();
+        }
+      } catch {
+        showLoginScreen();
+      }
+    }
+
+    function showLoginScreen() {
+      const el = document.getElementById('login-screen');
+      if (el) { el.style.display = 'flex'; el.style.opacity = '1'; }
+    }
+
+    function hideLoginScreen() {
+      const el = document.getElementById('login-screen');
+      if (el) el.style.display = 'none';
+    }
+
+    function showToastLogin(msg) {
+      const toast = document.createElement('div');
+      toast.textContent = msg;
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#EF4444;color:white;padding:12px 24px;border-radius:10px;font-size:13px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    function logout() {
+      localStorage.removeItem('jwt_token');
+      if (typeof state !== 'undefined') {
+        state.authenticated = false;
+        state.jwtToken = null;
+        state.currentUser = null;
+        state.tickets = [];
+        state.perfMetrics = null;
+        state.csatMetrics = null;
+      }
+      _accepted.terms = false;
+      _accepted.privacy = false;
+      ['terms', 'privacy'].forEach(type => {
+        const checkEl = document.getElementById(`${type}-check`);
+        const rowEl = document.getElementById(`${type}-row`);
+        const acceptBtn = document.getElementById(`${type}-accept-btn`);
+        if (checkEl) { checkEl.textContent = ''; checkEl.style.background = 'transparent'; checkEl.style.border = '2px solid rgba(255,255,255,0.15)'; checkEl.style.color = ''; }
+        if (rowEl) { rowEl.style.borderColor = 'rgba(255,255,255,0.07)'; rowEl.style.background = 'rgba(255,255,255,0.03)'; }
+        if (acceptBtn) { acceptBtn.disabled = true; acceptBtn.style.opacity = '0.4'; acceptBtn.textContent = '↓ Scroll to enable / Role para habilitar'; acceptBtn.style.background = 'linear-gradient(135deg,#7C3AED,#4F46E5)'; }
+      });
+      const loginBtn = document.getElementById('btn-guest-login');
+      if (loginBtn) { loginBtn.disabled = true; loginBtn.style.opacity = '0.4'; loginBtn.textContent = '🎭 Access Demo / Acessar Demo'; }
+      showLoginScreen();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await checkAuth();
     });
   </script>
 </body>

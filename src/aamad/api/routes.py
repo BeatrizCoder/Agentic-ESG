@@ -9,11 +9,14 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text as sa_text
 
+from pydantic import BaseModel
+
 from ..config import ENABLE_MOCK_INTEGRATIONS
-from ..core.config import verify_api_key, limiter
+from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS
 from ..core import services as _svc
 from ..data_store import data_store, SupportTicketData, SupportTicketDB
 from ..flow.support_flow import SupportFlow
+from ..auth import create_guest_token, verify_token
 from .models import (
     FeedbackRequest, RunMetrics, StatusResponse,
     StepsResponse, SupportResponse, SupportTicket, TraceResponse,
@@ -22,6 +25,40 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ── Auth models ───────────────────────────────────────────────────────────────
+
+class GuestLoginRequest(BaseModel):
+    accepted_terms: bool
+    accepted_privacy: bool
+
+
+# ── Auth endpoints ────────────────────────────────────────────────────────────
+
+@router.post("/auth/guest")
+async def guest_login(request: GuestLoginRequest):
+    if not request.accepted_terms:
+        raise HTTPException(status_code=400, detail="Must accept Terms of Service")
+    if not request.accepted_privacy:
+        raise HTTPException(status_code=400, detail="Must accept Privacy Policy")
+    token = create_guest_token()
+    logger.info("Guest token issued")
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": JWT_EXPIRE_HOURS * 3600,
+        "user": {"name": "Demo User", "role": "guest", "email": "guest@demo.com"},
+    }
+
+
+@router.get("/auth/me")
+async def get_me(user=Depends(verify_token)):
+    return {
+        "name": user.get("name", "Demo User"),
+        "role": user.get("role", "guest"),
+        "email": user.get("sub"),
+    }
 
 
 # ── Dataset helpers ───────────────────────────────────────────────────────────

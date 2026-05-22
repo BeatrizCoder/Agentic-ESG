@@ -2,6 +2,7 @@
 
 import os
 import sys
+import secrets
 import logging
 import yaml
 from dotenv import load_dotenv
@@ -54,6 +55,11 @@ ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000",
 ).split(",")
+
+# ── JWT ───────────────────────────────────────────────────────────────────────
+JWT_SECRET: str = os.getenv("JWT_SECRET", secrets.token_hex(32))
+JWT_ALGORITHM: str = "HS256"
+JWT_EXPIRE_HOURS: int = 24
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
