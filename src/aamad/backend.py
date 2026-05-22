@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from .core.config import ALLOWED_ORIGINS, limiter
 from .core import services as _svc  # noqa: F401 — triggers singleton initialization
 from .api.routes import router
+from .config import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,15 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+
+@app.on_event("startup")
+async def _log_db_config() -> None:
+    # STEP 3 — confirm which database the production backend is actually using
+    db_type = "postgresql" if "postgresql" in DATABASE_URL else "sqlite"
+    safe_url = DATABASE_URL[:50] + "..." if len(DATABASE_URL) > 50 else DATABASE_URL
+    logger.info("DATABASE_URL type: %s", db_type)
+    logger.info("DATABASE_URL: %s", safe_url)
 
 
 def main(argv: list[str] | None = None) -> int:

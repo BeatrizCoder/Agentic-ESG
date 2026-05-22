@@ -1093,12 +1093,30 @@ class DataStore:
 
         try:
             with self.SessionLocal() as session:
+                # STEP 2 — unfiltered count to catch filter bugs
+                all_rows = session.execute(
+                    _text("SELECT feedback FROM support_tickets")
+                ).fetchall()
+                logger.info("CSAT debug ALL rows (no filter): %d", len(all_rows))
+                for i, row in enumerate(all_rows):
+                    logger.info(
+                        "CSAT all[%d]: type=%s repr=%s",
+                        i, type(row[0]).__name__, repr(row[0]),
+                    )
+
+                # STEP 1 — filtered query used for real calculation
                 feedback_data = session.execute(
                     _text(
                         f"SELECT feedback FROM support_tickets "
                         f"WHERE feedback IS NOT NULL {null_filter}"
                     )
                 ).fetchall()
+                logger.info("CSAT debug filtered rows: %d", len(feedback_data))
+                for i, row in enumerate(feedback_data):
+                    logger.info(
+                        "CSAT filtered[%d]: type=%s repr=%s",
+                        i, type(row[0]).__name__, repr(row[0]),
+                    )
         except Exception as e:
             logger.error("CSAT query error: %s", e)
             return empty
