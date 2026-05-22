@@ -4065,26 +4065,59 @@
             <button class="button-secondary" data-action="reject" data-id="${ticket.reference_id}">❌ Reject</button>
           </div>
         `;
-      } else if (ticket.escalation_required) {
-        const awaitBtn = ticket.response ? `
-          <button class="button-outline-yellow" data-action="await-customer" data-id="${ticket.reference_id}">⏳ Awaiting Customer Info</button>
-        ` : '';
-        confirmAction = `
-          <div class="danger-card">
-            <h4>Escalation required</h4>
-            <p>${ticket.escalation_reason || 'The AI team flagged this request for human review.'}</p>
-            ${ticket.triggered_keyword ? `<p><strong>Trigger:</strong> ${ticket.triggered_keyword}</p>` : ''}
-          </div>
-          ${ticket.response ? `<div class="response-bubble">${formatResponseText(ticket.response)}</div>` : ''}
-          <p style="margin: 0; font-size: 0.82rem; color: var(--muted);">Select action after reviewing the AI response above:</p>
-          <div class="detail-action-row">
-            <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Approve & Resolve</button>
-            ${awaitBtn}
-            <button class="button-secondary" data-action="reject" data-id="${ticket.reference_id}">❌ Reject</button>
-          </div>
-        `;
       } else {
-        confirmAction = `<div class="response-bubble">${formatResponseText(ticket.response)}</div>`;
+        const needsHumanReview = (
+          ticket.status === 'pending_human_review' ||
+          ticket.escalation_required === true ||
+          ticket.routing_action === 'escalate'
+        );
+        const isAutoResolved = (
+          ticket.status === 'completed' ||
+          ticket.routing_action === 'resolve' ||
+          ticket.routing_action === 'step_by_step'
+        );
+
+        if (needsHumanReview) {
+          const awaitBtn = ticket.response ? `
+            <button class="button-outline-yellow" data-action="await-customer" data-id="${ticket.reference_id}">⏳ Awaiting Customer Info</button>
+          ` : '';
+          confirmAction = `
+            <div class="danger-card">
+              <h4>Escalation required</h4>
+              <p>${ticket.escalation_reason || 'The AI team flagged this request for human review.'}</p>
+              ${ticket.triggered_keyword ? `<p><strong>Trigger:</strong> ${ticket.triggered_keyword}</p>` : ''}
+            </div>
+            ${ticket.response ? `<div class="response-bubble">${formatResponseText(ticket.response)}</div>` : ''}
+            <p style="margin: 0; font-size: 0.82rem; color: var(--muted);">Select action after reviewing the AI response above:</p>
+            <div class="detail-action-row">
+              <button class="button-primary" data-action="approve" data-id="${ticket.reference_id}">✅ Approve & Resolve</button>
+              ${awaitBtn}
+              <button class="button-secondary" data-action="reject" data-id="${ticket.reference_id}">❌ Reject</button>
+            </div>
+          `;
+        } else if (isAutoResolved) {
+          confirmAction = `
+            <div style="
+              display:flex;
+              align-items:center;
+              gap:8px;
+              padding:12px 16px;
+              background:rgba(16,185,129,0.08);
+              border:1px solid rgba(16,185,129,0.2);
+              border-radius:10px;
+              margin-bottom:16px;
+            ">
+              <span style="font-size:18px">✅</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#10B981;">Resolved automatically by AI</div>
+                <div style="font-size:11px;color:var(--muted);font-family:var(--mono);">No human review needed</div>
+              </div>
+            </div>
+            ${ticket.response ? `<div class="response-bubble">${formatResponseText(ticket.response)}</div>` : ''}
+          `;
+        } else {
+          confirmAction = `<div class="response-bubble">${formatResponseText(ticket.response)}</div>`;
+        }
       }
       const feedbackCard = (() => {
         const fb = ticket.feedback;
