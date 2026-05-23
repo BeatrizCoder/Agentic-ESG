@@ -135,6 +135,7 @@ if SQLALCHEMY_AVAILABLE:
         quality_evaluation = Column(JSON, default=dict)
         pending_action = Column(JSON, default=dict)
         user_id = Column(String, default="anonymous")
+        is_historical = Column(Boolean, default=False)
 
 
 class SupportTicketData(BaseModel):
@@ -205,8 +206,10 @@ class DataStore:
             self._migrate_add_api_tags()
             self._migrate_add_pending_action()
             self._migrate_add_user_id()
+            self._migrate_add_is_historical()
             self._seed_refunds()
             self._seed_pending_actions()
+            self.seed_historical_tickets()
             logger.info("Database tables created/verified")
         else:
             os.makedirs(data_dir, exist_ok=True)
@@ -253,6 +256,152 @@ class DataStore:
                 conn.commit()
         except Exception:
             pass  # Column already exists
+
+    def _migrate_add_is_historical(self):
+        """Add is_historical column to existing support_tickets rows."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE support_tickets ADD COLUMN is_historical BOOLEAN DEFAULT FALSE"
+                    )
+                )
+                conn.commit()
+                logger.info("Added is_historical column to support_tickets")
+        except Exception:
+            pass  # Column already exists
+
+    def seed_historical_tickets(self) -> int:
+        """Seed historical_seed.json into Neon as is_historical=TRUE rows (idempotent)."""
+        import json as _json
+        from pathlib import Path as _Path
+        from sqlalchemy import text as _text
+
+        logger.info("Starting historical seed check...")
+
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            logger.info("No database configured — skipping historical seed")
+            return 0
+
+        with self.SessionLocal() as session:
+            count = session.execute(
+                _text("SELECT COUNT(*) FROM support_tickets WHERE is_historical = TRUE")
+            ).scalar() or 0
+
+        logger.info("Historical tickets in DB: %d", count)
+
+        if count > 0:
+            logger.info("Already seeded — skipping")
+            return count
+
+        seed_path = _Path("src/aamad/data/historical_seed.json")
+        logger.info("Seed file exists: %s", seed_path.exists())
+        logger.info("Seed file path: %s", seed_path.absolute())
+
+        if not seed_path.exists():
+            logger.warning("historical_seed.json not found — cannot seed historical data")
+            return 0
+
+        logger.info("Seeding historical tickets...")
+        try:
+            with open(seed_path, encoding="utf-8") as f:
+                rows = _json.load(f)
+        except Exception as e:
+            logger.error("Failed to read historical_seed.json: %s", e)
+            return 0
+
+        def _coerce(val, default):
+            if val is None:
+                return default
+            if isinstance(val, str):
+                try:
+                    return _json.loads(val)
+                except Exception:
+                    return default
+            return val
+
+        inserted = 0
+        with self.SessionLocal() as session:
+            for r in rows:
+                ref_id = r.get("reference_id", "")
+                if not ref_id:
+                    continue
+                existing = session.execute(
+                    _text("SELECT reference_id FROM support_tickets WHERE reference_id = :rid"),
+                    {"rid": ref_id},
+                ).fetchone()
+                if existing:
+                    continue
+
+                created_raw = r.get("created_at") or r.get("updated_at") or ""
+                try:
+                    created_dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+                except Exception:
+                    created_dt = datetime.utcnow()
+
+                updated_raw = r.get("updated_at") or created_raw
+                try:
+                    updated_dt = datetime.fromisoformat(updated_raw.replace("Z", "+00:00"))
+                except Exception:
+                    updated_dt = created_dt
+
+                session.execute(_text("""
+                    INSERT INTO support_tickets (
+                        reference_id, inquiry, category, category_confidence,
+                        sentiment, sentiment_confidence, urgency,
+                        articles, response, response_confidence,
+                        escalation_required, escalation_reason, triggered_keyword,
+                        steps, knowledge_source, memory_saved, execution_mode,
+                        tools_used, cache_used, status,
+                        created_at, updated_at, feedback, run_id, execution_time_ms,
+                        api_tags, quality_evaluation, pending_action, user_id, is_historical
+                    ) VALUES (
+                        :reference_id, :inquiry, :category, :category_confidence,
+                        :sentiment, :sentiment_confidence, :urgency,
+                        :articles, :response, :response_confidence,
+                        :escalation_required, :escalation_reason, :triggered_keyword,
+                        :steps, :knowledge_source, :memory_saved, :execution_mode,
+                        :tools_used, :cache_used, :status,
+                        :created_at, :updated_at, :feedback, :run_id, :execution_time_ms,
+                        :api_tags, :quality_evaluation, :pending_action, :user_id, TRUE
+                    )
+                """), {
+                    "reference_id": ref_id,
+                    "inquiry": r.get("inquiry", ""),
+                    "category": r.get("category", ""),
+                    "category_confidence": r.get("category_confidence") or 0,
+                    "sentiment": r.get("sentiment", ""),
+                    "sentiment_confidence": r.get("sentiment_confidence") or 0,
+                    "urgency": r.get("urgency", ""),
+                    "articles": _json.dumps(_coerce(r.get("articles"), [])),
+                    "response": r.get("response", ""),
+                    "response_confidence": r.get("response_confidence") or 0,
+                    "escalation_required": bool(r.get("escalation_required", False)),
+                    "escalation_reason": r.get("escalation_reason", ""),
+                    "triggered_keyword": r.get("triggered_keyword"),
+                    "steps": _json.dumps(_coerce(r.get("steps"), [])),
+                    "knowledge_source": r.get("knowledge_source", ""),
+                    "memory_saved": bool(r.get("memory_saved", False)),
+                    "execution_mode": r.get("execution_mode", "deterministic"),
+                    "tools_used": _json.dumps(_coerce(r.get("tools_used"), [])),
+                    "cache_used": bool(r.get("cache_used", False)),
+                    "status": r.get("status", "completed"),
+                    "created_at": created_dt,
+                    "updated_at": updated_dt,
+                    "feedback": _json.dumps(_coerce(r.get("feedback"), None)) if r.get("feedback") is not None else None,
+                    "run_id": r.get("run_id"),
+                    "execution_time_ms": r.get("execution_time_ms") or 0,
+                    "api_tags": _json.dumps(_coerce(r.get("api_tags"), [])),
+                    "quality_evaluation": _json.dumps(_coerce(r.get("quality_evaluation"), {})),
+                    "pending_action": _json.dumps(_coerce(r.get("pending_action"), {})),
+                    "user_id": r.get("user_id", "historical"),
+                })
+                inserted += 1
+
+            session.commit()
+
+        logger.info("Seeded %d historical tickets into Neon", inserted)
+        return inserted
 
     def _migrate_add_api_tags(self):
         """Add api_tags and quality_evaluation columns to existing databases."""
@@ -1210,9 +1359,11 @@ class DataStore:
             return []
         from sqlalchemy import text as _text
 
+        hist_filter = "AND is_historical = TRUE" if historical_only else "AND (is_historical = FALSE OR is_historical IS NULL)"
+
         try:
             with self.SessionLocal() as session:
-                rows = session.execute(_text("""
+                rows = session.execute(_text(f"""
                     SELECT
                         category,
                         COUNT(*) AS ticket_count,
@@ -1226,6 +1377,7 @@ class DataStore:
                       AND execution_time_ms > 0
                       AND category IS NOT NULL
                       AND category != ''
+                      {hist_filter}
                     GROUP BY category
                     ORDER BY avg_time_ms DESC
                 """)).fetchall()
@@ -1256,6 +1408,7 @@ class DataStore:
         interval_expr = (
             "NOW() - INTERVAL '7 days'" if is_postgres else "datetime('now', '-7 days')"
         )
+        hist_filter = "AND is_historical = TRUE" if historical_only else "AND (is_historical = FALSE OR is_historical IS NULL)"
 
         try:
             with self.SessionLocal() as session:
@@ -1263,30 +1416,33 @@ class DataStore:
                     SELECT DATE(created_at) AS day, COUNT(*) AS tickets
                     FROM support_tickets
                     WHERE created_at >= {interval_expr}
+                      {hist_filter}
                     GROUP BY DATE(created_at)
                     ORDER BY day DESC
                 """)).fetchall()
 
                 if is_postgres:
-                    category_costs = session.execute(_text("""
+                    category_costs = session.execute(_text(f"""
                         SELECT
                             category,
                             COUNT(*) AS tickets,
                             AVG(
                                 CASE WHEN quality_evaluation IS NOT NULL
-                                      AND quality_evaluation::text NOT IN ('null', '{}')
+                                      AND quality_evaluation::text NOT IN ('null', '{{}}')
                                 THEN (quality_evaluation->>'cost_usd')::float
                                 END
                             ) AS avg_cost_usd
                         FROM support_tickets
                         WHERE category IS NOT NULL AND category != ''
+                          {hist_filter}
                         GROUP BY category
                     """)).fetchall()
                 else:
-                    category_costs = session.execute(_text("""
+                    category_costs = session.execute(_text(f"""
                         SELECT category, COUNT(*) AS tickets, NULL AS avg_cost_usd
                         FROM support_tickets
                         WHERE category IS NOT NULL AND category != ''
+                          {hist_filter}
                         GROUP BY category
                     """)).fetchall()
 

@@ -742,6 +742,16 @@ async def get_dataset_mode():
     }
 
 
+@router.post("/api/admin/seed-historical")
+async def force_seed_historical(_=Depends(verify_api_key)):
+    """Force-seed historical_seed.json into Neon (idempotent — safe to call multiple times)."""
+    count = data_store.seed_historical_tickets()
+    return {
+        "seeded": count,
+        "message": f"Seeded {count} historical tickets",
+    }
+
+
 @router.post("/api/dataset/mode")
 async def set_dataset_mode(payload: dict, _=Depends(verify_api_key)):
     """Switch dataset mode. Historical mode reads demo_dataset.db (read-only)."""
