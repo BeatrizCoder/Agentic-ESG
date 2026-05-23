@@ -5887,9 +5887,14 @@
           return resolve(generateOfflineTicket(inquiry));
         }
         try {
+          const jwt = state.jwtToken || localStorage.getItem('jwt_token') || '';
           const response = await fetch(state.backendUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': getApiKey(),
+              'Authorization': `Bearer ${jwt}`,
+            },
             body: JSON.stringify({ inquiry }),
           });
           if (!response.ok) {
@@ -8000,6 +8005,7 @@
 
     async function loadTicketsFromDB() {
       const apiKey = getApiKey();
+      const jwt    = state.jwtToken || localStorage.getItem('jwt_token') || '';
       const url = BACKEND_URL + '/api/tickets';
 
       console.log('loadTicketsFromDB:', {
@@ -8012,7 +8018,7 @@
       if (!state.useBackend) return [];
 
       try {
-        const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+        const res = await fetch(url, { headers: { 'X-API-Key': apiKey, 'Authorization': `Bearer ${jwt}` } });
 
         console.log('tickets response status:', res.status);
 
@@ -8198,7 +8204,8 @@
       analyticsRefreshInterval = setInterval(() => {
         if (!state.useBackend) return;
         const ticketsUrl = state.backendUrl.replace('/api/support', '/api/tickets');
-        fetch(ticketsUrl, { headers: { 'X-API-Key': getApiKey() } })
+        const _jwt = state.jwtToken || localStorage.getItem('jwt_token') || '';
+        fetch(ticketsUrl, { headers: { 'X-API-Key': getApiKey(), 'Authorization': `Bearer ${_jwt}` } })
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data || !Array.isArray(data)) return;

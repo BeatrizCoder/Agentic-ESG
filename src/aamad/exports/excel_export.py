@@ -55,7 +55,7 @@ def generate_excel_report(
     wb.remove(wb.active)
 
     _create_dashboard_sheet(wb, metrics, cost_forecast, resolution_time, period)
-    _create_tickets_sheet(wb, tickets)
+    _create_tickets_sheet(wb, tickets, period)
     _create_agents_sheet(wb, agent_metrics)
     _create_cost_sheet(wb, cost_forecast, metrics)
 
@@ -227,10 +227,10 @@ def _create_dashboard_sheet(wb, metrics, cost_forecast, resolution_time, period)
     return ws
 
 
-def _create_tickets_sheet(wb, tickets):
+def _create_tickets_sheet(wb, tickets, period="All time"):
     ws = wb.create_sheet("🎫 Tickets")
     ws.sheet_view.showGridLines = False
-    ws.freeze_panes = "A2"
+    ws.freeze_panes = "A3"
 
     columns = [
         ("Reference ID", 18),
@@ -248,9 +248,23 @@ def _create_tickets_sheet(wb, tickets):
     for i, (_, width) in enumerate(columns, 1):
         ws.column_dimensions[get_column_letter(i)].width = width
 
-    ws.row_dimensions[1].height = 30
+    # Title row
+    title_text = (
+        f"Tickets Export — {period} — "
+        f"{len(tickets)} records — "
+        f"{datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    )
+    ws.row_dimensions[1].height = 24
+    title_cell = ws.cell(row=1, column=1, value=title_text)
+    title_cell.font = _font(bold=True, size=11, color=WHITE)
+    title_cell.fill = _fill(GRAY_DARK)
+    title_cell.alignment = _align(h="left", v="center")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(columns))
+
+    # Column headers (row 2)
+    ws.row_dimensions[2].height = 30
     for i, (name, _) in enumerate(columns, 1):
-        cell = ws.cell(row=1, column=i, value=name)
+        cell = ws.cell(row=2, column=i, value=name)
         cell.font = _font(bold=True, size=11, color=WHITE)
         cell.fill = _fill(PURPLE)
         cell.alignment = _align(h="center", v="center")
@@ -264,7 +278,7 @@ def _create_tickets_sheet(wb, tickets):
         "rejected":             (RED,   RED_LIGHT),
     }
 
-    for i, ticket in enumerate(tickets, 2):
+    for i, ticket in enumerate(tickets, 3):
         ws.row_dimensions[i].height = 18
 
         if isinstance(ticket, dict):
@@ -318,11 +332,11 @@ def _create_tickets_sheet(wb, tickets):
         for j, value in enumerate(row_data, 1):
             cell = ws.cell(row=i, column=j, value=value)
             cell.font = _font(size=10)
-            cell.fill = _fill(bg if j == 6 else WHITE if i % 2 == 0 else GRAY_LIGHT)
+            cell.fill = _fill(bg if j == 6 else WHITE if i % 2 == 1 else GRAY_LIGHT)
             cell.alignment = _align(h="center" if j != 1 else "left")
             cell.border = _border()
 
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(tickets) + 1}"
+    ws.auto_filter.ref = f"A2:{get_column_letter(len(columns))}{len(tickets) + 2}"
     return ws
 
 

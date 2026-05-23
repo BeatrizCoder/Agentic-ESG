@@ -82,31 +82,25 @@ async def get_me(user=Depends(verify_token)):
 # ── Dataset helpers ───────────────────────────────────────────────────────────
 
 def _get_demo_tickets() -> List[SupportTicketData]:
-    """Read tickets from demo_dataset.db without touching the live database."""
+    """Read tickets from demo_dataset.db (or historical_seed.json fallback)."""
     import json as _json
-    from sqlalchemy import create_engine, text as _text
     from pathlib import Path as _Path
 
-    demo_db = _Path("src/aamad/data/demo_dataset.db")
-    if not demo_db.exists():
-        return []
-    try:
-        engine = create_engine(f"sqlite:///{demo_db}")
-        with engine.connect() as conn:
-            rows = conn.execute(
-                _text("SELECT * FROM support_tickets ORDER BY created_at DESC")
-            ).mappings().all()
+    def _j(r, key, default="[]"):
+        raw = r.get(key)
+        if raw is None:
+            return _json.loads(default)
+        if isinstance(raw, (list, dict)):
+            return raw
+        try:
+            return _json.loads(raw)
+        except Exception:
+            return _json.loads(default)
+
+    def _rows_to_tickets(rows):
         result = []
         for r in rows:
             r = dict(r)
-
-            def _j(key, default="[]"):
-                raw = r.get(key) or default
-                try:
-                    return _json.loads(raw) if isinstance(raw, str) else (raw or _json.loads(default))
-                except Exception:
-                    return _json.loads(default)
-
             result.append(SupportTicketData(
                 reference_id=r.get("reference_id", ""),
                 run_id=r.get("run_id", ""),
@@ -116,47 +110,75 @@ def _get_demo_tickets() -> List[SupportTicketData]:
                 sentiment=r.get("sentiment", ""),
                 sentiment_confidence=r.get("sentiment_confidence") or 0,
                 urgency=r.get("urgency", ""),
-                articles=_j("articles"),
+                articles=_j(r, "articles"),
                 escalation_required=bool(r.get("escalation_required", False)),
                 escalation_reason=r.get("escalation_reason", ""),
                 triggered_keyword=r.get("triggered_keyword"),
                 response=r.get("response", ""),
                 response_confidence=r.get("response_confidence") or 0,
-                quality_evaluation=_j("quality_evaluation", "{}"),
-                steps=_j("steps"),
-                tools_used=_j("tools_used"),
-                api_tags=_j("api_tags"),
+                quality_evaluation=_j(r, "quality_evaluation", "{}"),
+                steps=_j(r, "steps"),
+                tools_used=_j(r, "tools_used"),
+                api_tags=_j(r, "api_tags"),
                 execution_time_ms=r.get("execution_time_ms") or 0,
                 created_at=r.get("created_at", ""),
                 updated_at=r.get("updated_at") or r.get("created_at", ""),
-                pending_action=_j("pending_action", "{}"),
+                pending_action=_j(r, "pending_action", "{}"),
                 knowledge_source=r.get("knowledge_source", ""),
                 memory_saved=bool(r.get("memory_saved", False)),
                 execution_mode=r.get("execution_mode", ""),
                 cache_used=bool(r.get("cache_used", False)),
             ))
         return result
-    except Exception as _e:
-        logger.error(f"Error reading demo dataset: {_e}")
-        return []
+
+    demo_db = _Path("src/aamad/data/demo_dataset.db")
+    seed_json = _Path("src/aamad/data/historical_seed.json")
+
+    if demo_db.exists():
+        try:
+            from sqlalchemy import create_engine, text as _text
+            engine = create_engine(f"sqlite:///{demo_db}")
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    _text("SELECT * FROM support_tickets ORDER BY created_at DESC")
+                ).mappings().all()
+            return _rows_to_tickets(rows)
+        except Exception as _e:
+            logger.error("Error reading demo_dataset.db: %s", _e)
+
+    if seed_json.exists():
+        try:
+            with open(seed_json, encoding="utf-8") as f:
+                raw = _json.load(f)
+            return _rows_to_tickets(raw)
+        except Exception as _e:
+            logger.error("Error reading historical_seed.json: %s", _e)
+
+    return []
 
 
 def _get_ticket_count(mode: str) -> int:
     """Get ticket count for a given mode without side effects."""
-    from sqlalchemy import create_engine, text as _text
+    import json as _json
     from pathlib import Path as _Path
 
     try:
         if mode == "historical":
             demo_db = _Path("src/aamad/data/demo_dataset.db")
-            if not demo_db.exists():
-                return 0
-            engine = create_engine(f"sqlite:///{demo_db}")
-            with engine.connect() as conn:
-                return conn.execute(
-                    _text("SELECT COUNT(*) FROM support_tickets")
-                ).scalar() or 0
+            seed_json = _Path("src/aamad/data/historical_seed.json")
+            if demo_db.exists():
+                from sqlalchemy import create_engine, text as _text
+                engine = create_engine(f"sqlite:///{demo_db}")
+                with engine.connect() as conn:
+                    return conn.execute(
+                        _text("SELECT COUNT(*) FROM support_tickets")
+                    ).scalar() or 0
+            if seed_json.exists():
+                with open(seed_json, encoding="utf-8") as f:
+                    return len(_json.load(f))
+            return 0
         else:
+            from sqlalchemy import text as _text
             with data_store.SessionLocal() as session:
                 return session.execute(
                     _text("SELECT COUNT(*) FROM support_tickets")
@@ -173,29 +195,42 @@ def _get_historical_csat_metrics() -> Dict[str, Any]:
 
     empty: Dict[str, Any] = {"csat_score": None, "csat_positive": 0, "csat_negative": 0, "total_feedback": 0}
     demo_db = _Path("src/aamad/data/demo_dataset.db")
-    if not demo_db.exists():
+    seed_json = _Path("src/aamad/data/historical_seed.json")
+    if not demo_db.exists() and not seed_json.exists():
         return empty
-    try:
-        engine = create_engine(f"sqlite:///{demo_db}")
-        with engine.connect() as conn:
-            rows = conn.execute(
-                _text(
-                    "SELECT feedback FROM support_tickets "
-                    "WHERE feedback IS NOT NULL "
-                    "AND CAST(feedback AS TEXT) != 'null' "
-                    "AND CAST(feedback AS TEXT) != '\"\"'"
-                )
-            ).fetchall()
-    except Exception as e:
-        logger.warning("Historical CSAT query error: %s", e)
-        return empty
+
+    feedback_values = []
+    if demo_db.exists():
+        try:
+            engine = create_engine(f"sqlite:///{demo_db}")
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    _text(
+                        "SELECT feedback FROM support_tickets "
+                        "WHERE feedback IS NOT NULL "
+                        "AND CAST(feedback AS TEXT) != 'null' "
+                        "AND CAST(feedback AS TEXT) != '\"\"'"
+                    )
+                ).fetchall()
+            feedback_values = [r[0] for r in rows]
+        except Exception as e:
+            logger.warning("Historical CSAT SQLite error: %s", e)
+    if not feedback_values and seed_json.exists():
+        try:
+            with open(seed_json, encoding="utf-8") as f:
+                seed = _json.load(f)
+            feedback_values = [
+                t.get("feedback") for t in seed
+                if t.get("feedback") not in (None, "null", '""', "")
+            ]
+        except Exception as e:
+            logger.warning("Historical CSAT JSON error: %s", e)
 
     positive = 0
     negative = 0
 
-    for row in rows:
+    for fb in feedback_values:
         try:
-            fb = row[0]
             if isinstance(fb, dict):
                 if fb.get("helpful") is True or fb.get("value") == "positive":
                     positive += 1
@@ -718,10 +753,12 @@ async def set_dataset_mode(payload: dict, _=Depends(verify_api_key)):
             status_code=400, detail="Mode must be 'live' or 'historical'"
         )
 
-    if mode == "historical" and not _Path("src/aamad/data/demo_dataset.db").exists():
+    _has_demo_db   = _Path("src/aamad/data/demo_dataset.db").exists()
+    _has_seed_json = _Path("src/aamad/data/historical_seed.json").exists()
+    if mode == "historical" and not _has_demo_db and not _has_seed_json:
         raise HTTPException(
             status_code=404,
-            detail="Demo dataset not found. Create demo_dataset.db first.",
+            detail="Historical dataset not found (demo_dataset.db or historical_seed.json).",
         )
 
     _svc.dataset_mode = mode
