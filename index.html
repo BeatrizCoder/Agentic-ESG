@@ -3750,7 +3750,7 @@
           </div>
         </section>
 
-        <div id="dataset-toggle-bar" style="display:${isLocalhost ? 'flex' : 'none'};align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;margin-bottom:16px;">
+        <div id="dataset-toggle-bar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;margin-bottom:16px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:13px;color:var(--muted);">📊 Dataset:</span>
             <div style="display:flex;background:rgba(0,0,0,0.2);border-radius:8px;padding:3px;gap:3px;">
@@ -6233,74 +6233,78 @@
     // ─────────────────────────────────────────────
 
     async function exportExcel(evt) {
-      const btn = (evt || event).target.closest('button');
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = '⏳ Generating Excel...';
-      btn.disabled = true;
+      const btn = (evt || event)?.target?.closest('button');
+      if (btn) { btn.innerHTML = '⏳ Generating Excel...'; btn.disabled = true; }
 
       try {
-        const baseUrl = BACKEND_URL;
-        const res = await fetch(`${baseUrl}/api/export/excel`, {
-          headers: {
-            'X-API-Key': getApiKey(),
-            'Authorization': `Bearer ${state.jwtToken || ''}`,
-          },
-        });
+        const apiKey = localStorage.getItem('operator_api_key') || getApiKey();
+        const jwt    = localStorage.getItem('jwt_token') || '';
+        const url    = `${BACKEND_URL}/api/export/excel?api_key=${encodeURIComponent(apiKey)}`;
+        console.log('[Export] Excel request to:', url);
 
-        if (res.ok) {
-          const blob = await res.blob();
-          const url  = URL.createObjectURL(blob);
-          const a    = document.createElement('a');
-          a.href     = url;
-          a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.xlsx`;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast('✅ Excel report downloaded!');
-        } else {
-          showToast('❌ Export failed');
-        }
+        const res = await fetch(url, {
+          headers: { 'X-API-Key': apiKey, 'Authorization': `Bearer ${jwt}` },
+        });
+        console.log('[Export] Excel response status:', res.status, 'Content-Type:', res.headers.get('Content-Type'));
+
+        if (!res.ok) { showToast(`❌ Export failed (${res.status})`); return; }
+
+        const blob = await res.blob();
+        console.log('[Export] Excel blob size:', blob.size, 'type:', blob.type);
+        if (blob.size === 0) { showToast('❌ Empty file received'); return; }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        showToast('✅ Excel report downloaded!');
       } catch (e) {
-        console.error('Excel export error:', e);
+        console.error('[Export] Excel error:', e);
         showToast('❌ Connection error');
       } finally {
-        btn.innerHTML = originalHTML;
-        btn.disabled  = false;
+        if (btn) { btn.innerHTML = '📊 Export Excel'; btn.disabled = false; }
       }
     }
 
     async function exportPDF(evt) {
-      const btn = (evt || event).target.closest('button');
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = '⏳ Generating PDF...';
-      btn.disabled = true;
+      const btn = (evt || event)?.target?.closest('button');
+      if (btn) { btn.innerHTML = '⏳ Generating PDF...'; btn.disabled = true; }
 
       try {
-        const baseUrl = BACKEND_URL;
-        const res = await fetch(`${baseUrl}/api/export/pdf`, {
-          headers: {
-            'X-API-Key': getApiKey(),
-            'Authorization': `Bearer ${state.jwtToken || ''}`,
-          },
-        });
+        const apiKey = localStorage.getItem('operator_api_key') || getApiKey();
+        const jwt    = localStorage.getItem('jwt_token') || '';
+        const url    = `${BACKEND_URL}/api/export/pdf?api_key=${encodeURIComponent(apiKey)}`;
+        console.log('[Export] PDF request to:', url);
 
-        if (res.ok) {
-          const blob = await res.blob();
-          const url  = URL.createObjectURL(blob);
-          const a    = document.createElement('a');
-          a.href     = url;
-          a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.pdf`;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast('✅ PDF report downloaded!');
-        } else {
-          showToast('❌ Export failed');
-        }
+        const res = await fetch(url, {
+          headers: { 'X-API-Key': apiKey, 'Authorization': `Bearer ${jwt}` },
+        });
+        console.log('[Export] PDF response status:', res.status, 'Content-Type:', res.headers.get('Content-Type'));
+
+        if (!res.ok) { showToast(`❌ Export failed (${res.status})`); return; }
+
+        const blob = await res.blob();
+        console.log('[Export] PDF blob size:', blob.size, 'type:', blob.type);
+        if (blob.size === 0) { showToast('❌ Empty file received'); return; }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `agentic_support_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        showToast('✅ PDF report downloaded!');
       } catch (e) {
-        console.error('PDF export error:', e);
+        console.error('[Export] PDF error:', e);
         showToast('❌ Connection error');
       } finally {
-        btn.innerHTML = originalHTML;
-        btn.disabled  = false;
+        if (btn) { btn.innerHTML = '📄 Export PDF'; btn.disabled = false; }
       }
     }
 
@@ -6340,38 +6344,26 @@
             0;
 
           // ── ViaCEP / Address Validation ──
-          if (agentL.includes('address validation tool')) {
+          if (agentL.includes('address validation agent')) {
             m.viacep.calls++;
             m.viacep.total_latency += latency;
-            const out = (d.output_summary || '').toLowerCase();
-            if (out.includes("'valid': true") || out.includes('"valid": true') || out.includes("valid': true")) {
+            if (d.cep_valid === true) {
               m.viacep.valid++;
+              if (d.logistics_alert) m.viacep.alerts_triggered++;
             } else {
               m.viacep.invalid++;
-              if (out.includes('fallback')) m.viacep.fallbacks++;
-            }
-          }
-          if (agentL.includes('address validation agent') && !agentL.includes('tool')) {
-            if (d.logistics_alert || d.cep_valid === true) {
-              if (d.logistics_alert) m.viacep.alerts_triggered++;
-              // Also count as valid if cep_valid is true and we didn't already count it
-              if (d.cep_valid === true && m.viacep.calls > 0) {
-                // already counted via tool agent; don't double-count
-              }
             }
           }
 
           // ── Weather ──
-          if (agentL.includes('weather check tool')) {
+          if (agentL.includes('weather check agent')) {
             m.weather.calls++;
             m.weather.total_latency += latency;
-            const out = (d.output_summary || '').toLowerCase();
-            if (out.includes("'available': true") || out.includes('"available": true') || out.includes("available': true")) {
+            if (d.available === true) {
               m.weather.available++;
-              if (out.includes('adverse')) m.weather.adverse_alerts++;
+              if (d.adverse === true) m.weather.adverse_alerts++;
             } else {
               m.weather.unavailable++;
-              if (out.includes('fallback')) m.weather.fallbacks++;
             }
           }
 
@@ -6773,8 +6765,10 @@
       const scorePillLabel = score >= 80 ? '🟢 Exceeds Benchmark' : score >= 75 ? '🟢 Meets Benchmark' : score >= 60 ? '🟡 Below Benchmark' : score >= 40 ? '🔴 Needs Attention' : '🔴 Critical';
       const scorePillColor = score >= 75 ? '#6EE7B7' : score >= 60 ? '#FBBF24' : '#F87171';
       const scorePillBg   = score >= 75 ? 'rgba(110,231,183,0.12)' : score >= 60 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)';
-      const helpfulPct = c.total_feedback > 0 ? Math.round((c.helpful_count / c.total_feedback) * 100) : 0;
-      const notHelpfulPct = c.total_feedback > 0 ? Math.round((c.not_helpful_count / c.total_feedback) * 100) : 0;
+      const helpfulCount = c.helpful_count ?? c.csat_positive ?? 0;
+      const notHelpfulCount = c.not_helpful_count ?? c.csat_negative ?? 0;
+      const helpfulPct = c.total_feedback > 0 ? Math.round((helpfulCount / c.total_feedback) * 100) : 0;
+      const notHelpfulPct = c.total_feedback > 0 ? Math.round((notHelpfulCount / c.total_feedback) * 100) : 0;
 
       return `
         <div class="panel-card" style="margin-top: 20px; padding: 28px 32px;">
@@ -6796,14 +6790,14 @@
               <div style="display:grid; gap:12px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                   <span style="font-size:0.9rem;">👍 Helpful</span>
-                  <span style="font-family:'DM Mono',monospace; font-size:0.85rem; color:#6EE7B7;">${c.helpful_count} <span style="color:var(--muted); font-size:0.78rem;">(${helpfulPct}%)</span></span>
+                  <span style="font-family:'DM Mono',monospace; font-size:0.85rem; color:#6EE7B7;">${helpfulCount} <span style="color:var(--muted); font-size:0.78rem;">(${helpfulPct}%)</span></span>
                 </div>
                 <div style="background:rgba(255,255,255,0.06); border-radius:4px; height:4px; overflow:hidden;">
                   <div style="height:100%; width:${helpfulPct}%; background:#6EE7B7; border-radius:4px; transition:width 0.4s;"></div>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                   <span style="font-size:0.9rem;">👎 Not Helpful</span>
-                  <span style="font-family:'DM Mono',monospace; font-size:0.85rem; color:#F87171;">${c.not_helpful_count} <span style="color:var(--muted); font-size:0.78rem;">(${notHelpfulPct}%)</span></span>
+                  <span style="font-family:'DM Mono',monospace; font-size:0.85rem; color:#F87171;">${notHelpfulCount} <span style="color:var(--muted); font-size:0.78rem;">(${notHelpfulPct}%)</span></span>
                 </div>
                 <div style="background:rgba(255,255,255,0.06); border-radius:4px; height:4px; overflow:hidden;">
                   <div style="height:100%; width:${notHelpfulPct}%; background:#F87171; border-radius:4px; transition:width 0.4s;"></div>

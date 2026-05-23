@@ -6,14 +6,14 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text as sa_text
 
 from pydantic import BaseModel
 
 from ..config import ENABLE_MOCK_INTEGRATIONS
-from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS
+from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS, INTERNAL_API_KEY
 from ..core import services as _svc
 from ..data_store import data_store, SupportTicketData, SupportTicketDB
 from ..flow.support_flow import SupportFlow
@@ -28,6 +28,16 @@ from ..exports.pdf_export import generate_pdf_report
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _verify_export_key(
+    request: Request,
+    api_key: str = Query(default=None),
+) -> None:
+    """Accept API key from either X-API-Key header or ?api_key= query param."""
+    key = request.headers.get("X-API-Key") or api_key
+    if key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 
 # ── Auth models ───────────────────────────────────────────────────────────────
@@ -517,6 +527,8 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
         "csat_score": csat_score,
         "csat_positive": helpful_count,
         "csat_negative": not_helpful_count,
+        "helpful_count": helpful_count,
+        "not_helpful_count": not_helpful_count,
         "total_feedback": total_feedback,
         "feedback_rate": round((total_feedback / total) * 100) if total > 0 else 0,
         "agent_performance": obs_summary.get("agent_performance", {}),
@@ -796,8 +808,9 @@ def _obs_to_agent_list(obs_summary: dict) -> list:
 
 @router.get("/api/export/excel")
 async def export_excel(
+    request: Request,
     user=Depends(optional_token),
-    _=Depends(verify_api_key),
+    _=Depends(_verify_export_key),
 ):
     """Export analytics report as Excel (.xlsx)."""
     historical = _svc.dataset_mode == "historical"
@@ -821,14 +834,19 @@ async def export_excel(
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
     )
 
 
 @router.get("/api/export/pdf")
 async def export_pdf(
+    request: Request,
     user=Depends(optional_token),
-    _=Depends(verify_api_key),
+    _=Depends(_verify_export_key),
 ):
     """Export analytics report as PDF."""
     historical = _svc.dataset_mode == "historical"
@@ -852,7 +870,11 @@ async def export_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
     )
 
 

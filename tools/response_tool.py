@@ -85,13 +85,14 @@ class ResponseTool(BaseSupportTool):
                         "in the customer's region. Real weather data retrieved.\n"
                         "Your response MUST:\n"
                         "- Start with weather emoji (🌧️ 🌩️ ⛈️ based on conditions)\n"
-                        "- Mention the specific city and real temperature\n"
-                        "- Mention the real weather conditions\n"
-                        "- Explain weather is causing delivery delays\n"
-                        "- Estimate 1-2 additional business days\n"
-                        "- Be warm and reassuring\n"
+                        "- Mention the specific city name and real weather conditions from the context\n"
+                        "- Explain weather is causing delivery delays (1-2 additional business days)\n"
+                        "- Be warm, empathetic, and reassuring\n"
+                        "- Do NOT ask for the order number or any other information\n"
+                        "- Do NOT ask for anything — this is a resolved response\n"
+                        "- End with: 'Assim que as condições melhorarem, seu pedido será retomado normalmente.' "
+                        "(or English equivalent: 'As soon as conditions improve, your order will resume normally.')\n"
                         "- Under 100 words\n"
-                        "- Do NOT ask for more information — resolve this directly\n"
                     )
 
                 elif "CLEAR WEATHER ESCALATION" in (external_context or ""):

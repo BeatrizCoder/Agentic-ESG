@@ -301,6 +301,7 @@ class SupportFlowStepsMixin:
             "has_email": decision.has_email,
             "explicit_escalation": decision.explicit_escalation,
             "confidence": decision.confidence,
+            "execution_mode": "deterministic",
         })
         return f"Routed as: {self.state.routing_action}"
 
@@ -369,6 +370,7 @@ class SupportFlowStepsMixin:
                     "action_required": action,
                     "urgency": urgency,
                     "latency_ms": pa_result.get("latency_ms"),
+                    "execution_mode": "deterministic",
                 })
                 logger.info(
                     "enrich: pending action found order=%s status=%s",
@@ -452,6 +454,7 @@ class SupportFlowStepsMixin:
                         "state": state_code,
                         "logistics_alert": True,
                         "alert_key": alert["alert_key"],
+                        "execution_mode": "external_api",
                     })
                 else:
                     context_parts.append(
@@ -463,6 +466,7 @@ class SupportFlowStepsMixin:
                         "address": formatted,
                         "state": state_code,
                         "logistics_alert": False,
+                        "execution_mode": "external_api",
                     })
             else:
                 logger.debug(
@@ -552,6 +556,7 @@ class SupportFlowStepsMixin:
                 "temperature": weather_result.get("temperature_c"),
                 "adverse": weather_result.get("adverse_conditions"),
                 "source": "city_detection",
+                "execution_mode": "external_api",
             })
 
         # ── Refund status lookup ──
@@ -603,6 +608,7 @@ class SupportFlowStepsMixin:
                     "found": refund_result.get("found"),
                     "auto_resolve": refund_result.get("auto_resolve"),
                     "should_escalate": refund_result.get("should_escalate"),
+                    "execution_mode": "deterministic",
                 })
 
         self.state.external_context = "\n".join(context_parts)
@@ -721,6 +727,7 @@ class SupportFlowStepsMixin:
                 "reason": "Active logistics delay — auto-resolved",
                 "alert_key": alert.get("alert_key"),
                 "auto_resolved": True,
+                "execution_mode": "deterministic",
             })
 
         elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
@@ -741,6 +748,7 @@ class SupportFlowStepsMixin:
                 "override": "weather_delay",
                 "reason": "Adverse weather — auto-resolved",
                 "auto_resolved": True,
+                "execution_mode": "deterministic",
             })
 
         elif (self.state.weather_result and
@@ -788,6 +796,7 @@ class SupportFlowStepsMixin:
                     "reason": "Clear weather — awaiting order number",
                     "city": city,
                     "auto_resolved": False,
+                    "execution_mode": "deterministic",
                 })
 
             elif self.state.routing_action == "escalate":
@@ -809,6 +818,7 @@ class SupportFlowStepsMixin:
                     "city": city,
                     "auto_resolved": False,
                     "hitl": True,
+                    "execution_mode": "deterministic",
                 })
 
         elif (self.state.refund_data.get("found") and
@@ -822,6 +832,7 @@ class SupportFlowStepsMixin:
                 "override": "refund_status",
                 "refund_status": refund_status,
                 "auto_resolved": True,
+                "execution_mode": "deterministic",
             })
 
         elif self.state.refund_data.get("should_escalate"):
@@ -845,6 +856,7 @@ class SupportFlowStepsMixin:
                 "refund_status": refund_status,
                 "auto_resolved": False,
                 "hitl": True,
+                "execution_mode": "deterministic",
             })
 
         elif (self.state.pending_action and self.state.pending_action.get("found")):
@@ -864,6 +876,7 @@ class SupportFlowStepsMixin:
                 "status": pa.get("status"),
                 "action_required": pa.get("action_required"),
                 "urgency": pa.get("urgency"),
+                "execution_mode": "deterministic",
             })
 
         else:
@@ -1069,6 +1082,7 @@ class SupportFlowStepsMixin:
             "status": "running_in_background",
             "run_id": run_id,
             "note": "Results saved to DB when complete",
+            "execution_mode": "crewai_llm_sonnet",
         })
 
         return "Evaluation started in background"
