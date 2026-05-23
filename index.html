@@ -2729,6 +2729,7 @@
       resolutionTime: null,
       costForecast: null,
       timeline: null,
+      exportPeriod: '30',
     };
 
     function getApiKey() {
@@ -2807,9 +2808,10 @@
             <span class="metric-value" style="font-size:1.2rem;">
               ${(() => {
                 const c = state.csatMetrics;
-                if (!c || c.csat_score === null) return '<span style="font-size:0.9rem;color:var(--muted);">N/A</span>';
+                const total = c?.total_feedback ?? 0;
+                if (!c || !c.csat_score || total === 0) return '<span style="font-size:0.9rem;color:var(--muted);">--</span>';
                 const emoji = c.csat_score >= 80 ? '😊' : c.csat_score >= 50 ? '😐' : '😞';
-                return emoji + ' ' + c.csat_score + '%';
+                return `${emoji} ${c.csat_score}% <span style="font-size:0.7rem;color:var(--muted);display:block;">Based on ${total} responses</span>`;
               })()}
             </span>
           </div>
@@ -6273,20 +6275,26 @@
       try {
         const apiKey = localStorage.getItem('operator_api_key') || getApiKey();
         const jwt    = localStorage.getItem('jwt_token') || '';
-        const period = document.getElementById('export-period')?.value || '30';
+        const period = state.exportPeriod || '30';
         const url    = `${BACKEND_URL}/api/export/excel?api_key=${encodeURIComponent(apiKey)}&days=${period}`;
-        console.log('[Export] Excel request to:', url);
+        console.log('[Export] Excel URL:', url);
+        console.log('[Export] API Key:', apiKey ? 'set' : 'EMPTY');
 
         const res = await fetch(url, {
           headers: { 'X-API-Key': apiKey, 'Authorization': `Bearer ${jwt}` },
         });
-        console.log('[Export] Excel response status:', res.status, 'Content-Type:', res.headers.get('Content-Type'));
+        console.log('[Export] Excel status:', res.status, '| Content-Type:', res.headers.get('Content-Type'));
 
-        if (!res.ok) { showToast(`❌ Export failed (${res.status})`); return; }
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error('[Export] Excel error body:', errText);
+          showToast(`❌ Export failed (${res.status})`);
+          return;
+        }
 
         const blob = await res.blob();
-        console.log('[Export] Excel blob size:', blob.size, 'type:', blob.type);
-        if (blob.size === 0) { showToast('❌ Empty file received'); return; }
+        console.log('[Export] Excel blob size:', blob.size, '| type:', blob.type);
+        if (blob.size < 100) { showToast('❌ Empty file received'); return; }
 
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -6299,7 +6307,7 @@
         showToast('✅ Excel report downloaded!');
       } catch (e) {
         console.error('[Export] Excel error:', e);
-        showToast('❌ Connection error');
+        showToast('❌ Error: ' + e.message);
       } finally {
         if (btn) { btn.innerHTML = '📊 Export Excel'; btn.disabled = false; }
       }
@@ -6312,20 +6320,25 @@
       try {
         const apiKey = localStorage.getItem('operator_api_key') || getApiKey();
         const jwt    = localStorage.getItem('jwt_token') || '';
-        const period = document.getElementById('export-period')?.value || '30';
+        const period = state.exportPeriod || '30';
         const url    = `${BACKEND_URL}/api/export/pdf?api_key=${encodeURIComponent(apiKey)}&days=${period}`;
-        console.log('[Export] PDF request to:', url);
+        console.log('[Export] PDF URL:', url);
 
         const res = await fetch(url, {
           headers: { 'X-API-Key': apiKey, 'Authorization': `Bearer ${jwt}` },
         });
-        console.log('[Export] PDF response status:', res.status, 'Content-Type:', res.headers.get('Content-Type'));
+        console.log('[Export] PDF status:', res.status, '| Content-Type:', res.headers.get('Content-Type'));
 
-        if (!res.ok) { showToast(`❌ Export failed (${res.status})`); return; }
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error('[Export] PDF error body:', errText);
+          showToast(`❌ Export failed (${res.status})`);
+          return;
+        }
 
         const blob = await res.blob();
-        console.log('[Export] PDF blob size:', blob.size, 'type:', blob.type);
-        if (blob.size === 0) { showToast('❌ Empty file received'); return; }
+        console.log('[Export] PDF blob size:', blob.size, '| type:', blob.type);
+        if (blob.size < 100) { showToast('❌ Empty file received'); return; }
 
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -6338,7 +6351,7 @@
         showToast('✅ PDF report downloaded!');
       } catch (e) {
         console.error('[Export] PDF error:', e);
-        showToast('❌ Connection error');
+        showToast('❌ Error: ' + e.message);
       } finally {
         if (btn) { btn.innerHTML = '📄 Export PDF'; btn.disabled = false; }
       }
@@ -6566,16 +6579,13 @@
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
             <span style="font-size:12px;color:var(--muted);font-family:var(--mono);">📅 Export period:</span>
-            <select id="export-period" style="
+            <select id="export-period" onchange="state.exportPeriod=this.value" style="
               padding:6px 10px;font-size:12px;font-family:var(--mono);
               background:rgba(255,255,255,0.05);
               border:1px solid rgba(255,255,255,0.1);
               border-radius:6px;color:var(--text);cursor:pointer;
             ">
-              <option value="7">Last 7 days</option>
-              <option value="30" selected>Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="0">All time</option>
+              ${[['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days'],['0','All time']].map(([v,l])=>`<option value="${v}"${state.exportPeriod===v?' selected':''}>${l}</option>`).join('')}
             </select>
             <button onclick="exportExcel(event)" style="
               display:flex;align-items:center;gap:6px;
@@ -6663,7 +6673,8 @@
       const resolutionRate = getResolutionRate(tickets);
       function _parseWall(t) {
         const v = t.wall_time_sec != null ? t.wall_time_sec
-          : t._elapsed != null ? t._elapsed : t.elapsed != null ? t.elapsed : t.wall_time;
+          : t._elapsed != null ? t._elapsed : t.elapsed != null ? t.elapsed : t.wall_time != null ? t.wall_time
+          : t.execution_time_ms != null ? t.execution_time_ms / 1000 : null;
         if (v == null) return null;
         if (typeof v === 'number') return v > 0 ? v : null;
         const n = parseFloat(v); return isNaN(n) || n <= 0 ? null : n;
@@ -6883,7 +6894,8 @@
 
       function parseTime(t) {
         const v = t.wall_time_sec != null ? t.wall_time_sec
-          : t._elapsed != null ? t._elapsed : t.elapsed != null ? t.elapsed : t.wall_time;
+          : t._elapsed != null ? t._elapsed : t.elapsed != null ? t.elapsed : t.wall_time != null ? t.wall_time
+          : t.execution_time_ms != null ? t.execution_time_ms / 1000 : null;
         if (v == null) return null;
         if (typeof v === 'number') return v > 0 ? v : null;
         const n = parseFloat(v);
