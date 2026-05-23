@@ -22,8 +22,13 @@ from .models import (
     FeedbackRequest, RunMetrics, StatusResponse,
     StepsResponse, SupportResponse, SupportTicket, TraceResponse,
 )
-from ..exports.excel_export import generate_excel_report
-from ..exports.pdf_export import generate_pdf_report
+try:
+    from ..exports.excel_export import generate_excel_report
+    from ..exports.pdf_export import generate_pdf_report
+    _EXPORTS_AVAILABLE = True
+except ImportError as _exc:
+    logger.warning("Export dependencies not available (%s). Install openpyxl and reportlab.", _exc)
+    _EXPORTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -813,6 +818,8 @@ async def export_excel(
     _=Depends(_verify_export_key),
 ):
     """Export analytics report as Excel (.xlsx)."""
+    if not _EXPORTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Export dependencies (openpyxl) not installed on this server.")
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
@@ -849,6 +856,8 @@ async def export_pdf(
     _=Depends(_verify_export_key),
 ):
     """Export analytics report as PDF."""
+    if not _EXPORTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Export dependencies (reportlab) not installed on this server.")
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
