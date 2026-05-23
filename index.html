@@ -2535,20 +2535,26 @@
       </div>
       <div style="margin-bottom:20px">
         <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data We Collect / Dados que Coletamos</h3>
-        <p style="margin:0">EN: We collect only the minimum necessary:<br>
-          - Support inquiries submitted through the platform<br>
-          - Usage metrics (response time, category, sentiment)<br>
-          - Session tokens for authentication (JWT, 24h expiry)<br>
-          - IP addresses and access logs (retained for 7 days, used only for security and rate limiting)<br>
-          - Browser/device type (User Agent header)<br><br>
-          We do NOT collect real names, phone numbers, payment information, or persistent identifiers.</p>
-        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Coletamos apenas o mínimo necessário:<br>
-          - Consultas de suporte enviadas pela plataforma<br>
-          - Métricas de uso (tempo de resposta, categoria)<br>
-          - Tokens de sessão para autenticação (JWT, 24h)<br>
-          - Endereços IP e logs de acesso (retidos por 7 dias, usados apenas para segurança e rate limiting)<br>
-          - Tipo de navegador/dispositivo (User Agent)<br><br>
-          NÃO coletamos nomes reais, telefones, informações de pagamento ou identificadores persistentes.</p>
+        <p style="margin:0"><strong style="color:white">What We Store</strong><br>
+          - Support tickets you submit, linked to an anonymous session ID (e.g. guest-a1b2c3d4e5f6)<br>
+          - Usage metrics: response time, category, sentiment<br>
+          - No names, emails, or personal identifiers are stored</p>
+        <p style="margin:10px 0 0"><strong style="color:white">Session Token (JWT)</strong><br>
+          When you access the platform, a temporary token is created and stored only in your browser (localStorage).
+          It expires automatically after 24 hours. This token is NEVER stored in our database.</p>
+        <p style="margin:10px 0 0"><strong style="color:white">IP Addresses</strong><br>
+          Your IP address is processed by our hosting provider (Render) only for rate limiting (max 10 req/min).
+          It is NOT stored in our database.</p>
+        <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">O Que Armazenamos</strong><br>
+          - Tickets de suporte que você envia, vinculados a um ID de sessão anônimo (ex: guest-a1b2c3d4e5f6)<br>
+          - Métricas de uso: tempo de resposta, categoria, sentimento<br>
+          - Nenhum nome, e-mail ou identificador pessoal é armazenado</p>
+        <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">Token de Sessão (JWT)</strong><br>
+          Ao acessar a plataforma, um token temporário é criado e armazenado apenas no seu navegador (localStorage).
+          Ele expira automaticamente após 24 horas. Este token NUNCA é armazenado em nosso banco de dados.</p>
+        <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">Endereços IP</strong><br>
+          Seu endereço IP é processado pelo provedor de hospedagem (Render) apenas para controle de taxa
+          (máx 10 req/min). NÃO é armazenado em nosso banco de dados.</p>
       </div>
       <div style="margin-bottom:20px">
         <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">How We Use Your Data / Como Usamos Seus Dados</h3>
@@ -2574,8 +2580,13 @@
       </div>
       <div style="margin-bottom:20px">
         <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Data Retention / Retenção de Dados</h3>
-        <p style="margin:0">EN: Demo data is retained for a maximum of 30 days and then permanently deleted. Session tokens expire after 24 hours.</p>
-        <p style="margin:8px 0 0;color:#6B7280;font-style:italic">PT: Dados de demonstração são retidos por no máximo 30 dias e depois excluídos permanentemente. Tokens de sessão expiram após 24 horas.</p>
+        <p style="margin:0"><strong style="color:white">Automatic Data Deletion</strong><br>
+          All ticket data linked to your session is automatically deleted after 24 hours. No manual action required.
+          You can also request immediate deletion by contacting: beatrizcostaleal1996@gmail.com</p>
+        <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">Exclusão Automática de Dados</strong><br>
+          Todos os dados de tickets vinculados à sua sessão são excluídos automaticamente após 24 horas.
+          Nenhuma ação manual é necessária. Você também pode solicitar exclusão imediata pelo e-mail:
+          beatrizcostaleal1996@gmail.com</p>
       </div>
       <div style="margin-bottom:20px">
         <h3 style="color:#E5E7EB;margin:0 0 8px;font-size:14px">Your Rights / Seus Direitos (LGPD Art. 18)</h3>
@@ -3760,14 +3771,17 @@
             </div>
           </div>
           <div style="font-size:11px;font-family:var(--mono);color:var(--muted);">
-            <span id="dataset-mode-label">${state.datasetMode==='live'?'🟢 Live database':'📂 Historical dataset (read-only)'}</span>
+            <span id="dataset-mode-label">${state.datasetMode==='live'?'🟢 Live Mode — your private session':'📂 Demo Dataset — shared read-only data'}</span>
           </div>
         </div>
 
         ${state.datasetMode === 'historical' ? `
-        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:8px 16px;margin-bottom:12px;font-size:12px;color:#A78BFA;font-family:var(--mono);display:flex;align-items:center;gap:8px;">
-          📂 Viewing historical dataset — Live database is unchanged and still accepting tickets
-        </div>` : ''}
+        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#A78BFA;font-family:var(--mono);display:flex;align-items:center;gap:8px;">
+          📂 Demo Dataset — 266 pre-populated tickets generated during development. Read-only. Your new tickets always go to Live mode.
+        </div>` : `
+        <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.18);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#6EE7B7;font-family:var(--mono);display:flex;align-items:center;gap:8px;">
+          🟢 Live Mode — Your private session. Tickets you generate are visible only to you, linked to your anonymous session ID. Data is automatically deleted after 24 hours.
+        </div>`}
 
         <section class="metrics-row">
           ${renderMetricCard(metrics.total, 'Total Tickets', `All time · ${metrics.todayCount} today`)}

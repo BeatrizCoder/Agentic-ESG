@@ -749,6 +749,13 @@ async def get_dataset_mode():
     }
 
 
+@router.post("/api/admin/cleanup")
+async def cleanup_sessions(_=Depends(verify_api_key)):
+    """Delete expired guest session data (>24h). Safe to call via cron/UptimeRobot."""
+    deleted = data_store.cleanup_expired_sessions()
+    return {"deleted": deleted, "message": f"Cleaned up {deleted} expired tickets"}
+
+
 @router.post("/api/admin/seed-historical")
 async def force_seed_historical(_=Depends(verify_api_key)):
     """Force-seed historical_seed.json into Neon (idempotent — safe to call multiple times)."""

@@ -1,6 +1,7 @@
 """JWT guest authentication helpers."""
 
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -15,8 +16,9 @@ security = HTTPBearer(auto_error=False)
 
 
 def create_guest_token() -> str:
+    session_id = f"guest-{uuid.uuid4().hex[:12]}"
     payload = {
-        "sub": "guest@demo.com",
+        "sub": session_id,
         "role": "guest",
         "name": "Demo User",
         "iat": datetime.utcnow(),

@@ -210,6 +210,7 @@ class DataStore:
             self._seed_refunds()
             self._seed_pending_actions()
             self.seed_historical_tickets()
+            self.cleanup_expired_sessions()
             logger.info("Database tables created/verified")
         else:
             os.makedirs(data_dir, exist_ok=True)
@@ -1493,6 +1494,34 @@ class DataStore:
             },
         }
 
+
+    def cleanup_expired_sessions(self) -> int:
+        """Delete guest tickets older than 24 hours. Keeps historical rows."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return 0
+        from sqlalchemy import text as _text
+
+        is_postgres = DATABASE_URL.startswith("postgresql")
+        interval_expr = "NOW() - INTERVAL '24 hours'" if is_postgres else "datetime('now', '-24 hours')"
+
+        try:
+            with self.SessionLocal() as session:
+                result = session.execute(_text(f"""
+                    DELETE FROM support_tickets
+                    WHERE user_id LIKE 'guest-%'
+                      AND (is_historical = FALSE OR is_historical IS NULL)
+                      AND created_at < {interval_expr}
+                """))
+                session.commit()
+                deleted = result.rowcount or 0
+            if deleted > 0:
+                logger.info("Session cleanup: deleted %d expired guest tickets", deleted)
+            else:
+                logger.info("Session cleanup: nothing to delete")
+            return deleted
+        except Exception as e:
+            logger.error("Session cleanup error: %s", e)
+            return 0
 
     def get_ticket_timeline(
         self,
