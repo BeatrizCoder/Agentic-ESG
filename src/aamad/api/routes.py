@@ -894,19 +894,15 @@ async def export_excel(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
-    raw = data_store.get_tickets_filtered(
+    tickets_for_export = data_store.get_tickets_filtered(
         days=days,
         historical_only=historical,
         user_id=user_id if not historical else None,
     )
-    tickets_for_export = raw if raw else (
-        [t.model_dump() if hasattr(t, "model_dump") else t for t in _get_demo_tickets()]
-        if historical else []
-    )
-    metrics = _build_export_metrics(
-        [SupportTicketData(**t) if isinstance(t, dict) else t for t in tickets_for_export],
-        historical,
-    )
+    if not tickets_for_export and historical:
+        tickets_for_export = _get_demo_tickets()
+
+    metrics = _build_export_metrics(tickets_for_export, historical)
     obs = _svc.observability_service.get_summary()
     agent_metrics = _obs_to_agent_list(obs)
 
@@ -915,7 +911,7 @@ async def export_excel(
         else ("All Time" if days == 0 else f"Last {days} Days")
     )
     buffer = generate_excel_report(
-        tickets=tickets_for_export,
+        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets_for_export],
         metrics=metrics,
         agent_metrics=agent_metrics,
         cost_forecast=data_store.get_cost_forecast(historical_only=historical),
@@ -948,19 +944,15 @@ async def export_pdf(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
-    raw = data_store.get_tickets_filtered(
+    tickets_for_export = data_store.get_tickets_filtered(
         days=days,
         historical_only=historical,
         user_id=user_id if not historical else None,
     )
-    tickets_for_export = raw if raw else (
-        [t.model_dump() if hasattr(t, "model_dump") else t for t in _get_demo_tickets()]
-        if historical else []
-    )
-    metrics = _build_export_metrics(
-        [SupportTicketData(**t) if isinstance(t, dict) else t for t in tickets_for_export],
-        historical,
-    )
+    if not tickets_for_export and historical:
+        tickets_for_export = _get_demo_tickets()
+
+    metrics = _build_export_metrics(tickets_for_export, historical)
     obs = _svc.observability_service.get_summary()
     agent_metrics = _obs_to_agent_list(obs)
 
@@ -969,7 +961,7 @@ async def export_pdf(
         else ("All Time" if days == 0 else f"Last {days} Days")
     )
     buffer = generate_pdf_report(
-        tickets=tickets_for_export,
+        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets_for_export],
         metrics=metrics,
         agent_metrics=agent_metrics,
         cost_forecast=data_store.get_cost_forecast(historical_only=historical),

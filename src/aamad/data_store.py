@@ -1545,32 +1545,31 @@ class DataStore:
         days: int = 30,
         historical_only: bool = False,
         user_id: str = None,
-    ) -> list:
-        """Return raw ticket dicts filtered by date range and dataset mode."""
+    ) -> List["SupportTicketData"]:
+        """Return SupportTicketData filtered by date range and dataset mode."""
         if not self.use_database or not SQLALCHEMY_AVAILABLE:
             return []
-        from sqlalchemy import text as _text
-
-        if historical_only:
-            where = "WHERE is_historical = TRUE"
-        elif user_id:
-            where = f"WHERE user_id = '{user_id}' AND (is_historical = FALSE OR is_historical IS NULL)"
-        else:
-            where = "WHERE (is_historical = FALSE OR is_historical IS NULL)"
-
-        is_postgres = DATABASE_URL.startswith("postgresql")
-        if days and days > 0:
-            interval_expr = f"NOW() - INTERVAL '{days} days'" if is_postgres else f"datetime('now', '-{days} days')"
-            date_filter = f"AND created_at >= {interval_expr}"
-        else:
-            date_filter = ""
+        from datetime import timedelta
 
         try:
             with self.SessionLocal() as session:
-                rows = session.execute(
-                    _text(f"SELECT * FROM support_tickets {where} {date_filter} ORDER BY created_at DESC")
-                ).fetchall()
-            return [dict(r._mapping) for r in rows]
+                q = session.query(SupportTicketDB)
+
+                if historical_only:
+                    q = q.filter(SupportTicketDB.is_historical == True)  # noqa: E712
+                else:
+                    q = q.filter(
+                        (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None)  # noqa: E711
+                    )
+                    if user_id:
+                        q = q.filter(SupportTicketDB.user_id == user_id)
+
+                if days and days > 0:
+                    cutoff = datetime.utcnow() - timedelta(days=days)
+                    q = q.filter(SupportTicketDB.created_at >= cutoff)
+
+                db_tickets = q.order_by(SupportTicketDB.created_at.desc()).all()
+                return [self._db_to_pydantic(t) for t in db_tickets]
         except Exception as e:
             logger.error("get_tickets_filtered error: %s", e)
             return []
