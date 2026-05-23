@@ -781,6 +781,22 @@ async def set_dataset_mode(payload: dict, _=Depends(verify_api_key)):
     }
 
 
+@router.get("/api/analytics/timeline")
+async def get_ticket_timeline(
+    days: int = 30,
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+):
+    """Daily ticket counts for the last N days, with zeros for empty days."""
+    historical = _svc.dataset_mode == "historical"
+    user_id = user.get("sub") if user else None
+    return data_store.get_ticket_timeline(
+        days=days,
+        historical_only=historical,
+        user_id=user_id if not historical else None,
+    )
+
+
 @router.get("/api/analytics/resolution-time")
 async def get_resolution_time(_=Depends(verify_api_key)):
     """Average pipeline execution time per category."""
@@ -861,6 +877,7 @@ def _obs_to_agent_list(obs_summary: dict) -> list:
 @router.get("/api/export/excel")
 async def export_excel(
     request: Request,
+    days: int = 30,
     user=Depends(optional_token),
     _=Depends(_verify_export_key),
 ):
@@ -870,18 +887,33 @@ async def export_excel(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
-    tickets = _get_demo_tickets() if historical else data_store.get_user_tickets(user_id)
-    metrics = _build_export_metrics(tickets, historical)
-    obs     = _svc.observability_service.get_summary()
+    raw = data_store.get_tickets_filtered(
+        days=days,
+        historical_only=historical,
+        user_id=user_id if not historical else None,
+    )
+    tickets_for_export = raw if raw else (
+        [t.model_dump() if hasattr(t, "model_dump") else t for t in _get_demo_tickets()]
+        if historical else []
+    )
+    metrics = _build_export_metrics(
+        [SupportTicketData(**t) if isinstance(t, dict) else t for t in tickets_for_export],
+        historical,
+    )
+    obs = _svc.observability_service.get_summary()
     agent_metrics = _obs_to_agent_list(obs)
 
+    period_label = (
+        "Historical Dataset" if historical
+        else ("All Time" if days == 0 else f"Last {days} Days")
+    )
     buffer = generate_excel_report(
-        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets],
+        tickets=tickets_for_export,
         metrics=metrics,
         agent_metrics=agent_metrics,
         cost_forecast=data_store.get_cost_forecast(historical_only=historical),
         resolution_time=data_store.get_resolution_time_by_category(historical_only=historical),
-        period="Historical Dataset" if historical else "My Tickets",
+        period=period_label,
     )
 
     filename = f"agentic_support_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
@@ -899,6 +931,7 @@ async def export_excel(
 @router.get("/api/export/pdf")
 async def export_pdf(
     request: Request,
+    days: int = 30,
     user=Depends(optional_token),
     _=Depends(_verify_export_key),
 ):
@@ -908,18 +941,33 @@ async def export_pdf(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub", "anonymous") if user else "anonymous"
 
-    tickets = _get_demo_tickets() if historical else data_store.get_user_tickets(user_id)
-    metrics = _build_export_metrics(tickets, historical)
-    obs     = _svc.observability_service.get_summary()
+    raw = data_store.get_tickets_filtered(
+        days=days,
+        historical_only=historical,
+        user_id=user_id if not historical else None,
+    )
+    tickets_for_export = raw if raw else (
+        [t.model_dump() if hasattr(t, "model_dump") else t for t in _get_demo_tickets()]
+        if historical else []
+    )
+    metrics = _build_export_metrics(
+        [SupportTicketData(**t) if isinstance(t, dict) else t for t in tickets_for_export],
+        historical,
+    )
+    obs = _svc.observability_service.get_summary()
     agent_metrics = _obs_to_agent_list(obs)
 
+    period_label = (
+        "Historical Dataset" if historical
+        else ("All Time" if days == 0 else f"Last {days} Days")
+    )
     buffer = generate_pdf_report(
-        tickets=[t.model_dump() if hasattr(t, "model_dump") else t for t in tickets],
+        tickets=tickets_for_export,
         metrics=metrics,
         agent_metrics=agent_metrics,
         cost_forecast=data_store.get_cost_forecast(historical_only=historical),
         resolution_time=data_store.get_resolution_time_by_category(historical_only=historical),
-        period="Historical Dataset" if historical else "My Tickets",
+        period=period_label,
     )
 
     filename = f"agentic_support_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"

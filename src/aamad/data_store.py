@@ -1486,5 +1486,87 @@ class DataStore:
         }
 
 
+    def get_ticket_timeline(
+        self,
+        days: int = 30,
+        historical_only: bool = False,
+        user_id: str = None,
+    ) -> list:
+        """Returns ticket count per day for last N days, with zeros for empty days."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        from sqlalchemy import text as _text
+        from datetime import timedelta
+
+        if historical_only:
+            filter_clause = "AND is_historical = TRUE"
+        elif user_id:
+            filter_clause = f"AND user_id = '{user_id}' AND (is_historical = FALSE OR is_historical IS NULL)"
+        else:
+            filter_clause = "AND (is_historical = FALSE OR is_historical IS NULL)"
+
+        is_postgres = DATABASE_URL.startswith("postgresql")
+        interval_expr = f"NOW() - INTERVAL '{days} days'" if is_postgres else f"datetime('now', '-{days} days')"
+
+        try:
+            with self.SessionLocal() as session:
+                rows = session.execute(_text(f"""
+                    SELECT DATE(created_at) AS day, COUNT(*) AS count
+                    FROM support_tickets
+                    WHERE created_at >= {interval_expr}
+                      {filter_clause}
+                    GROUP BY DATE(created_at)
+                    ORDER BY day ASC
+                """)).fetchall()
+        except Exception as e:
+            logger.error("Timeline query error: %s", e)
+            return []
+
+        data_map = {str(r[0]): r[1] for r in rows}
+
+        today = datetime.utcnow().date()
+        result = []
+        for i in range(days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            day_str = str(day)
+            result.append({"date": day_str, "count": data_map.get(day_str, 0)})
+        return result
+
+    def get_tickets_filtered(
+        self,
+        days: int = 30,
+        historical_only: bool = False,
+        user_id: str = None,
+    ) -> list:
+        """Return raw ticket dicts filtered by date range and dataset mode."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        from sqlalchemy import text as _text
+
+        if historical_only:
+            where = "WHERE is_historical = TRUE"
+        elif user_id:
+            where = f"WHERE user_id = '{user_id}' AND (is_historical = FALSE OR is_historical IS NULL)"
+        else:
+            where = "WHERE (is_historical = FALSE OR is_historical IS NULL)"
+
+        is_postgres = DATABASE_URL.startswith("postgresql")
+        if days and days > 0:
+            interval_expr = f"NOW() - INTERVAL '{days} days'" if is_postgres else f"datetime('now', '-{days} days')"
+            date_filter = f"AND created_at >= {interval_expr}"
+        else:
+            date_filter = ""
+
+        try:
+            with self.SessionLocal() as session:
+                rows = session.execute(
+                    _text(f"SELECT * FROM support_tickets {where} {date_filter} ORDER BY created_at DESC")
+                ).fetchall()
+            return [dict(r._mapping) for r in rows]
+        except Exception as e:
+            logger.error("get_tickets_filtered error: %s", e)
+            return []
+
+
 # Global data store instance
 data_store = DataStore()
