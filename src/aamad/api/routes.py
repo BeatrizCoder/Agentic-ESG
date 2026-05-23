@@ -494,13 +494,25 @@ async def get_ticket_trace(
 
 
 @router.get("/api/metrics/summary")
-async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
-    """Aggregate performance metrics across all tickets in current dataset mode."""
-    tickets = (
-        _get_demo_tickets()
-        if _svc.dataset_mode == "historical"
-        else data_store.get_all_tickets()
-    )
+async def get_metrics_summary(
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+) -> Dict[str, Any]:
+    """Aggregate performance metrics — strictly isolated by dataset mode."""
+    historical = _svc.dataset_mode == "historical"
+    user_id = user.get("sub") if user else None
+
+    logger.info("Metrics request: mode=%s user=%s", _svc.dataset_mode, user_id or "none")
+
+    if historical:
+        tickets = _get_demo_tickets()
+        csat_metrics = _get_historical_csat_metrics()
+    else:
+        tickets = data_store.get_live_tickets(user_id=user_id)
+        csat_metrics = data_store.get_csat_metrics(user_id=user_id)
+
+    logger.info("Metrics: %d tickets loaded for mode=%s", len(tickets), _svc.dataset_mode)
+
     if not tickets:
         return {
             "total_runs": 0,
@@ -542,11 +554,6 @@ async def get_metrics_summary(_=Depends(verify_api_key)) -> Dict[str, Any]:
     run_times = [t.execution_time_ms / 1000 for t in tickets if t.execution_time_ms]
     fastest = round(min(run_times), 3) if run_times else 0.0
     slowest = round(max(run_times), 3) if run_times else 0.0
-
-    if _svc.dataset_mode == "historical":
-        csat_metrics = _get_historical_csat_metrics()
-    else:
-        csat_metrics = data_store.get_csat_metrics()
 
     csat_score = csat_metrics["csat_score"]
     helpful_count = csat_metrics["csat_positive"]

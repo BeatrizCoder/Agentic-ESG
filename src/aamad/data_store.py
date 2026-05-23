@@ -1209,11 +1209,17 @@ class DataStore:
             }
 
     def get_all_tickets(self) -> List[SupportTicketData]:
-        """Get all support tickets."""
+        """Get all live (non-historical) support tickets."""
         if self.use_database:
             db = self.SessionLocal()
             try:
-                db_tickets = db.query(SupportTicketDB).all()
+                db_tickets = (
+                    db.query(SupportTicketDB)
+                    .filter(
+                        (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None)  # noqa: E711
+                    )
+                    .all()
+                )
                 return [self._db_to_pydantic(ticket) for ticket in db_tickets]
             except Exception as e:
                 logger.error(f"Database error getting all tickets: {e}")
@@ -1225,14 +1231,30 @@ class DataStore:
             tickets = self._load_tickets()
             return [SupportTicketData(**data) for data in tickets.values()]
 
+    def get_live_tickets(self, user_id: str = None) -> List[SupportTicketData]:
+        """Return live (non-historical) tickets, optionally scoped to a single user."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        with self.SessionLocal() as session:
+            q = session.query(SupportTicketDB).filter(
+                (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None)  # noqa: E711
+            )
+            if user_id:
+                q = q.filter(SupportTicketDB.user_id == user_id)
+            db_tickets = q.order_by(SupportTicketDB.created_at.desc()).all()
+            return [self._db_to_pydantic(t) for t in db_tickets]
+
     def get_user_tickets(self, user_id: str) -> List[SupportTicketData]:
-        """Get tickets for a specific user only."""
+        """Get live tickets for a specific user (never returns historical rows)."""
         if not self.use_database or not SQLALCHEMY_AVAILABLE:
             return []
         with self.SessionLocal() as session:
             db_tickets = (
                 session.query(SupportTicketDB)
                 .filter(SupportTicketDB.user_id == user_id)
+                .filter(
+                    (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None)  # noqa: E711
+                )
                 .order_by(SupportTicketDB.created_at.desc())
                 .all()
             )
@@ -1255,8 +1277,8 @@ class DataStore:
             all_tickets = self.get_all_tickets()
             return [ticket for ticket in all_tickets if ticket.status == status]
 
-    def get_csat_metrics(self) -> Dict[str, Any]:
-        """Calculate CSAT via raw SQL, handling both JSON-dict and plain-string feedback."""
+    def get_csat_metrics(self, user_id: str = None) -> Dict[str, Any]:
+        """Calculate CSAT for live tickets, optionally scoped to a single user."""
         import json as _json
         from sqlalchemy import text as _text
 
@@ -1270,33 +1292,19 @@ class DataStore:
             if is_postgres
             else "AND CAST(feedback AS TEXT) != 'null' AND CAST(feedback AS TEXT) != '\"\"'"
         )
+        # Always exclude historical tickets from live CSAT
+        hist_exclude = "AND (is_historical = FALSE OR is_historical IS NULL)"
+        user_filter = f"AND user_id = '{user_id}'" if user_id else ""
 
         try:
             with self.SessionLocal() as session:
-                # STEP 2 — unfiltered count to catch filter bugs
-                all_rows = session.execute(
-                    _text("SELECT feedback FROM support_tickets")
-                ).fetchall()
-                logger.info("CSAT debug ALL rows (no filter): %d", len(all_rows))
-                for i, row in enumerate(all_rows):
-                    logger.info(
-                        "CSAT all[%d]: type=%s repr=%s",
-                        i, type(row[0]).__name__, repr(row[0]),
-                    )
-
-                # STEP 1 — filtered query used for real calculation
                 feedback_data = session.execute(
                     _text(
                         f"SELECT feedback FROM support_tickets "
-                        f"WHERE feedback IS NOT NULL {null_filter}"
+                        f"WHERE feedback IS NOT NULL {null_filter} {hist_exclude} {user_filter}"
                     )
                 ).fetchall()
-                logger.info("CSAT debug filtered rows: %d", len(feedback_data))
-                for i, row in enumerate(feedback_data):
-                    logger.info(
-                        "CSAT filtered[%d]: type=%s repr=%s",
-                        i, type(row[0]).__name__, repr(row[0]),
-                    )
+                logger.info("CSAT: %d feedback rows (user=%s)", len(feedback_data), user_id or "all-live")
         except Exception as e:
             logger.error("CSAT query error: %s", e)
             return empty
