@@ -150,9 +150,19 @@ def _get_demo_tickets() -> List[SupportTicketData]:
         try:
             with open(seed_json, encoding="utf-8") as f:
                 raw = _json.load(f)
-            return _rows_to_tickets(raw)
+            if raw:
+                return _rows_to_tickets(raw)
         except Exception as _e:
             logger.error("Error reading historical_seed.json: %s", _e)
+
+    # Fallback: read is_historical=TRUE rows from Neon
+    try:
+        neon_tickets = data_store.get_historical_tickets()
+        if neon_tickets:
+            logger.info("_get_demo_tickets: loaded %d historical tickets from Neon", len(neon_tickets))
+            return neon_tickets
+    except Exception as _e:
+        logger.error("Error reading historical tickets from Neon: %s", _e)
 
     return []
 

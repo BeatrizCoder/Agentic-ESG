@@ -6714,12 +6714,16 @@
       };
       let totalNotHelpful = 0;
       for (const ticket of (tickets || [])) {
-        const fb = ticket.feedback || {};
-        if (fb.helpful === false) {
+        const fb = ticket.feedback;
+        // feedback stored as "negative" (string) or {value:"negative", reason:"..."} (object)
+        const isNotHelpful = fb === 'negative' || (fb && fb.value === 'negative') || (fb && fb.helpful === false);
+        if (isNotHelpful) {
           totalNotHelpful++;
-          const match = (fb.comments || '').match(/Reason:\s*([a-z_]+)/i);
-          const rawKey = match ? match[1] : 'not_specified';
-          const key = KEY_ALIASES[rawKey] || rawKey;
+          // reason stored in fb.reason (object form) or parsed from fb.comments (legacy)
+          const rawReason = (fb && fb.reason)
+            || ((fb && fb.comments || '').match(/Reason:\s*([a-z_]+)/i) || [])[1]
+            || 'not_specified';
+          const key = KEY_ALIASES[rawReason.toLowerCase()] || rawReason.toLowerCase();
           if (nhReasons[key]) nhReasons[key].count++;
           else nhReasons.other.count++;
         }

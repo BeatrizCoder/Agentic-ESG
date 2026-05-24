@@ -1164,6 +1164,7 @@ class DataStore:
             )
 
             # Per-agent metrics
+            from sqlalchemy import case as _case
             rows = session.query(
                 ObservabilityEventDB.agent_name,
                 ObservabilityEventDB.tool_name,
@@ -1171,6 +1172,10 @@ class DataStore:
                 func.avg(ObservabilityEventDB.latency_ms).label("avg_latency"),
                 func.sum(ObservabilityEventDB.total_tokens).label("total_tokens"),
                 func.sum(ObservabilityEventDB.cost_usd).label("total_cost"),
+                func.sum(_case(
+                    (ObservabilityEventDB.execution_mode == "llm", 1),
+                    else_=0,
+                )).label("llm_calls"),
             ).group_by(
                 ObservabilityEventDB.agent_name, ObservabilityEventDB.tool_name
             ).all()
@@ -1184,6 +1189,7 @@ class DataStore:
                     "avg_latency_ms": round(row.avg_latency or 0, 2),
                     "total_tokens": row.total_tokens or 0,
                     "total_cost_usd": round(row.total_cost or 0, 6),
+                    "llm_calls": int(row.llm_calls or 0),
                 }
                 if row.tool_name:
                     tool_usage[row.tool_name] = (
@@ -1208,6 +1214,19 @@ class DataStore:
                 "agent_performance": agent_performance,
                 "tool_usage": tool_usage,
             }
+
+    def get_historical_tickets(self) -> List[SupportTicketData]:
+        """Return all is_historical=TRUE rows from Neon."""
+        if not self.use_database or not SQLALCHEMY_AVAILABLE:
+            return []
+        with self.SessionLocal() as session:
+            db_tickets = (
+                session.query(SupportTicketDB)
+                .filter(SupportTicketDB.is_historical == True)  # noqa: E712
+                .order_by(SupportTicketDB.created_at.desc())
+                .all()
+            )
+            return [self._db_to_pydantic(t) for t in db_tickets]
 
     def get_all_tickets(self) -> List[SupportTicketData]:
         """Get all live (non-historical) support tickets."""
