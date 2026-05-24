@@ -2820,30 +2820,6 @@
           </div>
         </div>
 
-        ${state.view === 'operator' ? `
-        <div class="sidebar-section sidebar-config">
-          <div class="toggle-group">
-            <div>
-              <div class="input-label">Use FastAPI Backend</div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="backendToggle" ${state.useBackend ? 'checked' : ''} />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div>
-            <div class="input-label">Backend URL</div>
-            <input id="backendUrlInput" class="sidebar-input" value="${state.backendUrl}" />
-          </div>
-          <div>
-            <div class="input-label">API Key</div>
-            <input id="apiKeyInput" class="sidebar-input" type="password" value="${state.apiKey}" />
-          </div>
-          <div>
-            <span class="badge">${state.useBackend ? 'online' : 'offline mode'}</span>
-          </div>
-        </div>
-        ` : ''}
 
         ${state.view === 'operator' ? `
         <div style="padding-top:16px;">
@@ -2869,6 +2845,27 @@
             <button id="btn-list-backups" style="padding:8px 12px;font-size:11px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);color:#38BDF8;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">📦 View Backups</button>
             <button id="btn-load-209" style="padding:8px 12px;font-size:11px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">📂 Load Dev Data (209 tickets)</button>
             <button id="btn-load-clean" style="padding:8px 12px;font-size:11px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981;border-radius:6px;cursor:pointer;font-family:var(--mono);text-align:left;">✨ Load Clean Demo State</button>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+              <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:6px;">Backend Config</div>
+              <div class="toggle-group" style="margin-bottom:6px;">
+                <div><div class="input-label" style="font-size:11px;">Use FastAPI Backend</div></div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="backendToggle" ${state.useBackend ? 'checked' : ''} />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div style="margin-bottom:6px;">
+                <div class="input-label" style="font-size:11px;">Backend URL</div>
+                <input id="backendUrlInput" class="sidebar-input" value="${state.backendUrl}" />
+              </div>
+              <div style="margin-bottom:6px;">
+                <div class="input-label" style="font-size:11px;">API Key</div>
+                <input id="apiKeyInput" class="sidebar-input" type="password" value="${state.apiKey}" />
+              </div>
+              <div>
+                <span class="badge">${state.useBackend ? 'online' : 'offline mode'}</span>
+              </div>
+            </div>
           </div>
         </details>
         ` : `
