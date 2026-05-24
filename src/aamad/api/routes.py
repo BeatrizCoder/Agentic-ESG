@@ -502,7 +502,7 @@ async def get_metrics_summary(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub") if user else None
 
-    logger.info("Metrics request: mode=%s user=%s", _svc.dataset_mode, user_id or "none")
+    logger.info("Metrics: mode=%s user_id=%s", _svc.dataset_mode, user_id)
 
     if historical:
         tickets = _get_demo_tickets()

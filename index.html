@@ -2808,10 +2808,13 @@
             <span class="metric-value" style="font-size:1.2rem;">
               ${(() => {
                 const c = state.csatMetrics;
-                const total = c?.total_feedback ?? 0;
-                if (!c || !c.csat_score || total === 0) return '<span style="font-size:0.9rem;color:var(--muted);">--</span>';
-                const emoji = c.csat_score >= 80 ? '😊' : c.csat_score >= 50 ? '😐' : '😞';
-                return `${emoji} ${c.csat_score}% <span style="font-size:0.7rem;color:var(--muted);display:block;">Based on ${total} responses</span>`;
+                const hasFeedback = (c?.total_feedback || 0) > 0;
+                const csat = hasFeedback ? c.csat_score : null;
+                const csatDisplay = csat !== null ? `${csat.toFixed(1)}%` : '--';
+                const csatSubtext = hasFeedback ? `Based on ${c.total_feedback} responses` : 'No feedback yet';
+                if (csat === null) return `<span style="font-size:0.9rem;color:var(--muted);">--</span><span style="font-size:0.7rem;color:var(--muted);display:block;">${csatSubtext}</span>`;
+                const emoji = csat >= 80 ? '😊' : csat >= 50 ? '😐' : '😞';
+                return `${emoji} ${csatDisplay} <span style="font-size:0.7rem;color:var(--muted);display:block;">${csatSubtext}</span>`;
               })()}
             </span>
           </div>
@@ -8007,7 +8010,12 @@
           return;
         }
         const data = await resp.json();
-        console.log('Metrics loaded:', { csat: data.csat_score, total: data.total_runs });
+        console.log('Metrics received:', {
+          mode: state.datasetMode,
+          csat_score: data.csat_score,
+          total_feedback: data.total_feedback,
+          total_runs: data.total_runs
+        });
         state.perfMetrics = data;
         state.csatMetrics = data;
         render();
@@ -8415,7 +8423,12 @@
     }
 
     function acceptDoc(type) {
+      if (type !== 'terms' && type !== 'privacy') {
+        console.error('Invalid type:', type);
+        return;
+      }
       _accepted[type] = true;
+      console.log('Accepted:', type, _accepted);
       const checkEl = document.getElementById(`${type}-check`);
       const rowEl = document.getElementById(`${type}-row`);
       if (checkEl) {
@@ -8440,14 +8453,27 @@
     function updateLoginButton() {
       const btn = document.getElementById('btn-guest-login');
       if (!btn) return;
-      const allAccepted = _accepted.terms && _accepted.privacy;
-      btn.disabled = !allAccepted;
-      btn.style.opacity = allAccepted ? '1' : '0.4';
-      btn.style.cursor = allAccepted ? 'pointer' : 'not-allowed';
+      const bothAccepted = (
+        _accepted.terms === true &&
+        _accepted.privacy === true
+      );
+      console.log('updateLoginButton:', {
+        terms: _accepted.terms,
+        privacy: _accepted.privacy,
+        bothAccepted
+      });
+      btn.disabled = !bothAccepted;
+      btn.style.opacity = bothAccepted ? '1' : '0.4';
+      btn.style.cursor = bothAccepted ? 'pointer' : 'not-allowed';
+      btn.style.pointerEvents = bothAccepted ? 'auto' : 'none';
     }
 
     async function guestLogin() {
-      if (!_accepted.terms || !_accepted.privacy) return;
+      if (_accepted.terms !== true || _accepted.privacy !== true) {
+        console.error('Terms not fully accepted!');
+        showToastLogin('Please accept both T&C and Privacy Policy');
+        return;
+      }
       const btn = document.getElementById('btn-guest-login');
       if (btn) { btn.textContent = '⏳ Entering... / Entrando...'; btn.disabled = true; btn.style.cursor = 'not-allowed'; }
       try {
@@ -8550,6 +8576,13 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       await checkAuth();
+      document.getElementById('btn-guest-login')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (_accepted.terms !== true || _accepted.privacy !== true) return;
+          guestLogin();
+        }
+      });
     });
   </script>
 </body>
