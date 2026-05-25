@@ -15,13 +15,16 @@ from pydantic import BaseModel
 from ..config import ENABLE_MOCK_INTEGRATIONS
 from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS, INTERNAL_API_KEY
 from ..core import services as _svc
-from ..data_store import data_store, SupportTicketData, SupportTicketDB
+from ..data_store import data_store, SupportTicketData
 from ..flow.support_flow import SupportFlow
 from ..auth import create_guest_token, verify_token, optional_token
 from .models import (
     FeedbackRequest, RunMetrics, StatusResponse,
     StepsResponse, SupportResponse, SupportTicket, TraceResponse,
 )
+
+logger = logging.getLogger(__name__)
+
 try:
     from ..exports.excel_export import generate_excel_report
     from ..exports.pdf_export import generate_pdf_report
@@ -29,8 +32,6 @@ try:
 except ImportError as _exc:
     logger.warning("Export dependencies not available (%s). Install openpyxl and reportlab.", _exc)
     _EXPORTS_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

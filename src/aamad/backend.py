@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.requests import Request
+from starlette.responses import Response
 
 from .core.config import limiter
 from .core import services as _svc  # noqa: F401 — triggers singleton initialization
@@ -31,6 +33,22 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key", "Authorization"],
     expose_headers=["Content-Disposition"],
 )
+
+
+@app.middleware("http")
+async def _add_cors_headers(request: Request, call_next):
+    origin = request.headers.get("origin")
+    response = await call_next(request)
+
+    response.headers["access-control-allow-origin"] = origin or "*"
+    response.headers["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS"
+    response.headers["access-control-allow-headers"] = "Content-Type, X-API-Key, Authorization"
+    response.headers["access-control-expose-headers"] = "Content-Disposition"
+
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=dict(response.headers))
+
+    return response
 
 app.include_router(router)
 
