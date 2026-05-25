@@ -8517,20 +8517,51 @@
 
     async function checkAuth() {
       const token = localStorage.getItem('jwt_token');
+      console.log('checkAuth: token exists?', !!token);
       if (!token) { showLoginScreen(); return; }
       try {
-        const baseUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : 'http://localhost:8000').replace('/api/support', '');
-        const res = await fetch(`${baseUrl}/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const isLocal = (
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1'
+        );
+        const backendBase = isLocal
+          ? 'http://localhost:8000'
+          : 'https://web-production-126e2.up.railway.app';
+        console.log('checkAuth: calling', backendBase + '/auth/me');
+        const res = await fetch(`${backendBase}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        console.log('checkAuth: /auth/me status', res.status);
         if (res.ok) {
           const user = await res.json();
-          if (typeof state !== 'undefined') { state.authenticated = true; state.jwtToken = token; state.currentUser = user; }
+          console.log('checkAuth: valid session', user);
+          state.authenticated = true;
+          state.jwtToken = token;
+          state.currentUser = user;
           hideLoginScreen();
+          if (typeof loadTicketsFromDB === 'function') await loadTicketsFromDB();
+          if (typeof loadMetrics === 'function') await loadMetrics();
+          if (typeof render === 'function') render();
         } else {
+          console.log('checkAuth: invalid token, showing login');
           localStorage.removeItem('jwt_token');
           showLoginScreen();
         }
-      } catch {
-        showLoginScreen();
+      } catch (e) {
+        console.error('checkAuth error:', e.message);
+        // Don't remove token on network error — backend may be cold-starting
+        if (token) {
+          console.log('checkAuth: network error but token exists, trying to continue');
+          state.authenticated = true;
+          state.jwtToken = token;
+          hideLoginScreen();
+          if (typeof render === 'function') render();
+        } else {
+          showLoginScreen();
+        }
       }
     }
 
