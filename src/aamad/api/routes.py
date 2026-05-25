@@ -510,9 +510,9 @@ async def get_metrics_summary(
 ) -> Dict[str, Any]:
     """Aggregate performance metrics — strictly isolated by dataset mode."""
     historical = _svc.dataset_mode == "historical"
-    user_id = user.get("sub") if user else None
+    user_id = user.get("sub") if user else "anonymous"
 
-    logger.info("Metrics: mode=%s user_id=%s", _svc.dataset_mode, user_id)
+    logger.info("GET /metrics/summary: mode=%s user_id=%s", _svc.dataset_mode, user_id)
 
     if historical:
         tickets = _get_demo_tickets()
@@ -571,6 +571,11 @@ async def get_metrics_summary(
     total_feedback = csat_metrics["total_feedback"]
 
     obs_summary = _svc.observability_service.get_summary()
+
+    logger.info(
+        "Metrics result: total=%s csat=%s feedback=%s",
+        total, csat_score, total_feedback,
+    )
 
     return {
         "total_runs": total,

@@ -8428,8 +8428,9 @@
         console.error('Invalid type:', type);
         return;
       }
+      console.log('acceptDoc called:', type, 'before:', {..._accepted});
       _accepted[type] = true;
-      console.log('Accepted:', type, _accepted);
+      console.log('acceptDoc after:', {..._accepted});
       const checkEl = document.getElementById(`${type}-check`);
       const rowEl = document.getElementById(`${type}-row`);
       if (checkEl) {
@@ -8470,8 +8471,9 @@
     }
 
     async function guestLogin() {
+      console.log('guestLogin called, accepted:', {..._accepted});
       if (_accepted.terms !== true || _accepted.privacy !== true) {
-        console.error('Terms not fully accepted!');
+        console.error('NOT FULLY ACCEPTED - blocking!', {..._accepted});
         showToastLogin('Please accept both T&C and Privacy Policy');
         return;
       }
