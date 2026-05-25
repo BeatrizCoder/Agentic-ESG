@@ -291,10 +291,6 @@ class DataStore:
 
         logger.info("Historical tickets in DB: %d", count)
 
-        if count > 0:
-            logger.info("Already seeded — skipping")
-            return count
-
         seed_path = _Path("src/aamad/data/historical_seed.json")
         logger.info("Seed file exists: %s", seed_path.exists())
         logger.info("Seed file path: %s", seed_path.absolute())

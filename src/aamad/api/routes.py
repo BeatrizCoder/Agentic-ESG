@@ -512,7 +512,7 @@ async def get_metrics_summary(
     historical = _svc.dataset_mode == "historical"
     user_id = user.get("sub") if user else "anonymous"
 
-    logger.info("GET /metrics/summary: mode=%s user_id=%s", _svc.dataset_mode, user_id)
+    logger.info("GET /metrics/summary: mode=%s user_id=%s has_jwt=%s", _svc.dataset_mode, user_id, bool(user))
 
     if historical:
         tickets = _get_demo_tickets()
@@ -520,6 +520,7 @@ async def get_metrics_summary(
     else:
         tickets = data_store.get_live_tickets(user_id=user_id)
         csat_metrics = data_store.get_csat_metrics(user_id=user_id)
+        logger.info("Live metrics: tickets=%d csat=%s feedback=%s", len(tickets), csat_metrics.get("csat_score"), csat_metrics.get("total_feedback"))
 
     logger.info("Metrics: %d tickets loaded for mode=%s", len(tickets), _svc.dataset_mode)
 

@@ -8005,7 +8005,13 @@
       if (!state.useBackend) return;
       try {
         const metricsUrl = state.backendUrl.replace('/api/support', '/api/metrics/summary');
-        const resp = await fetch(metricsUrl, { headers: { 'X-API-Key': getApiKey() } });
+        const jwt = state.jwtToken || localStorage.getItem('jwt_token') || '';
+        const resp = await fetch(metricsUrl, {
+          headers: {
+            'X-API-Key': getApiKey(),
+            ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {}),
+          }
+        });
         if (!resp.ok) {
           console.warn('Metrics fetch failed:', resp.status);
           return;
