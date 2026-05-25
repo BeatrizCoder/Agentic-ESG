@@ -8552,16 +8552,9 @@
         }
       } catch (e) {
         console.error('checkAuth error:', e.message);
-        // Don't remove token on network error — backend may be cold-starting
-        if (token) {
-          console.log('checkAuth: network error but token exists, trying to continue');
-          state.authenticated = true;
-          state.jwtToken = token;
-          hideLoginScreen();
-          if (typeof render === 'function') render();
-        } else {
-          showLoginScreen();
-        }
+        // Network error — keep token (backend may be cold-starting) but require re-login
+        // Never bypass T&C acceptance on network failure
+        showLoginScreen();
       }
     }
 
