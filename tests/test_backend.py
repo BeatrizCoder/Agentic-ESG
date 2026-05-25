@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from aamad.backend import SupportFlow, SupportTicket, SupportState, data_store, SupportTicketData
+from fastapi.testclient import TestClient
+
+from aamad.backend import SupportFlow, SupportTicket, SupportState, data_store, SupportTicketData, app
 from aamad.integrations.ticketing_client import TicketingClient
 from aamad.integrations.crm_client import CRMClient
 from aamad.integrations.notification_client import NotificationClient
@@ -108,6 +110,28 @@ def test_mock_ticketing_client():
     update_result = client.update_ticket_status(external_id, "resolved")
     assert update_result["success"] is True
     assert update_result["status"] == "resolved"
+
+
+def test_support_endpoint_falls_back_when_flow_raises(monkeypatch):
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("simulated flow failure")
+
+    monkeypatch.setattr("aamad.api.routes.SupportFlow.kickoff_async", _boom)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/support",
+        json={"inquiry": "Test fallback response"},
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["inquiry"] == "Test fallback response"
+    assert payload["category"] == "General Support"
+    assert payload["response_confidence"] == 50
+    assert payload["reference_id"].startswith("REF-")
+    assert payload["execution_mode"] == "fallback"
 
 
 def test_mock_crm_client():

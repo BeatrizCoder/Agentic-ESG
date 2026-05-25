@@ -36,6 +36,98 @@ except ImportError as _exc:
 router = APIRouter()
 
 
+def _fallback_ticket_data(inquiry: str, error: Exception, started_at: float) -> SupportTicketData:
+    """Create a minimal fallback ticket payload when the support flow fails."""
+    now = datetime.now().isoformat()
+    wall_time = round(time.time() - started_at, 3)
+    reference_id = f"REF-{int(time.time())}"
+    run_id = str(uuid.uuid4())
+    return SupportTicketData(
+        reference_id=reference_id,
+        inquiry=inquiry,
+        category="General Support",
+        category_confidence=55,
+        sentiment="Neutral",
+        sentiment_confidence=55,
+        urgency="Low",
+        articles=[],
+        response=(
+            "Thanks for your message. We received your request and are working to restore "
+            "the support service. If you need immediate help, please try again in a moment."
+        ),
+        response_confidence=50,
+        escalation_required=False,
+        escalation_reason="Support service fallback response.",
+        triggered_keyword=None,
+        steps=[
+            {
+                "agent": "Fallback",
+                "timestamp": now,
+                "details": {
+                    "error": str(error),
+                    "mode": "fallback",
+                },
+            }
+        ],
+        knowledge_source="fallback",
+        memory_saved=False,
+        execution_mode="fallback",
+        prompt_template_used=None,
+        skills_used=[],
+        tools_used=[],
+        cache_used=False,
+        status="completed",
+        created_at=now,
+        updated_at=now,
+        feedback=None,
+        run_id=run_id,
+        execution_time_ms=int(wall_time * 1000),
+        wall_time_sec=wall_time,
+        token_usage={},
+        cost_usd=0.0,
+        api_tags=[],
+        quality_evaluation={},
+        pending_action={},
+        user_id="anonymous",
+    )
+
+
+def _fallback_support_response(ticket_data: SupportTicketData) -> SupportResponse:
+    return SupportResponse(
+        inquiry=ticket_data.inquiry,
+        category=ticket_data.category,
+        category_confidence=ticket_data.category_confidence,
+        sentiment=ticket_data.sentiment,
+        sentiment_confidence=ticket_data.sentiment_confidence,
+        urgency=ticket_data.urgency,
+        articles=ticket_data.articles,
+        response=ticket_data.response,
+        response_confidence=ticket_data.response_confidence,
+        escalation_required=ticket_data.escalation_required,
+        escalation_reason=ticket_data.escalation_reason,
+        reference_id=ticket_data.reference_id,
+        triggered_keyword=ticket_data.triggered_keyword,
+        steps=ticket_data.steps,
+        knowledge_source=ticket_data.knowledge_source,
+        memory_saved=ticket_data.memory_saved,
+        execution_mode=ticket_data.execution_mode,
+        prompt_template_used=ticket_data.prompt_template_used,
+        skills_used=ticket_data.skills_used,
+        tools_used=ticket_data.tools_used,
+        cache_used=ticket_data.cache_used,
+        run_id=ticket_data.run_id,
+        wall_time_sec=ticket_data.wall_time_sec,
+        token_usage=ticket_data.token_usage,
+        cost_usd=ticket_data.cost_usd,
+        routing_action="resolve",
+        routing_reason="fallback",
+        routing_missing_info=[],
+        api_tags=ticket_data.api_tags,
+        quality_evaluation=ticket_data.quality_evaluation,
+        pending_action=ticket_data.pending_action,
+    )
+
+
 async def _verify_export_key(
     request: Request,
     api_key: str = Query(default=None),
@@ -307,150 +399,170 @@ async def create_support_ticket(
     run_id = str(uuid.uuid4())
     start_time = time.time()
 
-    # Process the support request through the CrewAI flow
-    support_flow = SupportFlow()
-    await support_flow.kickoff_async({"inquiry": inquiry, "run_id": run_id})
-    # Unwrap the StateProxy so Pydantic/pydantic-core sees real Python lists,
-    # not LockedListProxy (whose C-level list buffer is always empty).
-    final_state = support_flow.state._unwrap()
+    try:
+        # Process the support request through the CrewAI flow
+        support_flow = SupportFlow()
+        await support_flow.kickoff_async({"inquiry": inquiry, "run_id": run_id})
+        # Unwrap the StateProxy so Pydantic/pydantic-core sees real Python lists,
+        # not LockedListProxy (whose C-level list buffer is always empty).
+        final_state = support_flow.state._unwrap()
 
-    wall_time = round(time.time() - start_time, 3)
-    execution_time_ms = int(wall_time * 1000)
+        wall_time = round(time.time() - start_time, 3)
+        execution_time_ms = int(wall_time * 1000)
 
-    # Generate reference ID
-    reference_id = (
-        final_state.reference_id
-        if final_state.escalation_required
-        else f"REF-{int(time.time())}"
-    )
+        # Generate reference ID
+        reference_id = (
+            final_state.reference_id
+            if final_state.escalation_required
+            else f"REF-{int(time.time())}"
+        )
 
-    # Determine status based on routing action and escalation
-    if final_state.routing_action == "awaiting":
-        status = "awaiting_customer_info"
-    elif final_state.escalation_required:
-        status = "pending_human_review"
-    else:
-        status = "completed"
+        # Determine status based on routing action and escalation
+        if final_state.routing_action == "awaiting":
+            status = "awaiting_customer_info"
+        elif final_state.escalation_required:
+            status = "pending_human_review"
+        else:
+            status = "completed"
 
-    # Capture RunMetrics and store in shared metrics_store
-    metrics = RunMetrics(
-        run_id=run_id,
-        reference_id=reference_id,
-        status=status,
-        started_at=start_time,
-        finished_at=time.time(),
-        wall_time_sec=wall_time,
-        step_count=len(final_state.steps),
-        tool_latency_ms={
-            step["agent"]: step.get("elapsed_ms", 0)
-            for step in final_state.steps
-        },
-        token_usage={},
-        success_rate=1.0 if not final_state.escalation_required else 0.8,
-    )
-    _svc.metrics_store[reference_id] = metrics
+        # Capture RunMetrics and store in shared metrics_store
+        metrics = RunMetrics(
+            run_id=run_id,
+            reference_id=reference_id,
+            status=status,
+            started_at=start_time,
+            finished_at=time.time(),
+            wall_time_sec=wall_time,
+            step_count=len(final_state.steps),
+            tool_latency_ms={
+                step["agent"]: step.get("elapsed_ms", 0)
+                for step in final_state.steps
+            },
+            token_usage={},
+            success_rate=1.0 if not final_state.escalation_required else 0.8,
+        )
+        _svc.metrics_store[reference_id] = metrics
 
-    # Create ticket data for persistence
-    ticket_data = SupportTicketData(
-        reference_id=reference_id,
-        inquiry=inquiry,
-        category=final_state.category,
-        category_confidence=final_state.category_confidence,
-        sentiment=final_state.sentiment,
-        sentiment_confidence=final_state.sentiment_confidence,
-        urgency=final_state.urgency,
-        articles=final_state.articles,
-        response=final_state.response,
-        response_confidence=final_state.response_confidence,
-        escalation_required=final_state.escalation_required,
-        escalation_reason=final_state.escalation_reason,
-        triggered_keyword=final_state.triggered_keyword,
-        steps=final_state.steps,
-        knowledge_source=final_state.knowledge_source,
-        memory_saved=final_state.memory_saved,
-        execution_mode=final_state.execution_mode,
-        prompt_template_used=final_state.prompt_template_used,
-        skills_used=final_state.skills_used,
-        tools_used=final_state.tools_used,
-        cache_used=final_state.cache_used,
-        status=status,
-        created_at=datetime.now().isoformat(),
-        updated_at=datetime.now().isoformat(),
-        run_id=run_id,
-        execution_time_ms=execution_time_ms,
-        wall_time_sec=wall_time,
-        token_usage=final_state.token_usage,
-        cost_usd=final_state.cost_usd,
-        api_tags=final_state.api_tags,
-        quality_evaluation=final_state.quality_evaluation or {},
-        pending_action=final_state.pending_action or {},
-        user_id=user_id,
-    )
+        # Create ticket data for persistence
+        ticket_data = SupportTicketData(
+            reference_id=reference_id,
+            inquiry=inquiry,
+            category=final_state.category,
+            category_confidence=final_state.category_confidence,
+            sentiment=final_state.sentiment,
+            sentiment_confidence=final_state.sentiment_confidence,
+            urgency=final_state.urgency,
+            articles=final_state.articles,
+            response=final_state.response,
+            response_confidence=final_state.response_confidence,
+            escalation_required=final_state.escalation_required,
+            escalation_reason=final_state.escalation_reason,
+            triggered_keyword=final_state.triggered_keyword,
+            steps=final_state.steps,
+            knowledge_source=final_state.knowledge_source,
+            memory_saved=final_state.memory_saved,
+            execution_mode=final_state.execution_mode,
+            prompt_template_used=final_state.prompt_template_used,
+            skills_used=final_state.skills_used,
+            tools_used=final_state.tools_used,
+            cache_used=final_state.cache_used,
+            status=status,
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            run_id=run_id,
+            execution_time_ms=execution_time_ms,
+            wall_time_sec=wall_time,
+            token_usage=final_state.token_usage,
+            cost_usd=final_state.cost_usd,
+            api_tags=final_state.api_tags,
+            quality_evaluation=final_state.quality_evaluation or {},
+            pending_action=final_state.pending_action or {},
+            user_id=user_id,
+        )
 
-    # Save to data store
-    data_store.save_ticket(ticket_data)
-
-    # Write per-ticket observability summary to SQLite
-    _svc.observability_service.finalize_ticket(
-        reference_id=reference_id,
-        wall_time_sec=wall_time,
-        quality_evaluation=final_state.quality_evaluation or {},
-    )
-
-    # Handle integrations if enabled
-    if ENABLE_MOCK_INTEGRATIONS:
         try:
-            if final_state.escalation_required:
-                _svc.ticketing_client.create_ticket({
-                    "inquiry": inquiry,
-                    "category": final_state.category,
-                    "urgency": final_state.urgency,
-                    "reference_id": reference_id,
-                })
-                _svc.notification_client.send_support_notification(
-                    "support@company.com",
+            # Save to data store
+            data_store.save_ticket(ticket_data)
+
+            # Write per-ticket observability summary to SQLite
+            _svc.observability_service.finalize_ticket(
+                reference_id=reference_id,
+                wall_time_sec=wall_time,
+                quality_evaluation=final_state.quality_evaluation or {},
+            )
+        except Exception:
+            logger.exception("Failed to persist support ticket for reference_id=%s", reference_id)
+
+        # Handle integrations if enabled
+        if ENABLE_MOCK_INTEGRATIONS:
+            try:
+                if final_state.escalation_required:
+                    _svc.ticketing_client.create_ticket({
+                        "inquiry": inquiry,
+                        "category": final_state.category,
+                        "urgency": final_state.urgency,
+                        "reference_id": reference_id,
+                    })
+                    _svc.notification_client.send_support_notification(
+                        "support@company.com",
+                        ticket_data.model_dump(),
+                    )
+                _svc.notification_client.send_customer_notification(
+                    "customer@example.com",
                     ticket_data.model_dump(),
                 )
-            _svc.notification_client.send_customer_notification(
-                "customer@example.com",
-                ticket_data.model_dump(),
-            )
-        except Exception as e:
-            logger.error("Integration error: %s", e)
+            except Exception as e:
+                logger.error("Integration error: %s", e)
 
-    return SupportResponse(
-        inquiry=inquiry,
-        category=final_state.category,
-        category_confidence=final_state.category_confidence,
-        sentiment=final_state.sentiment,
-        sentiment_confidence=final_state.sentiment_confidence,
-        urgency=final_state.urgency,
-        articles=final_state.articles,
-        response=final_state.response,
-        response_confidence=final_state.response_confidence,
-        escalation_required=final_state.escalation_required,
-        escalation_reason=final_state.escalation_reason,
-        reference_id=reference_id,
-        triggered_keyword=final_state.triggered_keyword,
-        steps=final_state.steps,
-        knowledge_source=final_state.knowledge_source,
-        memory_saved=final_state.memory_saved,
-        execution_mode=final_state.execution_mode,
-        prompt_template_used=final_state.prompt_template_used,
-        tools_used=final_state.tools_used,
-        skills_used=final_state.skills_used,
-        cache_used=final_state.cache_used,
-        run_id=run_id,
-        wall_time_sec=wall_time,
-        token_usage=final_state.token_usage or None,
-        cost_usd=final_state.cost_usd or None,
-        routing_action=final_state.routing_action or None,
-        routing_reason=final_state.routing_reason or None,
-        routing_missing_info=final_state.routing_missing_info or None,
-        api_tags=final_state.api_tags or None,
-        quality_evaluation=final_state.quality_evaluation or None,
-        pending_action=final_state.pending_action or None,
-    )
+        return SupportResponse(
+            inquiry=inquiry,
+            category=final_state.category,
+            category_confidence=final_state.category_confidence,
+            sentiment=final_state.sentiment,
+            sentiment_confidence=final_state.sentiment_confidence,
+            urgency=final_state.urgency,
+            articles=final_state.articles,
+            response=final_state.response,
+            response_confidence=final_state.response_confidence,
+            escalation_required=final_state.escalation_required,
+            escalation_reason=final_state.escalation_reason,
+            reference_id=reference_id,
+            triggered_keyword=final_state.triggered_keyword,
+            steps=final_state.steps,
+            knowledge_source=final_state.knowledge_source,
+            memory_saved=final_state.memory_saved,
+            execution_mode=final_state.execution_mode,
+            prompt_template_used=final_state.prompt_template_used,
+            tools_used=final_state.tools_used,
+            skills_used=final_state.skills_used,
+            cache_used=final_state.cache_used,
+            run_id=run_id,
+            wall_time_sec=wall_time,
+            token_usage=final_state.token_usage or None,
+            cost_usd=final_state.cost_usd or None,
+            routing_action=final_state.routing_action or None,
+            routing_reason=final_state.routing_reason or None,
+            routing_missing_info=final_state.routing_missing_info or None,
+            api_tags=final_state.api_tags or None,
+            quality_evaluation=final_state.quality_evaluation or None,
+            pending_action=final_state.pending_action or None,
+        )
+    except Exception as exc:
+        logger.exception("Support flow failed for inquiry=%r", inquiry)
+        fallback_ticket = _fallback_ticket_data(inquiry, exc, start_time)
+        try:
+            data_store.save_ticket(fallback_ticket)
+        except Exception:
+            logger.exception("Failed to persist fallback support ticket")
+        try:
+            _svc.observability_service.finalize_ticket(
+                reference_id=fallback_ticket.reference_id,
+                wall_time_sec=fallback_ticket.wall_time_sec or 0.0,
+                quality_evaluation={},
+            )
+        except Exception:
+            logger.exception("Failed to finalize fallback observability")
+        return _fallback_support_response(fallback_ticket)
 
 
 @router.get("/api/support/{reference_id}/status", response_model=StatusResponse)
