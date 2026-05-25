@@ -51,10 +51,25 @@ async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-ALLOWED_ORIGINS = os.environ.get(
-    "ALLOWED_ORIGINS",
-    "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000",
-).split(",")
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:3000",
+    "https://agentic-support-platform.vercel.app",
+    "https://agentic-support-platform-68ywpt9al-beatrizcoders-projects.vercel.app",
+]
+
+configured_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+ALLOWED_ORIGINS = configured_origins + [
+    origin
+    for origin in DEFAULT_ALLOWED_ORIGINS
+    if origin not in configured_origins
+]
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
 JWT_SECRET: str = os.getenv("JWT_SECRET", secrets.token_hex(32))
