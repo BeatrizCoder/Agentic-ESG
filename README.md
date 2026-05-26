@@ -4,7 +4,8 @@
 > Capstone project — "Become An Agentic Architect" course by Carmelo Iaria.
 
 🌐 **Live Demo:** https://agentic-support-platform.vercel.app  
-🔧 **Backend API:** https://agentic-support-platform.onrender.com  
+🔧 **Backend API:** web-production-26e1b.up.railway.app 
+ 🔧 **Backend API Backup:** https://agentic-support-platform.onrender.com  
 📦 **GitHub:** https://github.com/BeatrizCoder/agentic-support-platform
 
 ---
