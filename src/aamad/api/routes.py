@@ -684,7 +684,10 @@ async def get_metrics_summary(
     not_helpful_count = csat_metrics["csat_negative"]
     total_feedback = csat_metrics["total_feedback"]
 
-    obs_summary = _svc.observability_service.get_summary()
+    obs_summary = data_store.get_observability_summary(
+        user_id=user_id if not historical else None,
+        historical_only=historical,
+    )
 
     logger.info(
         "Metrics result: total=%s csat=%s feedback=%s",
@@ -729,9 +732,17 @@ async def get_ticket_metrics(
 
 
 @router.get("/api/observability/summary")
-async def get_observability_summary(_=Depends(verify_api_key)) -> dict:
-    """Get aggregate observability metrics (SQLite-backed)."""
-    return _svc.observability_service.get_summary()
+async def get_observability_summary(
+    user=Depends(optional_token),
+    _=Depends(verify_api_key),
+) -> dict:
+    """Get aggregate observability metrics scoped to the active dataset mode."""
+    historical = _svc.dataset_mode == "historical"
+    user_id = user.get("sub") if user else "anonymous"
+    return data_store.get_observability_summary(
+        user_id=user_id if not historical else None,
+        historical_only=historical,
+    )
 
 
 @router.get("/api/observability/tickets/{reference_id}")
@@ -1039,7 +1050,10 @@ async def export_excel(
         tickets_for_export = _get_demo_tickets()
 
     metrics = _build_export_metrics(tickets_for_export, historical)
-    obs = _svc.observability_service.get_summary()
+    obs = data_store.get_observability_summary(
+        user_id=user_id if not historical else None,
+        historical_only=historical,
+    )
     agent_metrics = _obs_to_agent_list(obs)
 
     period_label = (
@@ -1089,7 +1103,10 @@ async def export_pdf(
         tickets_for_export = _get_demo_tickets()
 
     metrics = _build_export_metrics(tickets_for_export, historical)
-    obs = _svc.observability_service.get_summary()
+    obs = data_store.get_observability_summary(
+        user_id=user_id if not historical else None,
+        historical_only=historical,
+    )
     agent_metrics = _obs_to_agent_list(obs)
 
     period_label = (

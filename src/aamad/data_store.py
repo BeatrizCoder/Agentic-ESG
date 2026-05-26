@@ -1101,62 +1101,97 @@ class DataStore:
                 for e in events
             ]
 
-    def get_observability_summary(self) -> Dict[str, Any]:
-        """Aggregate observability metrics across all tickets via SQL."""
+    def get_observability_summary(
+        self,
+        user_id: str = None,
+        historical_only: bool = False,
+    ) -> Dict[str, Any]:
+        """Aggregate observability metrics, scoped to the active dataset mode."""
         if not self.use_database or not SQLALCHEMY_AVAILABLE:
             return {}
         from sqlalchemy import func
         with self.SessionLocal() as session:
+            # Build a subquery of reference_ids belonging to the active scope
+            if historical_only:
+                ref_ids_sq = (
+                    session.query(SupportTicketDB.reference_id)
+                    .filter(SupportTicketDB.is_historical == True)  # noqa: E712
+                    .subquery()
+                )
+            elif user_id and user_id != "anonymous":
+                ref_ids_sq = (
+                    session.query(SupportTicketDB.reference_id)
+                    .filter(
+                        (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None),  # noqa: E711,E712
+                        SupportTicketDB.user_id == user_id,
+                    )
+                    .subquery()
+                )
+            else:
+                ref_ids_sq = (
+                    session.query(SupportTicketDB.reference_id)
+                    .filter(
+                        (SupportTicketDB.is_historical == False) | (SupportTicketDB.is_historical == None),  # noqa: E711,E712
+                    )
+                    .subquery()
+                )
+
+            scope = ObservabilityEventDB.reference_id.in_(ref_ids_sq)
+
             # Per-event aggregates
-            total_events = session.query(ObservabilityEventDB).count()
+            total_events = session.query(ObservabilityEventDB).filter(scope).count()
             total_tickets = (
                 session.query(ObservabilityEventDB.reference_id)
+                .filter(scope)
                 .distinct()
                 .count()
             )
             avg_latency = (
-                session.query(func.avg(ObservabilityEventDB.latency_ms)).scalar() or 0.0
+                session.query(func.avg(ObservabilityEventDB.latency_ms)).filter(scope).scalar() or 0.0
             )
             total_tokens = (
-                session.query(func.sum(ObservabilityEventDB.total_tokens)).scalar() or 0
+                session.query(func.sum(ObservabilityEventDB.total_tokens)).filter(scope).scalar() or 0
             )
             total_cost = (
-                session.query(func.sum(ObservabilityEventDB.cost_usd)).scalar() or 0.0
+                session.query(func.sum(ObservabilityEventDB.cost_usd)).filter(scope).scalar() or 0.0
             )
             llm_calls = (
                 session.query(ObservabilityEventDB)
-                .filter(ObservabilityEventDB.execution_mode == "llm")
+                .filter(scope, ObservabilityEventDB.execution_mode == "llm")
                 .count()
             )
             det_calls = (
                 session.query(ObservabilityEventDB)
-                .filter(ObservabilityEventDB.execution_mode == "deterministic")
+                .filter(scope, ObservabilityEventDB.execution_mode == "deterministic")
                 .count()
             )
             cache_hits = (
                 session.query(ObservabilityEventDB)
-                .filter(ObservabilityEventDB.cache_used == True)
+                .filter(scope, ObservabilityEventDB.cache_used == True)  # noqa: E712
                 .count()
             )
             errors = (
                 session.query(ObservabilityEventDB)
-                .filter(ObservabilityEventDB.success == False)
+                .filter(scope, ObservabilityEventDB.success == False)  # noqa: E712
                 .count()
             )
 
-            # Per-ticket aggregates (for hallucination rate)
+            # Per-ticket aggregates (for hallucination rate) — scoped by the same ref_ids
+            ticket_obs_scope = TicketObservabilityDB.reference_id.in_(ref_ids_sq)
             total_evaluated = (
                 session.query(TicketObservabilityDB)
-                .filter(TicketObservabilityDB.quality_grade != "")
+                .filter(ticket_obs_scope, TicketObservabilityDB.quality_grade != "")
                 .count()
             )
             hallucinated = (
                 session.query(TicketObservabilityDB)
-                .filter(TicketObservabilityDB.hallucination_detected == True)
+                .filter(ticket_obs_scope, TicketObservabilityDB.hallucination_detected == True)  # noqa: E712
                 .count()
             )
             avg_wall_time = (
-                session.query(func.avg(TicketObservabilityDB.wall_time_sec)).scalar() or 0.0
+                session.query(func.avg(TicketObservabilityDB.wall_time_sec))
+                .filter(ticket_obs_scope)
+                .scalar() or 0.0
             )
 
             # Per-agent metrics
@@ -1172,7 +1207,7 @@ class DataStore:
                     (ObservabilityEventDB.execution_mode == "llm", 1),
                     else_=0,
                 )).label("llm_calls"),
-            ).group_by(
+            ).filter(scope).group_by(
                 ObservabilityEventDB.agent_name, ObservabilityEventDB.tool_name
             ).all()
 
@@ -1445,30 +1480,24 @@ class DataStore:
                     ORDER BY day DESC
                 """)).fetchall()
 
-                if is_postgres:
-                    category_costs = session.execute(_text(f"""
-                        SELECT
-                            category,
-                            COUNT(*) AS tickets,
-                            AVG(
-                                CASE WHEN quality_evaluation IS NOT NULL
-                                      AND quality_evaluation::text NOT IN ('null', '{{}}')
-                                THEN (quality_evaluation->>'cost_usd')::float
-                                END
-                            ) AS avg_cost_usd
-                        FROM support_tickets
-                        WHERE category IS NOT NULL AND category != ''
-                          {hist_filter}
-                        GROUP BY category
-                    """)).fetchall()
-                else:
-                    category_costs = session.execute(_text(f"""
-                        SELECT category, COUNT(*) AS tickets, NULL AS avg_cost_usd
-                        FROM support_tickets
-                        WHERE category IS NOT NULL AND category != ''
-                          {hist_filter}
-                        GROUP BY category
-                    """)).fetchall()
+                category_costs = session.execute(_text(f"""
+                    SELECT
+                        t.category,
+                        COUNT(*) AS tickets,
+                        AVG(
+                            COALESCE(
+                                (SELECT SUM(oe.cost_usd)
+                                 FROM observability_events oe
+                                 WHERE oe.reference_id = t.reference_id),
+                                0.0031
+                            )
+                        ) AS avg_cost_usd
+                    FROM support_tickets t
+                    WHERE t.category IS NOT NULL AND t.category != ''
+                      {hist_filter}
+                    GROUP BY t.category
+                    ORDER BY avg_cost_usd DESC
+                """)).fetchall()
 
         except Exception as e:
             logger.error("Cost forecast query error: %s", e)
