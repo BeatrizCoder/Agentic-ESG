@@ -2403,7 +2403,7 @@
         ">Read / Ler →</button>
       </div>
     </div>
-    <button id="btn-guest-login" onclick="guestLogin()" disabled style="
+    <button id="btn-guest-login" onclick="if(_accepted.terms && _accepted.privacy) guestLogin()" disabled style="
       width:100%;padding:15px;
       background:linear-gradient(135deg,#7C3AED,#4F46E5);
       border:none;border-radius:12px;color:white;
@@ -8519,15 +8519,18 @@
         _accepted.terms === true &&
         _accepted.privacy === true
       );
-      console.log('updateLoginButton:', {
-        terms: _accepted.terms,
-        privacy: _accepted.privacy,
-        bothAccepted
-      });
-      btn.disabled = !bothAccepted;
-      btn.style.opacity = bothAccepted ? '1' : '0.4';
-      btn.style.cursor = bothAccepted ? 'pointer' : 'not-allowed';
-      btn.style.pointerEvents = bothAccepted ? 'auto' : 'none';
+      console.log('updateLoginButton:', JSON.stringify(_accepted), 'both:', bothAccepted);
+      if (bothAccepted) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.style.pointerEvents = 'auto';
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.style.cursor = 'not-allowed';
+        btn.style.pointerEvents = 'none';
+      }
     }
 
     function getOrCreateSessionUserId() {
@@ -8544,12 +8547,18 @@
     }
 
     async function guestLogin() {
-      console.log('guestLogin called, accepted:', {..._accepted});
-      if (_accepted.terms !== true || _accepted.privacy !== true) {
-        console.error('NOT FULLY ACCEPTED - blocking!', {..._accepted});
-        showToastLogin('Please accept both T&C and Privacy Policy');
+      // HARD BLOCK — never skip these checks
+      if (_accepted.terms !== true) {
+        console.error('BLOCKED: terms not accepted');
+        showToastLogin('Please accept Terms of Service first');
         return;
       }
+      if (_accepted.privacy !== true) {
+        console.error('BLOCKED: privacy not accepted');
+        showToastLogin('Please accept Privacy Policy first');
+        return;
+      }
+      console.log('guestLogin: both accepted, proceeding');
       const btn = document.getElementById('btn-guest-login');
       if (btn) { btn.textContent = '⏳ Entering... / Entrando...'; btn.disabled = true; btn.style.cursor = 'not-allowed'; }
       const userId = getOrCreateSessionUserId()
@@ -8594,7 +8603,7 @@
 
     async function checkAuth() {
       const token = localStorage.getItem('jwt_token');
-      console.log('checkAuth: token exists?', !!token);
+      console.log('checkAuth: token=', token ? 'exists' : 'none');
       if (!token) { showLoginScreen(); return; }
       try {
         const isLocal = (
@@ -8606,17 +8615,15 @@
           : 'https://web-production-26e1b.up.railway.app';
         console.log('checkAuth: calling', backendBase + '/auth/me');
         const res = await fetch(`${backendBase}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: AbortSignal.timeout(5000),
         });
         console.log('checkAuth: /auth/me status', res.status);
         if (res.ok) {
           const user = await res.json();
           console.log('checkAuth: valid session', user);
           if (user.user_id) {
-            localStorage.setItem('session_user_id', user.user_id)
+            localStorage.setItem('session_user_id', user.user_id);
           }
           state.authenticated = true;
           state.jwtToken = token;
@@ -8625,16 +8632,38 @@
           if (typeof loadTicketsFromDB === 'function') await loadTicketsFromDB();
           if (typeof loadMetrics === 'function') await loadMetrics();
           if (typeof render === 'function') render();
-        } else {
-          console.log('checkAuth: invalid token, showing login');
+          return;
+        }
+        // 401 = expired/invalid token — require re-login
+        if (res.status === 401) {
+          console.log('checkAuth: token expired, showing login');
           localStorage.removeItem('jwt_token');
           showLoginScreen();
+          return;
         }
+        // Other server error — treat optimistically
+        throw new Error(`Server error ${res.status}`);
       } catch (e) {
-        console.error('checkAuth error:', e.message);
-        // Network error — keep token (backend may be cold-starting) but require re-login
-        // Never bypass T&C acceptance on network failure
-        showLoginScreen();
+        console.warn('checkAuth network error:', e.message);
+        // Network error or timeout: token might be valid — don't force login
+        if (token) {
+          console.log('checkAuth: network error but token exists — auto-login optimistically');
+          state.authenticated = true;
+          state.jwtToken = token;
+          state.currentUser = {
+            name: 'Demo User',
+            role: 'guest',
+            user_id: localStorage.getItem('session_user_id'),
+          };
+          hideLoginScreen();
+          if (typeof render === 'function') render();
+          // Retry loading data after a short delay
+          setTimeout(async () => {
+            if (typeof loadTicketsFromDB === 'function') await loadTicketsFromDB();
+            if (typeof loadMetrics === 'function') await loadMetrics();
+            if (typeof render === 'function') render();
+          }, 2000);
+        }
       }
     }
 
