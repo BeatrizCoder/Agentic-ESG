@@ -13,7 +13,7 @@ from sqlalchemy import text as sa_text
 from pydantic import BaseModel
 
 from ..config import ENABLE_MOCK_INTEGRATIONS
-from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS, INTERNAL_API_KEY
+from ..core.config import verify_api_key, limiter, JWT_EXPIRE_HOURS, INTERNAL_API_KEY, JWT_SECRET, JWT_ALGORITHM
 from ..core import services as _svc
 from ..data_store import data_store, SupportTicketData
 from ..flow.support_flow import SupportFlow
@@ -143,6 +143,7 @@ async def _verify_export_key(
 class GuestLoginRequest(BaseModel):
     accepted_terms: bool
     accepted_privacy: bool
+    persistent_user_id: str = None
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
@@ -153,13 +154,21 @@ async def guest_login(request: GuestLoginRequest):
         raise HTTPException(status_code=400, detail="Must accept Terms of Service")
     if not request.accepted_privacy:
         raise HTTPException(status_code=400, detail="Must accept Privacy Policy")
-    token = create_guest_token()
-    logger.info("Guest token issued")
+    token = create_guest_token(persistent_user_id=request.persistent_user_id)
+    from jose import jwt as jose_jwt
+    payload = jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    user_id = payload.get("sub")
+    logger.info("Guest login: user_id=%s", user_id)
     return {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": JWT_EXPIRE_HOURS * 3600,
-        "user": {"name": "Demo User", "role": "guest", "email": "guest@demo.com"},
+        "user": {
+            "name": "Demo User",
+            "role": "guest",
+            "email": "guest@demo.com",
+            "user_id": user_id,
+        },
     }
 
 
@@ -169,6 +178,7 @@ async def get_me(user=Depends(verify_token)):
         "name": user.get("name", "Demo User"),
         "role": user.get("role", "guest"),
         "email": user.get("sub"),
+        "user_id": user.get("sub"),
     }
 
 

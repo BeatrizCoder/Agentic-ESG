@@ -15,12 +15,18 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 
-def create_guest_token() -> str:
-    session_id = f"guest-{uuid.uuid4().hex[:12]}"
+def create_guest_token(persistent_user_id: str = None) -> str:
+    if persistent_user_id and persistent_user_id.startswith("guest-"):
+        session_id = persistent_user_id
+        logger.info("Reusing persistent session: %s", session_id)
+    else:
+        session_id = f"guest-{uuid.uuid4().hex[:12]}"
+        logger.info("New session created: %s", session_id)
     payload = {
         "sub": session_id,
         "role": "guest",
         "name": "Demo User",
+        "user_id": session_id,
         "iat": datetime.utcnow(),
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
     }

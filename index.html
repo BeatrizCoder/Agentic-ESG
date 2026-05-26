@@ -2540,8 +2540,9 @@
           - Usage metrics: response time, category, sentiment<br>
           - No names, emails, or personal identifiers are stored</p>
         <p style="margin:10px 0 0"><strong style="color:white">Session Token (JWT)</strong><br>
-          When you access the platform, a temporary token is created and stored only in your browser (localStorage).
-          It expires automatically after 24 hours. This token is NEVER stored in our database.</p>
+          A persistent anonymous ID is stored in your browser (localStorage) to identify your session across visits.
+          This ID (e.g. guest-a1b2c3) is never linked to your real identity. A JWT token is generated on each visit
+          and expires after 24 hours, but your session ID persists until you clear your browser data.</p>
         <p style="margin:10px 0 0"><strong style="color:white">IP Addresses</strong><br>
           Your IP address is processed by our hosting provider (Render) only for rate limiting (max 10 req/min).
           It is NOT stored in our database.</p>
@@ -2550,8 +2551,9 @@
           - Métricas de uso: tempo de resposta, categoria, sentimento<br>
           - Nenhum nome, e-mail ou identificador pessoal é armazenado</p>
         <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">Token de Sessão (JWT)</strong><br>
-          Ao acessar a plataforma, um token temporário é criado e armazenado apenas no seu navegador (localStorage).
-          Ele expira automaticamente após 24 horas. Este token NUNCA é armazenado em nosso banco de dados.</p>
+          Um ID anônimo persistente é armazenado no seu navegador (localStorage) para identificar sua sessão entre visitas.
+          Este ID (ex: guest-a1b2c3) nunca é vinculado à sua identidade real. Um token JWT é gerado a cada visita e expira
+          em 24 horas, mas seu ID de sessão persiste até você limpar os dados do navegador.</p>
         <p style="margin:10px 0 0;color:#6B7280;font-style:italic"><strong style="color:#9CA3AF">Endereços IP</strong><br>
           Seu endereço IP é processado pelo provedor de hospedagem (Render) apenas para controle de taxa
           (máx 10 req/min). NÃO é armazenado em nosso banco de dados.</p>
@@ -8528,6 +8530,19 @@
       btn.style.pointerEvents = bothAccepted ? 'auto' : 'none';
     }
 
+    function getOrCreateSessionUserId() {
+      let userId = localStorage.getItem('session_user_id')
+      if (!userId) {
+        const random = Math.random().toString(36).slice(2, 14)
+        userId = `guest-${random}`
+        localStorage.setItem('session_user_id', userId)
+        console.log('New session ID created:', userId)
+      } else {
+        console.log('Existing session ID reused:', userId)
+      }
+      return userId
+    }
+
     async function guestLogin() {
       console.log('guestLogin called, accepted:', {..._accepted});
       if (_accepted.terms !== true || _accepted.privacy !== true) {
@@ -8537,16 +8552,20 @@
       }
       const btn = document.getElementById('btn-guest-login');
       if (btn) { btn.textContent = '⏳ Entering... / Entrando...'; btn.disabled = true; btn.style.cursor = 'not-allowed'; }
+      const userId = getOrCreateSessionUserId()
       try {
         const baseUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : 'http://localhost:8000').replace('/api/support', '');
         const res = await fetch(`${baseUrl}/auth/guest`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accepted_terms: true, accepted_privacy: true }),
+          body: JSON.stringify({ accepted_terms: true, accepted_privacy: true, persistent_user_id: userId }),
         });
         if (res.ok) {
           const data = await res.json();
           localStorage.setItem('jwt_token', data.access_token);
+          if (data.user && data.user.user_id) {
+            localStorage.setItem('session_user_id', data.user.user_id)
+          }
           if (typeof state !== 'undefined') {
             state.jwtToken = data.access_token;
             state.authenticated = true;
@@ -8596,6 +8615,9 @@
         if (res.ok) {
           const user = await res.json();
           console.log('checkAuth: valid session', user);
+          if (user.user_id) {
+            localStorage.setItem('session_user_id', user.user_id)
+          }
           state.authenticated = true;
           state.jwtToken = token;
           state.currentUser = user;
