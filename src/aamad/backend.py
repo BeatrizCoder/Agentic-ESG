@@ -46,7 +46,10 @@ async def _add_cors_headers(request: Request, call_next):
     response.headers["access-control-expose-headers"] = "Content-Disposition"
 
     if request.method == "OPTIONS":
-        return Response(status_code=204, headers=dict(response.headers))
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        headers.pop("content-type", None)
+        return Response(status_code=204, headers=headers)
 
     return response
 

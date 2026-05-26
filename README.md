@@ -4,8 +4,8 @@
 > Capstone project — "Become An Agentic Architect" course by Carmelo Iaria.
 
 🌐 **Live Demo:** https://agentic-support-platform.vercel.app  
-🔧 **Backend API:** web-production-26e1b.up.railway.app 
- 🔧 **Backend API Backup:** https://agentic-support-platform.onrender.com  
+🔧 **Backend API (Railway):** https://web-production-126e2.up.railway.app  
+🔧 **Backend API (Render backup):** https://agentic-support-platform.onrender.com  
 📦 **GitHub:** https://github.com/BeatrizCoder/agentic-support-platform
 
 ---
@@ -49,7 +49,7 @@ The Agentic Support Platform is a production-grade multi-agent customer support 
 - LGPD-compliant privacy with automatic data deletion
 - Export to Excel and PDF with rich formatting
 - Dual-view: Customer Portal + Operator Dashboard
-- Dataset toggle: Live (isolated per user) vs Historical (266 demo tickets)
+- Dataset toggle: Live (isolated per user, 24h auto-delete) vs Historical (431 demo tickets)
 
 ---
 
@@ -206,12 +206,27 @@ Latency:  ~380ms avg | Retries: 2 | Timeout: 5s
 City extraction: LLM-based (handles any location mention)
 ```
 
+**Severity classification (from weather_id, wind speed, visibility):**
+```
+SEVERE  → weather_id: 2xx (thunderstorm), 502–531 (heavy rain),
+           6xx (snow/ice), 762/771/781 (extreme)
+           OR wind_speed > 50 km/h OR visibility < 1000m
+MODERATE → weather_id: 3xx (drizzle), 500–501 (light rain)
+           OR wind_speed 20–50 km/h
+CLEAR   → weather_id: 800–804 (clear/clouds)
+```
+
 **Business rules:**
 ```
-Adverse weather (rain/storm/snow)
-  → Weather delay alert
-  → LLM generates response with REAL temperature + conditions
-  → Auto-resolved
+SEVERE adverse weather
+  → ⛈️ Auto-resolved — broad operational notice
+  → DO NOT ask for order number
+  → Estimated recovery: 2-3 business days
+
+MODERATE adverse weather
+  → 🌧️ Contextual response — explains weather may contribute to delay
+  → Asks for order number to investigate specific delivery
+  → Awaiting form
 
 Clear weather + no order number
   → "☀️ Clima normal em {city}. Preciso do número do pedido."
@@ -251,11 +266,14 @@ aprovado/processado/pendente/em_analise
   → LLM generates empathetic status message
   → Auto-resolved with feedback buttons 👍 👎
 
-negado
-  → Customer gets 3 options:
-    👍 I understand → closes
-    👎 I disagree → dispute form → escalates
-    👤 Talk to human → HITL
+negado (denied)
+  → Initial response: explains denial reason (no "human will contact you" yet)
+  → Customer gets 2 options:
+    👍 Entendo a decisão → closes (accepted)
+    👎 Quero contestar  → AWAITING_CUSTOMER_DOCUMENTS form
+  → After customer submits contest documents:
+    → Escalates to specialist review
+    → "Nossos especialistas irão realizar uma revisão humana do seu caso"
 
 Not found
   → Investigation form (required fields, no skip)
@@ -269,15 +287,21 @@ Purpose:  Detect open cases requiring customer action
 Seed:     7 realistic scenarios (orders 77701–77707)
 ```
 
-| Order | Status | Product | Action Required |
-|-------|--------|---------|-----------------|
-| 77701 | AWAITING_PHOTO | Tênis Nike Air Max | Send damage photo |
-| 77702 | LABEL_EXPIRED | Smartwatch Samsung | Generate new return label |
-| 77703 | AWAITING_RETURN_SHIPMENT | Notebook Dell | Ship product back (deadline expired!) |
-| 77704 | AWAITING_DOCUMENTATION | iPhone Case | Send payment proof |
-| 77705 | DELIVERY_FAILED | Monitor LG 27" | Reschedule delivery (deadline 25/05!) |
-| 77706 | UNDER_TECHNICAL_ANALYSIS | Fone Sony WH-1000XM5 | Wait for technical report |
-| 77707 | AWAITING_RETURN | Cafeteira Nespresso | Return product today! |
+| Order | Status | Product | Routing | Action |
+|-------|--------|---------|---------|--------|
+| 77701 | AWAITING_PHOTO | Tênis Nike Air Max | ⏳ Awaiting | Customer sends damage photo |
+| 77702 | LABEL_EXPIRED | Smartwatch Samsung | ✅ Auto-resolve | System provides new label link |
+| 77703 | AWAITING_RETURN_SHIPMENT | Notebook Dell | ⏳ Awaiting | Customer ships product back |
+| 77704 | AWAITING_DOCUMENTATION | iPhone Case | ⏳ Awaiting | Customer sends payment proof |
+| 77705 | DELIVERY_FAILED | Monitor LG 27" | ✅ Auto-resolve | System gives reschedule URL + pickup address |
+| 77706 | UNDER_TECHNICAL_ANALYSIS | Fone Sony WH-1000XM5 | ✅ Auto-resolve | System shows analysis progress + expected date |
+| 77707 | AWAITING_RETURN | Cafeteira Nespresso | ⏳ Awaiting | Customer returns product |
+
+**Auto-resolve statuses** (`DELIVERY_FAILED`, `LABEL_EXPIRED`, `UNDER_TECHNICAL_ANALYSIS`): system has enough
+information to resolve without customer action — provides next steps directly.
+
+**Awaiting statuses** (`AWAITING_PHOTO`, `AWAITING_RETURN_SHIPMENT`, `AWAITING_DOCUMENTATION`, `AWAITING_RETURN`):
+customer must act first — shows awaiting form with specific instructions.
 
 ---
 
@@ -307,23 +331,33 @@ MAX_SNIPPET_CHARS = 800       # max chars per snippet
 
 ## Routing Engine
 
-Priority-based routing decision matrix:
+Priority-based routing decision matrix (progressive escalation — never jumps to human without first resolving or collecting info):
 
-| Priority | Condition | Action |
-|----------|-----------|--------|
-| 1 | Logistics alert (Sul/Sudeste CEP) | ✅ Auto-resolve + LLM message |
-| 2 | Adverse weather (city detected) | ✅ Auto-resolve + LLM message |
-| 3 | Pending action found (orders 77701–77707) | ⏳ Awaiting + action instructions |
-| 4 | Refund found in DB | ✅ Auto-resolve + LLM message |
-| 5 | Refund denied | 🔴 Show 3 options (accept/dispute/human) |
-| 6 | Explicit escalation keyword | 🚨 Escalate immediately |
-| 7 | Billing category | 🚨 Always escalate |
-| 8 | Account hacked/unauthorized | 🚨 Always escalate |
-| 9 | Order Issues + has order number | 🚨 Escalate (enough info) |
-| 10 | Order Issues + no order number | ⏳ Awaiting (request info) |
-| 11 | Account Access (normal) | 📋 Step-by-step guidance |
-| 12 | Technical Issue | ⏳ Awaiting + screenshot upload |
-| 13 | General Support | ✅ Auto-resolve |
+| Priority | Condition | Action | Details |
+|----------|-----------|--------|---------|
+| 1 | **Logistics alert** (Sul/Sudeste CEP) | ✅ Auto-resolve | `skip_routing` flag set — always wins, never asks for order number |
+| 2a | **Severe weather** (storm/snow/extreme) | ✅ Auto-resolve | Broad operational notice, no order number asked |
+| 2b | **Moderate weather** (drizzle/light rain) | ⏳ Awaiting | Contextual message with real city + temp, asks for order number |
+| 3 | **Pending action** — auto-resolve statuses | ✅ Auto-resolve | DELIVERY_FAILED → reschedule; LABEL_EXPIRED → new label; UNDER_TECHNICAL_ANALYSIS → wait message |
+| 3b | **Pending action** — awaiting statuses | ⏳ Awaiting | AWAITING_PHOTO / AWAITING_RETURN_SHIPMENT / AWAITING_DOCUMENTATION / AWAITING_RETURN |
+| 4 | **Refund found** + auto-resolvable | ✅ Auto-resolve | LLM generates empathetic status message |
+| 5 | **Refund denied** | 🔴 2 options | Accept / Contest → awaiting docs → specialist review |
+| 6 | **Explicit escalation keyword** | 🚨 Escalate | Customer asked for manager, legal action, etc. |
+| 7 | **Billing category** | 🚨 Always escalate | Financial security |
+| 8 | **Account hacked / unauthorized** | 🚨 Always escalate | Security team review |
+| 9 | **Exchange/return already approved** | ✅ Auto-resolve | Numbered steps: pack → label → drop off → new item |
+| 10 | **Order Issues + has order number** | 🚨 Escalate | Enough info to route to specialist |
+| 11 | **Order Issues + no order number** | ⏳ Awaiting | Ask for order number first |
+| 12 | **Account Access** (normal) | 📋 Step-by-step | Guided recovery instructions |
+| 13 | **Technical Issue** | 📋 Step-by-step | Troubleshooting first; awaiting only if "Not Helpful" |
+| 14 | **General Support** | ✅ Auto-resolve | Informational answer |
+
+**Progressive escalation philosophy:**
+```
+System always follows: Auto-resolve → Contextual response → Awaiting info → Escalate
+Never jumps straight to "I'll connect you with a human agent" when context allows resolution.
+Responses reference real operational data: CEP, weather, refund status, pending actions.
+```
 
 **Intake data stripping:**
 ```python
@@ -358,6 +392,26 @@ Auto-resolved tickets:
 
 **Awaiting form:** Dynamic fields based on what's missing:
 - Order number, email, screenshot (drag and drop)
+
+**Refund denied dispute flow (progressive — never simultaneous awaiting + escalation):**
+```
+1. Initial denial  → 2-button choice card (no "human will contact you" message yet)
+                       👍 Entendo a decisão  → closes
+                       👎 Quero contestar   → AWAITING_CUSTOMER_DOCUMENTS form
+2. Customer fills form → submits proof/bank statement
+3. After submit        → Specialist review card
+                         "Nossos especialistas irão realizar uma revisão humana"
+                         Status: 🚨 Em Revisão
+```
+
+**UX state rules:**
+```
+AWAITING  → Show awaiting form only (⏳ Awaiting Your Response badge)
+            NO escalation message shown simultaneously
+ESCALATED → Show escalation confirmation + reference ID
+            Status: 🚨 Under Specialist Review
+            "Our team will contact you within 24h"
+```
 
 ---
 
@@ -616,14 +670,16 @@ python3 -m http.server 5500
 
 | Service | Purpose | Plan |
 |---------|---------|------|
-| **Render** | Backend (FastAPI + Docker) | Free (cold start) |
+| **Railway** | Backend principal (FastAPI + Docker) | Hobby ($5 crédito/mês, sem cold start) |
+| **Render** | Backend backup (FastAPI + Docker) | Free (cold start após 15min) |
 | **Vercel** | Frontend (static HTML) | Free |
 | **Neon** | PostgreSQL database | Free (0.5GB, São Paulo) |
-| **UptimeRobot** | Keep Render awake | Free (5min ping) |
+| **UptimeRobot** | Keep backend awake | Free (5min ping) |
 
 **Deploy flow:**
 ```
-git push → GitHub → Render auto-deploy (backend)
+git push → GitHub → Railway auto-deploy (backend principal)
+                  → Render auto-deploy (backend backup)
                   → Vercel auto-deploy (frontend)
 ```
 
@@ -687,7 +743,6 @@ agentic-support-platform/
 ├── Dockerfile          ← Python 3.11-slim for Render
 ├── start_demo.sh       ← Local startup script
 ├── prepare_demo.sh     ← Pre-demo: backup + merge + clean
-├── Procfile            ← Render deploy command
 ├── railway.toml        ← Railway deploy config
 ├── render.yaml         ← Render deploy config
 ├── vercel.json         ← Vercel static deploy config
@@ -714,7 +769,7 @@ agentic-support-platform/
 | Rate Limiting | slowapi | FastAPI-native, IP-based |
 | Export | openpyxl + reportlab | Professional Excel + PDF |
 | Frontend | Vanilla JS | Zero dependencies, fast |
-| Deploy (backend) | Render + Docker | Container-based, Python 3.11 |
+| Deploy (backend) | Railway + Render + Docker | Railway: no cold start; Render: backup |
 | Deploy (frontend) | Vercel | CDN, instant, free |
 | Database hosting | Neon | Serverless PostgreSQL, free tier |
 | Monitoring | UptimeRobot | Prevents cold start |
@@ -727,7 +782,7 @@ agentic-support-platform/
 Near term:
   - Streaming responses (SSE/WebSocket)
   - Vector DB for semantic RAG (ChromaDB/Pinecone)
-  - Railway or GCP Cloud Run (more stable than Render free)
+  - GCP Cloud Run (production-grade deploy)
   - JWT with real user accounts (email + password)
 
 LLM quality:
@@ -739,6 +794,15 @@ Analytics:
   - NPS tracking
   - Predictive escalation (ML model)
   - Multi-language support expansion
+
+✅ Already implemented (previously in roadmap):
+  - Railway deploy (no cold start)
+  - JWT guest authentication (24h sessions)
+  - Excel + PDF export
+  - Resolution time by category
+  - Cost forecasting
+  - User-isolated tickets
+  - LGPD-compliant privacy
 ```
 
 ---
@@ -746,4 +810,3 @@ Analytics:
 *Built by Beatriz Costa — May 2026*  
 *Course: "Become An Agentic Architect" by Carmelo Iaria*  
 *Open source for educational purposes — github.com/BeatrizCoder*
-

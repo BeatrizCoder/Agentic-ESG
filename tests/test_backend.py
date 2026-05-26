@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
+import pytest
 from fastapi.testclient import TestClient
 
-from aamad.backend import SupportFlow, SupportTicket, SupportState, data_store, SupportTicketData, app
+from aamad.backend import app
+from aamad.data_store import SupportTicketData, data_store
+from aamad.flow.state import SupportState
+from aamad.flow.support_flow import SupportFlow
+from aamad.api.models import SupportTicket
 from aamad.integrations.ticketing_client import TicketingClient
 from aamad.integrations.crm_client import CRMClient
 from aamad.integrations.notification_client import NotificationClient
-import pytest
-from datetime import datetime
 
 
 def test_support_flow_process_returns_valid_context():
     # Test the tool registry directly since flow testing is complex
-    from aamad.backend import tool_registry
+    from aamad.core.services import tool_registry
 
     # Test classification tool
     result = tool_registry.execute_tool("Classification Tool", "My order #12345 hasn't arrived yet.")
@@ -132,6 +137,23 @@ def test_support_endpoint_falls_back_when_flow_raises(monkeypatch):
     assert payload["response_confidence"] == 50
     assert payload["reference_id"].startswith("REF-")
     assert payload["execution_mode"] == "fallback"
+
+
+def test_cors_preflight_returns_empty_204_without_content_length():
+    client = TestClient(app)
+
+    response = client.options(
+        "/api/support",
+        headers={
+            "Origin": "http://localhost:5500",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type",
+        },
+    )
+
+    assert response.status_code == 204
+    assert response.text == ""
+    assert "content-length" not in response.headers
 
 
 def test_mock_crm_client():
