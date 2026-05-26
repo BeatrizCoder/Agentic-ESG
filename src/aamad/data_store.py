@@ -210,7 +210,6 @@ class DataStore:
             self._seed_refunds()
             self._seed_pending_actions()
             self.seed_historical_tickets()
-            self.cleanup_expired_sessions()
             logger.info("Database tables created/verified")
         else:
             os.makedirs(data_dir, exist_ok=True)
