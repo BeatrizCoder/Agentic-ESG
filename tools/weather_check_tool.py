@@ -57,6 +57,22 @@ class WeatherCheckTool(BaseTool):
     def _is_adverse(self, weather_id: int) -> bool:
         return weather_id in self.adverse_weather_codes
 
+    def _get_severity(
+        self, weather_id: int, wind_speed_kmh: float = 0, visibility_m: int = 10000
+    ) -> str:
+        severe_ids = (
+            set(range(200, 233)) |                          # thunderstorm
+            {502, 503, 504, 511, 520, 521, 522, 531} |     # heavy/extreme rain
+            set(range(600, 623)) |                          # snow / ice
+            {762, 771, 781}                                 # volcanic ash, squalls, tornado
+        )
+        if weather_id in severe_ids or wind_speed_kmh > 50 or visibility_m < 1000:
+            return "severe"
+        moderate_ids = set(range(300, 322)) | {500, 501}    # drizzle + light rain
+        if weather_id in moderate_ids or 20 < wind_speed_kmh <= 50:
+            return "moderate"
+        return "clear"
+
     def _fetch_with_retry(self, url: str) -> dict:
         last_error = None
 
@@ -152,6 +168,9 @@ class WeatherCheckTool(BaseTool):
             feels_like = data["main"]["feels_like"]
             humidity = data["main"]["humidity"]
             adverse = self._is_adverse(weather_id)
+            wind_speed_kmh = round(data.get("wind", {}).get("speed", 0) * 3.6, 1)
+            visibility_m = data.get("visibility", 10000)
+            severity = self._get_severity(weather_id, wind_speed_kmh, visibility_m)
 
             result = {
                 "available": True,
@@ -163,6 +182,9 @@ class WeatherCheckTool(BaseTool):
                 "conditions": weather_desc,
                 "weather_id": weather_id,
                 "adverse_conditions": adverse,
+                "severity": severity,
+                "wind_speed_kmh": wind_speed_kmh,
+                "visibility_m": visibility_m,
                 "delivery_impact": (
                     "Adverse weather conditions detected — "
                     "deliveries may be delayed in this region."
@@ -175,8 +197,8 @@ class WeatherCheckTool(BaseTool):
             }
 
             logger.info(
-                "WeatherCheckTool: %s → %s°C, %s, adverse=%s",
-                city, temp, weather_desc, adverse
+                "WeatherCheckTool: %s → %s°C, %s, adverse=%s, severity=%s",
+                city, temp, weather_desc, adverse, severity
             )
             return result
 
@@ -306,10 +328,13 @@ class WeatherCheckTool(BaseTool):
                     feels_like = data["main"]["feels_like"]
                     humidity = data["main"]["humidity"]
                     adverse = self._is_adverse(weather_id)
+                    wind_speed_kmh = round(data.get("wind", {}).get("speed", 0) * 3.6, 1)
+                    visibility_m = data.get("visibility", 10000)
+                    severity = self._get_severity(weather_id, wind_speed_kmh, visibility_m)
 
                     logger.info(
-                        "OpenWeather: %s → %s %.1f°C adverse=%s latency=%dms",
-                        city, weather_desc, temp, adverse, latency_ms,
+                        "OpenWeather: %s → %s %.1f°C adverse=%s severity=%s latency=%dms",
+                        city, weather_desc, temp, adverse, severity, latency_ms,
                     )
 
                     return {
@@ -322,6 +347,9 @@ class WeatherCheckTool(BaseTool):
                         "conditions": weather_desc,
                         "weather_id": weather_id,
                         "adverse_conditions": adverse,
+                        "severity": severity,
+                        "wind_speed_kmh": wind_speed_kmh,
+                        "visibility_m": visibility_m,
                         "delivery_impact": (
                             "Adverse weather conditions detected — "
                             "deliveries may be delayed in this region."

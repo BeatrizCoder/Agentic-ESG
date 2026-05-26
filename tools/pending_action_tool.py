@@ -6,6 +6,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Statuses the system can resolve automatically without requiring customer action
+_AUTO_RESOLVE_STATUSES = {"DELIVERY_FAILED", "LABEL_EXPIRED", "UNDER_TECHNICAL_ANALYSIS"}
+
 _ORDER_PATTERNS = [
     r'pedido\s*[:#]?\s*(\d{4,8})',
     r'order\s*[:#]?\s*(\d{4,8})',
@@ -62,6 +65,7 @@ class PendingActionTool:
             order_number, result.get("status"),
         )
         result["latency_ms"] = latency_ms
+        result["auto_resolve"] = result.get("status", "") in _AUTO_RESOLVE_STATUSES
         return result
 
 

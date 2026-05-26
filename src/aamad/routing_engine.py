@@ -56,6 +56,16 @@ EXPLICIT_ESCALATION = [
 STEP_BY_STEP_CATEGORIES = ["Account Access", "Technical Issue"]
 ALWAYS_ESCALATE_CATEGORIES = ["Billing"]
 
+EXCHANGE_APPROVED_PATTERNS = [
+    r'troca\s+(foi\s+)?aprovada',
+    r'minha\s+troca\s+foi\s+aprovada',
+    r'devolução\s+(foi\s+)?aprovada',
+    r'devolucao\s+(foi\s+)?aprovada',
+    r'exchange\s+(was\s+)?approved',
+    r'return\s+(was\s+)?approved',
+    r'troca\s+aprovada',
+]
+
 # HOW-TO patterns: informational questions that should resolve directly,
 # never require order number or email.
 HOW_TO_PATTERNS = [
@@ -298,6 +308,20 @@ def route_ticket(
             confidence=0.85,
         )
 
+    # RULE 2.5: Exchange/return already approved → auto-resolve with next steps
+    if category == "Order Issues" and _has_pattern(norm_inquiry, EXCHANGE_APPROVED_PATTERNS):
+        return RoutingDecision(
+            action="resolve",
+            reason="Approved exchange/return — providing operational next steps",
+            missing_info=[],
+            has_order_number=has_order,
+            has_email=has_email,
+            has_invoice=has_invoice,
+            explicit_escalation=False,
+            triggered_keyword=None,
+            confidence=0.9,
+        )
+
     # RULE 3: Order Issues
     if category == "Order Issues":
         if not has_order:
@@ -365,39 +389,20 @@ def route_ticket(
             confidence=0.85,
         )
 
-    # RULE 5: Technical Issue
+    # RULE 5: Technical Issue → always step_by_step first
+    # (awaiting only shown if customer clicks "Not Helpful" in the UI)
     if category == "Technical Issue":
-        has_screenshot = any(
-            w in norm_inquiry
-            for w in ["screenshot", "print", "foto", "imagem", "image"]
+        return RoutingDecision(
+            action="step_by_step",
+            reason="Technical issue — providing guided troubleshooting steps",
+            missing_info=[],
+            has_order_number=has_order,
+            has_email=has_email,
+            has_invoice=has_invoice,
+            explicit_escalation=False,
+            triggered_keyword=None,
+            confidence=0.85,
         )
-        if not has_screenshot:
-            missing.append("screenshot_or_description")
-
-        if missing and urgency != "High":
-            return RoutingDecision(
-                action="awaiting",
-                reason="Need more details to diagnose the issue",
-                missing_info=missing,
-                has_order_number=has_order,
-                has_email=has_email,
-                has_invoice=has_invoice,
-                explicit_escalation=False,
-                triggered_keyword=None,
-                confidence=0.8,
-            )
-        else:
-            return RoutingDecision(
-                action="step_by_step",
-                reason="Technical issue — providing troubleshooting steps",
-                missing_info=[],
-                has_order_number=has_order,
-                has_email=has_email,
-                has_invoice=has_invoice,
-                explicit_escalation=False,
-                triggered_keyword=None,
-                confidence=0.85,
-            )
 
     # RULE 6: General Support → auto-resolve
     return RoutingDecision(

@@ -373,9 +373,11 @@ class SupportFlowStepsMixin:
                     "execution_mode": "deterministic",
                 })
                 logger.info(
-                    "enrich: pending action found order=%s status=%s",
-                    pa_result.get("order_number"), status,
+                    "enrich: pending action found order=%s status=%s auto_resolve=%s",
+                    pa_result.get("order_number"), status, pa_result.get("auto_resolve"),
                 )
+                if pa_result.get("auto_resolve"):
+                    self.state.routing_action = "resolve"
         except Exception as e:
             logger.error("enrich: pending_action_tool error: %s", e)
 
@@ -442,6 +444,7 @@ class SupportFlowStepsMixin:
                 if alert:
                     self.state.logistics_alert = alert
                     self.state.routing_action = "resolve"
+                    self.state.skip_routing = True
                     self.state.api_tags.append("logistics_alert")
                     context_parts.append(
                         f"Validated address: {formatted}"
@@ -528,8 +531,10 @@ class SupportFlowStepsMixin:
                         self.state.weather_delay = weather_delay
                         self.state.api_tags.append("weather_alert")
 
+                    _weather_sev = weather_result.get("severity", "severe")
+                    _sev_label = "SEVERE" if _weather_sev == "severe" else "MODERATE"
                     context_parts.append(
-                        f"WEATHER DELAY ALERT: "
+                        f"WEATHER DELAY ALERT: {_sev_label} — "
                         f"{conditions} in {detected_city} "
                         f"({temp}°C). Adverse conditions "
                         f"affecting deliveries."
@@ -714,9 +719,21 @@ class SupportFlowStepsMixin:
         self.state.skills_used.extend(escalation_skills.get("skills_used", []))
 
         # ── Priority chain: external alerts first, routing decision last ──
-        logger.debug("escalation: refund_data=%s routing_action=%s", self.state.refund_data, self.state.routing_action)
+        logger.debug("escalation: refund_data=%s routing_action=%s skip_routing=%s", self.state.refund_data, self.state.routing_action, self.state.skip_routing)
 
-        if self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
+        if self.state.skip_routing:
+            # Logistics alert resolved this ticket in enrich_with_external_data — do not override
+            self.state.escalation_required = False
+            self.state.routing_action = "resolve"
+            self.state.auto_resolve_reason = "logistics_skip"
+            self.log_step("Routing Engine", {
+                "override": "logistics_skip",
+                "reason": "skip_routing flag — logistics alert auto-resolved before routing",
+                "auto_resolved": True,
+                "execution_mode": "deterministic",
+            })
+
+        elif self.state.logistics_alert and self.state.logistics_alert.get("alert_active"):
             # PRIORITY 1: logistics alert — LLM already generated response using external_context
             alert = self.state.logistics_alert
             self.state.escalation_required = False
@@ -731,23 +748,48 @@ class SupportFlowStepsMixin:
             })
 
         elif self.state.weather_delay and self.state.weather_delay.get("delay_active"):
-            # PRIORITY 2: weather delay — overrides "awaiting" regardless of order number
-            self.state.escalation_required = False
-            self.state.routing_action = "resolve"
-            self.state.auto_resolve_reason = "weather_delay"
-
-            # If order number was provided, flag it so the LLM includes it in the response
-            if (self.state.routing_missing_info and
-                    "order_number" not in self.state.routing_missing_info):
-                self.state.external_context += (
-                    "\nNote: Customer provided order number — "
-                    "include it in the weather delay response."
+            # PRIORITY 2: severe weather → auto-resolve; moderate → awaiting order number
+            _weather_sev = self.state.weather_result.get("severity", "severe")
+            if _weather_sev == "severe":
+                self.state.escalation_required = False
+                self.state.routing_action = "resolve"
+                self.state.auto_resolve_reason = "weather_delay_severe"
+            else:
+                # Moderate — ask for order number to investigate
+                self.state.escalation_required = True
+                self.state.routing_action = "awaiting"
+                self.state.auto_resolve_reason = "weather_delay_moderate"
+                _is_pt_w = self._is_portuguese(self.state.inquiry)
+                _city_w = self.state.detected_city or ("sua região" if _is_pt_w else "your area")
+                _temp_w = self.state.weather_result.get("temperature_c", "")
+                _cond_w = self.state.weather_result.get("conditions", "")
+                if _is_pt_w:
+                    self.state.response = (
+                        f"🌧️ Verificamos as condições em {_city_w} "
+                        f"({_cond_w}, {_temp_w}°C). As condições climáticas "
+                        f"podem estar contribuindo para atrasos na sua região.\n\n"
+                        f"Para investigarmos seu pedido específico, "
+                        f"por favor informe o número do pedido."
+                    )
+                else:
+                    self.state.response = (
+                        f"🌧️ We checked conditions in {_city_w} "
+                        f"({_cond_w}, {_temp_w}°C). Weather may be contributing "
+                        f"to delays in your area.\n\n"
+                        f"To investigate your specific order, "
+                        f"please provide your order number."
+                    )
+                self.state.escalation_reason = (
+                    "Moderate weather — awaiting order number for investigation"
                 )
-
             self.log_step("Routing Engine", {
                 "override": "weather_delay",
-                "reason": "Adverse weather — auto-resolved",
-                "auto_resolved": True,
+                "severity": _weather_sev,
+                "reason": (
+                    f"Weather ({_weather_sev}) — "
+                    f"{'auto-resolved' if _weather_sev == 'severe' else 'awaiting order number'}"
+                ),
+                "auto_resolved": _weather_sev == "severe",
                 "execution_mode": "deterministic",
             })
 
@@ -860,15 +902,21 @@ class SupportFlowStepsMixin:
             })
 
         elif (self.state.pending_action and self.state.pending_action.get("found")):
-            # PRIORITY 4b: pending action awaiting customer response
+            # PRIORITY 4b: auto-resolve if system can handle it (DELIVERY_FAILED,
+            # LABEL_EXPIRED, UNDER_TECHNICAL_ANALYSIS), else awaiting customer action
             pa = self.state.pending_action
-            self.state.escalation_required = True
-            self.state.routing_action = "awaiting"
-            self.state.auto_resolve_reason = "pending_action"
-            self.state.escalation_reason = (
-                f"Pending action {pa.get('status', '')} "
-                f"requires {pa.get('action_required', '')}"
-            )
+            if pa.get("auto_resolve"):
+                self.state.escalation_required = False
+                self.state.routing_action = "resolve"
+                self.state.auto_resolve_reason = "pending_action_auto"
+            else:
+                self.state.escalation_required = True
+                self.state.routing_action = "awaiting"
+                self.state.auto_resolve_reason = "pending_action"
+                self.state.escalation_reason = (
+                    f"Pending action {pa.get('status', '')} "
+                    f"requires {pa.get('action_required', '')}"
+                )
             self.log_step("Routing Engine", {
                 "override": "pending_action",
                 "order_number": pa.get("order_number"),
@@ -876,6 +924,7 @@ class SupportFlowStepsMixin:
                 "status": pa.get("status"),
                 "action_required": pa.get("action_required"),
                 "urgency": pa.get("urgency"),
+                "auto_resolve": pa.get("auto_resolve", False),
                 "execution_mode": "deterministic",
             })
 
@@ -966,7 +1015,12 @@ class SupportFlowStepsMixin:
                 self.state.escalation_required = False
 
         # ── Append escalation notice to response ──
-        if self.state.escalation_required and self.state.routing_action != "awaiting":
+        # Skip for refund_denied — the choice card (FIX 3) handles escalation messaging
+        # after the customer explicitly contests, not in the initial denial response.
+        _is_refund_denied = "refund_denied" in self.state.api_tags
+        if (self.state.escalation_required and
+                self.state.routing_action != "awaiting" and
+                not _is_refund_denied):
             if _is_portuguese(self.state.inquiry):
                 self.state.response += (
                     "\n\nSua solicitação foi encaminhada para análise humana. "

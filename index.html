@@ -2719,6 +2719,7 @@
       awaitingReferenceId: null,
       originalInquiry: '',
       showAwaitingForm: false,
+      showRefundDisputeForm: false,
       uploadedFile: null,
       uploadedFileBase64: null,
       preEscalationOpen: false,
@@ -3576,16 +3577,76 @@
             <p style="font-size:0.85rem;color:#4B5563;margin:14px 0 10px;line-height:1.5;">
               ${pt ? 'O que você gostaria de fazer?' : 'What would you like to do?'}
             </p>
-            <div class="button-row" style="grid-template-columns:repeat(3,1fr);gap:10px;">
+            <div class="button-row" style="grid-template-columns:repeat(2,1fr);gap:10px;">
               <button id="rdf-denied-accept" class="button-secondary" style="border-color:rgba(16,185,129,0.35);color:#059669;">
-                👍 ${pt ? 'Aceitar decisão' : 'Accept decision'}
+                👍 ${pt ? 'Entendo a decisão' : 'I understand the decision'}
               </button>
               <button id="rdf-denied-dispute" class="button-secondary" style="border-color:rgba(245,158,11,0.35);color:#D97706;">
-                👎 ${pt ? 'Contestar' : 'Dispute'}
+                👎 ${pt ? 'Quero contestar' : 'I want to contest'}
               </button>
-              <button id="rdf-denied-human" class="button-secondary" style="border-color:rgba(99,102,241,0.35);color:#6366F1;">
-                👤 ${pt ? 'Falar com humano' : 'Talk to human'}
+            </div>
+          </div>
+        </section>`;
+    }
+
+    // FIX 3+4: Documents form shown when customer clicks "I want to contest"
+    function renderRefundDisputeDocumentsForm(ticket) {
+      const pt = isPortuguese(ticket?.inquiry || state.lastInquiry || '');
+      const inputBase = 'width:100%;padding:10px 12px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;font-size:0.88rem;font-family:inherit;background:#fff;box-sizing:border-box;margin-top:4px;';
+      const labelStyle = 'display:block;font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:4px;letter-spacing:0.03em;text-transform:uppercase;';
+      return `
+        <section class="result-card" style="background:rgba(245,158,11,0.03);border:1px solid rgba(245,158,11,0.2);border-left:3px solid #F59E0B;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;font-size:1rem;color:#78350F;">📋 ${pt ? 'Contestação de Reembolso' : 'Refund Contest'}</h2>
+              </div>
+              <span style="background:rgba(245,158,11,0.1);color:#D97706;border:1px solid rgba(245,158,11,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">⏳ ${pt ? 'Aguardando Documentos' : 'Awaiting Documents'}</span>
+            </div>
+            <p style="font-size:0.85rem;color:#4B5563;margin:12px 0 16px;line-height:1.6;">
+              ${pt
+                ? 'Para contestar a decisão, envie um comprovante de pagamento ou extrato bancário. Nossa equipe de especialistas irá revisar seu caso.'
+                : 'To contest the decision, please provide proof of payment or a bank statement. Our specialist team will review your case.'}
+            </p>
+            <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-left:3px solid #F59E0B;border-radius:12px;padding:20px 22px;margin-bottom:16px;">
+              <div style="margin-bottom:14px;">
+                <label style="${labelStyle}">${pt ? 'Comprovante ou Extrato Bancário' : 'Proof of Payment / Bank Statement'}</label>
+                <textarea id="dispute-docs-details" rows="4" placeholder="${pt ? 'Descreva o comprovante ou cole os dados relevantes do extrato (referência da transação, data, valor)...' : 'Describe the proof of payment or paste relevant bank statement details (transaction reference, date, amount)...'}" style="${inputBase}resize:vertical;min-height:90px;"></textarea>
+              </div>
+            </div>
+            <div class="button-row" style="grid-template-columns:1fr 1fr;gap:10px;">
+              <button id="submit-dispute-docs" class="button-primary">
+                📤 ${pt ? 'Enviar Contestação' : 'Submit Contest'}
               </button>
+              <button id="cancel-dispute-docs" class="button-secondary">
+                ↩ ${pt ? 'Voltar' : 'Back'}
+              </button>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    // FIX 4: Specialist review card shown after contest documents submitted
+    function renderRefundDisputeEscalationCard(ticket) {
+      const pt = isPortuguese(ticket?.inquiry || state.lastInquiry || '');
+      const refId = ticket?.reference_id || '';
+      return `
+        <section class="result-card" style="background:rgba(99,102,241,0.03);border:1px solid rgba(99,102,241,0.18);border-left:3px solid #6366F1;">
+          <div class="card-stack">
+            <div class="result-header">
+              <div>
+                <h2 style="margin:14px 0 4px;font-size:1rem;color:#1E1B4B;">🔍 ${pt ? 'Revisão por Especialistas' : 'Specialist Review'}</h2>
+              </div>
+              <span style="background:rgba(99,102,241,0.1);color:#6366F1;border:1px solid rgba(99,102,241,0.2);border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:600;white-space:nowrap;">🚨 ${pt ? 'Em Revisão' : 'Under Review'}</span>
+            </div>
+            <div class="response-bubble">
+              ${pt
+                ? 'Nossos especialistas irão realizar uma revisão humana do seu caso e fornecer mais contexto sobre a decisão de negação do reembolso. Você receberá um retorno em até 2 dias úteis.'
+                : 'Our specialists will perform a human review of your case and provide more context regarding the refund denial decision. You will receive a response within 2 business days.'}
+            </div>
+            ${refId ? `<div style="font-size:0.82rem;color:#64748B;padding:8px 12px;background:rgba(0,0,0,0.03);border-radius:8px;margin-top:10px;">🔖 ${pt ? 'Referência' : 'Reference'}: <span style="font-family:'DM Mono',monospace;font-weight:600;">${escapeHtml(refId)}</span></div>` : ''}
+            <div class="button-row" style="grid-template-columns:1fr;margin-top:12px;">
+              <button class="button-secondary" id="newInquiry">↩ ${pt ? 'Nova Consulta' : 'New Inquiry'}</button>
             </div>
           </div>
         </section>`;
@@ -3620,8 +3681,18 @@
       if (!autoResolvedByAPI && ticket.tags?.includes('requested_human_support')) {
         return renderHumanRequestedEscalationCard(ticket);
       }
-      // FIX 4: Refund denied → choice card instead of generic escalation
+      // FIX 3+4: Refund denied flows — check dispute state first
+      const activeTicketForDispute = state.tickets.find(t => t.reference_id === state.activeTicketId) || ticket;
       if (isRefundDenied && !autoResolvedByAPI) {
+        // After contest documents submitted → show specialist review card
+        if (activeTicketForDispute?.refundDisputeSubmitted) {
+          return renderRefundDisputeEscalationCard(activeTicketForDispute);
+        }
+        // While filling dispute documents form
+        if (state.showRefundDisputeForm) {
+          return renderRefundDisputeDocumentsForm(ticket);
+        }
+        // Initial denial → show 2-button choice card (no "Talk to Human")
         return renderRefundDeniedCard(ticket);
       }
       // FIX 1: Refund not found → investigation form (replaces response card)
@@ -4950,6 +5021,7 @@
           state.feedbackDone = null;
           state.notHelpfulFormVisible = false;
           state.showAwaitingForm = false;
+          state.showRefundDisputeForm = false;
           state.routingAction = null;
           state.missingInfo = [];
           render();
@@ -4967,6 +5039,7 @@
           state.lastInquiry = '';
           state.showResult = false;
           state.showAwaitingForm = false;
+          state.showRefundDisputeForm = false;
           state.routingAction = null;
           state.missingInfo = [];
           state.feedbackDone = null;
@@ -5037,54 +5110,28 @@
         render();
       });
 
+      // FIX 3: Contest → show awaiting documents form (AWAITING_CUSTOMER_DOCUMENTS)
       document.getElementById('rdf-denied-dispute')?.addEventListener('click', () => {
-        const ticket = state.tickets.find(t => t.reference_id === state.activeTicketId) || state.tickets[0];
-        const inq = (ticket?.inquiry || state.lastInquiry || '').replace(/\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim();
-        const disputeInquiry = inq +
-          '\n\n[CUSTOMER DISPUTES REFUND DENIAL — REQUESTS REVIEW]' +
-          (state.customerEmail ? `\nEmail: ${state.customerEmail}` : '') +
-          (state.customerName  ? `\nName: ${state.customerName}`   : '');
-        doSubmitInquiry(inq, disputeInquiry);
+        state.showRefundDisputeForm = true;
+        render();
       });
 
-      document.getElementById('rdf-denied-human')?.addEventListener('click', async () => {
-        const btn = document.getElementById('rdf-denied-human');
-        if (btn) { btn.disabled = true; btn.textContent = '⏳ Connecting...'; btn.style.opacity = '0.6'; }
-        const originalText = state.lastResult?.inquiry || state.lastInquiry || '';
-        const escalationInquiry = originalText.replace(/\[CUSTOMER REQUESTED HUMAN SUPPORT\]/g, '').trim() +
-          '\n\n[CUSTOMER REQUESTED HUMAN SUPPORT]';
-        try {
-          const res = await fetch(state.backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ inquiry: escalationInquiry })
-          });
-          const data = await res.json();
-          state.lastResult = data;
-          data.routing_action = 'escalate';
-          data.escalation_required = true;
-          if (!data.tags) data.tags = [];
-          if (!data.tags.includes('requested_human_support')) data.tags.push('requested_human_support');
-          if (!data.escalation_reason) data.escalation_reason = 'Customer requested human review of denied refund.';
-          const updatedTicket = {
-            reference_id: data.reference_id || state.activeTicketId,
-            routing_action: 'escalate',
-            escalation_required: true,
-            escalation_reason: data.escalation_reason,
-            tags: data.tags,
-            response: data.response,
-            category: data.category || 'Billing',
-            inquiry: escalationInquiry,
-          };
-          const existingIdx = state.tickets.findIndex(t => t.reference_id === updatedTicket.reference_id);
-          if (existingIdx >= 0) state.tickets[existingIdx] = { ...state.tickets[existingIdx], ...updatedTicket };
-          else state.tickets.unshift(updatedTicket);
-          state.activeTicketId = updatedTicket.reference_id;
-          render();
-        } catch (e) {
-          showToast('❌ Failed to connect. Please try again.');
-          if (btn) { btn.disabled = false; btn.textContent = '👤 Talk to human'; btn.style.opacity = '1'; }
-        }
+      // FIX 3+4: Submit contest documents → mark ticket as submitted → show specialist review card
+      document.getElementById('submit-dispute-docs')?.addEventListener('click', () => {
+        const ticket = state.tickets.find(t => t.reference_id === state.activeTicketId) || state.tickets[0];
+        const pt = isPortuguese(ticket?.inquiry || state.lastInquiry || '');
+        if (ticket) ticket.refundDisputeSubmitted = true;
+        state.showRefundDisputeForm = false;
+        render();
+        showToast(pt
+          ? '📄 Contestação enviada! Especialistas irão revisar seu caso.'
+          : '📄 Contest submitted! Specialists will review your case.');
+      });
+
+      // FIX 3: Cancel dispute form → go back to choice card
+      document.getElementById('cancel-dispute-docs')?.addEventListener('click', () => {
+        state.showRefundDisputeForm = false;
+        render();
       });
 
       document.getElementById('escalate-to-human')
@@ -5688,6 +5735,7 @@
       state.feedbackDone = null;
       state.notHelpfulFormVisible = false;
       state.refundDetailSubmitted = false;
+      state.showRefundDisputeForm = false;
       state.progressState = AGENTS.map(agent => ({ ...agent, status: 'waiting' }));
       state.feedbackStatus = null;
       render();

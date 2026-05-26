@@ -52,6 +52,7 @@ class SupportState(BaseModel):
     ticket_summary: str = ""
     action_needed: str = ""
     key_facts: list[str] = []
+    skip_routing: bool = False
 
     def log_step(self, agent_name: str, details: dict[str, Any]) -> None:
         self.steps.append({

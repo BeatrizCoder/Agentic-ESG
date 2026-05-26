@@ -96,11 +96,25 @@ def make_response_task(
     external_instructions = ""
 
     if "WEATHER DELAY ALERT" in external_context:
-        external_instructions = """
-WEATHER ALERT ACTIVE: Real weather data was retrieved.
-Your response MUST mention the specific city,
-real temperature and weather conditions.
-Use appropriate weather emoji (🌧️ ⛈️ ☀️).
+        _is_severe_weather = "SEVERE" in external_context
+        if _is_severe_weather:
+            external_instructions = """
+SEVERE WEATHER ALERT — AUTO-RESOLVED.
+DO NOT ask for order number or tracking info.
+DO NOT escalate. DO NOT say a human will contact them.
+Explain: severe weather (storm/flood/snow/extreme conditions) is causing
+broad operational disruptions in the region.
+All deliveries in the affected area are being monitored automatically.
+Give estimated recovery timeline: 2-3 business days after conditions improve.
+Use ⛈️ emoji. Be reassuring and professional.
+"""
+        else:
+            external_instructions = """
+MODERATE WEATHER ALERT.
+Explain that weather conditions in the customer's city may be contributing to delays.
+Mention the REAL temperature and conditions from the External Context.
+Ask for the order number to investigate their specific delivery.
+Use 🌧️ emoji. Be contextual and helpful.
 """
     elif "WEATHER CHECK" in external_context:
         external_instructions = """
@@ -168,10 +182,59 @@ If bank has NOT processed yet: explain banking timeline (5-10 days).
 If bank HAS processed: confirm money was returned.
 """
     elif "PENDING ACTION FOUND" in external_context:
-        external_instructions = """
+        import re as _re
+        _status_m = _re.search(r'Status: ([^\n]+)', external_context)
+        _pa_status = _status_m.group(1).strip() if _status_m else ""
+        if _pa_status == "DELIVERY_FAILED":
+            external_instructions = """
+DELIVERY FAILED — AUTO-RESOLVED. DO NOT escalate.
+Explain: we attempted delivery but no one was available to receive it.
+Provide both options from the Details field:
+- Reschedule via the reschedule_url link
+- Pick up at the cd_address location
+Mention the return_deadline — the item will be returned to stock after that date.
+Use 🏠 emoji. Be helpful and action-oriented.
+"""
+        elif _pa_status == "LABEL_EXPIRED":
+            external_instructions = """
+RETURN LABEL EXPIRED — AUTO-RESOLVED. DO NOT escalate.
+Explain: the return shipping label has expired.
+Provide the new_label_url from the Details field so the customer can generate a new one.
+Use 📦 emoji. Be clear and proactive.
+"""
+        elif _pa_status == "UNDER_TECHNICAL_ANALYSIS":
+            external_instructions = """
+PRODUCT UNDER TECHNICAL ANALYSIS — AUTO-RESOLVED. DO NOT escalate.
+Explain: the product is currently with our technical team for analysis.
+Reference the report_deadline and protocol from the Details field.
+Reassure the customer: we will contact them as soon as the report is ready.
+Use 🔧 emoji. Be reassuring.
+"""
+        else:
+            external_instructions = """
 EXISTING TICKET WITH PENDING ACTION FOUND.
 Reference the existing ticket ID.
 Clearly explain what action the customer needs to take.
+Provide specific next steps from the description and action_required fields.
+"""
+
+    # Exchange/return already approved — add numbered steps
+    _inq_lower = inquiry.lower()
+    _exchange_keywords = [
+        'troca aprovada', 'troca foi aprovada', 'devolução aprovada',
+        'devolucao aprovada', 'exchange approved', 'return approved',
+    ]
+    if routing_action == "resolve" and any(kw in _inq_lower for kw in _exchange_keywords):
+        external_instructions += """
+
+EXCHANGE/RETURN ALREADY APPROVED — AUTO-RESOLVED.
+Your response MUST include numbered steps for the exchange process:
+1. Embale o produto com segurança (use a embalagem original se possível)
+2. Coloque a etiqueta de devolução fornecida na embalagem
+3. Leve ao ponto de coleta da transportadora mais próximo
+4. Aguarde o novo produto ser enviado após recebimento (3-5 dias úteis)
+
+Use 📦 emoji. Be encouraging and specific.
 """
 
     return Task(
@@ -192,6 +255,25 @@ External Context (APIs/Database):
 {external_context or "No external data retrieved."}
 
 {external_instructions}
+
+ROUTING PHILOSOPHY — PROGRESSIVE ESCALATION:
+Follow progressive escalation. Your response must:
+1. Use ALL available context from External Context (CEP, weather, refund data, pending actions)
+2. Provide a contextual, operationally-aware response that explains WHY something happened
+3. Request missing info if routing_action is "awaiting"
+4. Only reference human review if routing_action is "escalate"
+
+Your response should be:
+✅ Smart — references specific data from External Context
+✅ Contextual — explains WHY something happened (logistics, weather, system issue)
+✅ Operationally aware — mentions real data (city, temperature, order status)
+✅ Enterprise-grade — professional and reassuring
+✅ Explainable — gives the customer a clear reason
+
+NEVER:
+❌ Say "I'll connect you with a human agent" for auto-resolvable issues (resolve/step_by_step)
+❌ Use escalation language when routing_action is "resolve" or "step_by_step"
+❌ Ignore available operational context in External Context
 
 FORMATTING RULES:
 - Respond in {detected_language.upper()} only
