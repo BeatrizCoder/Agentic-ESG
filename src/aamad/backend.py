@@ -1,6 +1,9 @@
 """Entry point — creates the FastAPI app and wires everything together."""
 
 import logging
+import os
+
+os.environ.setdefault("CREWAI_VERBOSE", "0")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

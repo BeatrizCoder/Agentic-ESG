@@ -1,12 +1,27 @@
 """Three CrewAI Crews that map to the three pipeline phases."""
 
+import io
 import json
 import logging
+import os
 import re
+import sys
 
 from crewai import Crew, Process
 
 logger = logging.getLogger(__name__)
+
+
+def _kickoff_silent(crew: Crew):
+    """Run crew.kickoff() suppressing rich/console TTY errors (non-TTY servers)."""
+    old_stdout, old_stderr = sys.stdout, sys.stderr
+    try:
+        sys.stdout = io.StringIO()
+        sys.stderr = io.StringIO()
+        return crew.kickoff()
+    finally:
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
 
 def _extract_json(raw: str) -> dict:
@@ -45,7 +60,7 @@ def run_analysis_crew(inquiry: str) -> dict:
         verbose=False,
     )
 
-    result = crew.kickoff()
+    result = _kickoff_silent(crew)
 
     try:
         tasks_output = result.tasks_output
@@ -107,7 +122,7 @@ def run_response_crew(
         verbose=False,
     )
 
-    result = crew.kickoff()
+    result = _kickoff_silent(crew)
 
     try:
         response_text = result.tasks_output[-1].raw.strip()
@@ -147,7 +162,7 @@ def run_evaluation_crew(
         verbose=False,
     )
 
-    result = crew.kickoff()
+    result = _kickoff_silent(crew)
 
     try:
         tasks_output = result.tasks_output
