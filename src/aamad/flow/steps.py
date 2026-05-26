@@ -268,8 +268,16 @@ class SupportFlowStepsMixin:
 
         return f"Analysis complete: {self.state.category} / {self.state.sentiment}"
 
-    @listen(classify_and_sentiment)
+    @listen(enrich_with_external_data)
     async def route_inquiry(self):
+        if self.state.skip_routing:
+            self.log_step("Routing Engine", {
+                "action": self.state.routing_action,
+                "reason": "skip_routing — enrichment already resolved this ticket",
+                "execution_mode": "skip",
+            })
+            return f"Skipped routing: {self.state.routing_action} (skip_routing)"
+
         decision = route_ticket(
             inquiry=self.state.inquiry,
             category=self.state.category,
@@ -322,7 +330,7 @@ class SupportFlowStepsMixin:
             f"from {self.state.knowledge_source}"
         )
 
-    @listen(retrieve_knowledge)
+    @listen(classify_and_sentiment)
     async def enrich_with_external_data(self):
         import re
         from ..routing_engine import check_logistics_alert, check_weather_delay
@@ -620,7 +628,7 @@ class SupportFlowStepsMixin:
         logger.debug("external_context after: %r", self.state.external_context)
         return f"External enrichment done: {len(context_parts)} data point(s)"
 
-    @listen(enrich_with_external_data)
+    @listen(retrieve_knowledge)
     async def generate_response(self):
         """
         Crew 2: Knowledge + Response sequential.
