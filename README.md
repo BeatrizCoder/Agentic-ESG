@@ -3,6 +3,10 @@
 > Multi-agent AI customer support platform built with FastAPI, CrewAI Flow, Claude Haiku 4.5, and vanilla JS.
 > Capstone project — "Become An Agentic Architect" course by Carmelo Iaria.
 
+🌐 **Live Demo:** https://agentic-support-platform.vercel.app  
+🔧 **Backend API:** https://agentic-support-platform.onrender.com  
+📦 **GitHub:** https://github.com/BeatrizCoder/agentic-support-platform
+
 ---
 
 ## 📋 Table of Contents
@@ -10,18 +14,20 @@
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Agent Pipeline](#agent-pipeline)
-- [LLM vs Deterministic — Decision Matrix](#llm-vs-deterministic)
+- [LLM vs Deterministic Decision Matrix](#llm-vs-deterministic-decision-matrix)
 - [External API Integrations](#external-api-integrations)
 - [Knowledge Base RAG](#knowledge-base-rag)
 - [Routing Engine](#routing-engine)
-- [HITL](#hitl)
+- [HITL Human in the Loop](#hitl-human-in-the-loop)
+- [Quality Evaluation LLM as Judge](#quality-evaluation-llm-as-judge)
 - [Observability and Metrics](#observability-and-metrics)
-- [LLM Quality Evaluation](#llm-quality-evaluation)
+- [Authentication and Privacy](#authentication-and-privacy)
 - [Frontend](#frontend)
+- [Export Features](#export-features)
 - [Setup and Installation](#setup-and-installation)
 - [Environment Variables](#environment-variables)
 - [Running the Project](#running-the-project)
-- [Testing](#testing)
+- [Deploy](#deploy)
 - [Project Structure](#project-structure)
 
 ---
@@ -31,14 +37,18 @@
 The Agentic Support Platform is a production-grade multi-agent customer support system that combines LLM intelligence with deterministic business rules to handle customer inquiries automatically and escalate to humans when needed.
 
 **Key capabilities:**
-- 5+ specialized AI agents in a CrewAI Flow pipeline
-- Intelligent routing by category, sentiment, and available information
-- Real-time external API integration (address validation + weather)
-- SQLite-backed refund lookup system
+- 3 CrewAI Crews with 6 specialized AI agents
+- CrewAI Flow orchestrating the full pipeline
+- Intelligent routing with priority-based business rules
+- Real-time external API integration (ViaCEP + OpenWeatherMap + SQLite Refund DB)
 - Human-in-the-loop (HITL) review with approve/reject/await
+- Cross-model quality evaluation (Sonnet judges Haiku)
 - Full observability with token tracking and cost per agent
-- Built-in LLM quality evaluation (LLM-as-a-judge)
+- JWT guest authentication with 24h session isolation
+- LGPD-compliant privacy with automatic data deletion
+- Export to Excel and PDF with rich formatting
 - Dual-view: Customer Portal + Operator Dashboard
+- Dataset toggle: Live (isolated per user) vs Historical (266 demo tickets)
 
 ---
 
@@ -48,184 +58,225 @@ The Agentic Support Platform is a production-grade multi-agent customer support 
 Customer Inquiry
       |
       v
-+---------------------------------------------+
-|              FastAPI Backend                |
-|                                             |
-|  +----------+    +----------------------+  |
-|  | CrewAI   |    |   Routing Engine     |  |
-|  |  Flow    |--->|  (Business Rules)    |  |
-|  +----------+    +----------------------+  |
-|       |                                     |
-|  +----v-------------------------------------+  |
-|  |         Agent Pipeline               |  |
-|  |                                      |  |
-|  |  Classifier --+                      |  |
-|  |               +-- (parallel)         |  |
-|  |  Sentiment  --+                      |  |
-|  |       |                              |  |
-|  |  Knowledge RAG (local)               |  |
-|  |       |                              |  |
-|  |  External Data Enrichment            |  |
-|  |    +--> ViaCEP API                   |  |
-|  |    +--> OpenWeatherMap API           |  |
-|  |    +--> Refund SQLite DB             |  |
-|  |       |                              |  |
-|  |  Response Generator (LLM)            |  |
-|  |  + Alert Messages (LLM)              |  |
-|  |       |                              |  |
-|  |  Summary Agent (LLM)                 |  |
-|  |       |                              |  |
-|  |  Escalation Evaluator (Rules)        |  |
-|  +--------------------------------------+  |
-|                    |                        |
-|           SQLite (tickets + refunds)        |
-+---------------------------------------------+
++------------------------------------------+
+|           FastAPI Backend                |
+|                                          |
+|  +----------+   +--------------------+  |
+|  | CrewAI   |   |   Routing Engine   |  |
+|  |  Flow    |-->|  (Business Rules)  |  |
+|  +----------+   +--------------------+  |
+|       |                                  |
+|  +----v---------------------------------+|
+|  |         3 CrewAI Crews               ||
+|  |                                      ||
+|  | Crew 1: Analysis (parallel)          ||
+|  |   Classification Agent               ||
+|  |   Sentiment Agent                    ||
+|  |         |                            ||
+|  | Python: Routing + RAG + APIs         ||
+|  |   ViaCEP / OpenWeatherMap            ||
+|  |   Refund DB / Pending Actions        ||
+|  |         |                            ||
+|  | Crew 2: Response (sequential)        ||
+|  |   Knowledge Agent                    ||
+|  |   Response Agent                     ||
+|  |         |                            ||
+|  | Python: Escalation Evaluator         ||
+|  |         |                            ||
+|  | Crew 3: Evaluation (background)      ||
+|  |   Summary Agent                      ||
+|  |   Quality Agent (Sonnet)             ||
+|  +--------------------------------------+|
+|                    |                     |
+|         Neon PostgreSQL (São Paulo)      |
++------------------------------------------+
       |
       v
 +-------------+     +----------------------+
 |  Customer   |     |  Operator Dashboard  |
 |   Portal    |     |  HITL + Analytics    |
 +-------------+     +----------------------+
+      |                        |
+   Vercel                   Vercel
 ```
 
 ---
 
 ## Agent Pipeline
 
-| Step | Agent | Type | Description |
-|------|-------|------|-------------|
-| 1 | Classification Agent | LLM | Categorizes inquiry + detects language |
-| 2 | Sentiment Analysis Agent | LLM | Detects sentiment + urgency (parallel with step 1) |
-| 3 | Routing Engine | Rules | Decides routing action per category |
-| 4 | Knowledge Retrieval Agent | Local | RAG search in markdown documents |
-| 5 | External Data Enrichment | APIs | ViaCEP + OpenWeather + Refund DB |
-| 6 | Response Generation Agent | LLM | Generates contextual + personalized response |
-| 7 | Summary Agent | LLM | Creates 2-line operator summary |
-| 8 | Escalation Evaluation Agent | Rules | Decides escalate/resolve/await |
+| Step | Agent/Component | Type | Description |
+|------|----------------|------|-------------|
+| 1 | **Crew 1: Analysis** | 🤖 CrewAI | Classification + Sentiment in parallel |
+| 1a | Classification Agent | 🤖 LLM Haiku | Category + language detection |
+| 1b | Sentiment Agent | 🤖 LLM Haiku | Sentiment + urgency (parallel with 1a) |
+| 2 | **Routing Engine** | ⚙️ Rules | Priority-based routing decision |
+| 3 | **Knowledge RAG** | ⚙️ Local | Retrieves relevant KB snippets |
+| 4 | **External Data Enrichment** | 🌐 APIs | ViaCEP + OpenWeatherMap + Refund DB |
+| 5 | **Crew 2: Response** | 🤖 CrewAI | Knowledge + Response sequential |
+| 5a | Knowledge Agent | 🤖 LLM Haiku | Synthesizes KB snippets |
+| 5b | Response Agent | 🤖 LLM Haiku | Generates personalized response |
+| 6 | **Escalation Evaluator** | ⚙️ Rules | Final routing decision |
+| 7 | **Crew 3: Evaluation** | 🤖 CrewAI | Runs in background (non-blocking) |
+| 7a | Summary Agent | 🤖 LLM Haiku | 2-line operator summary |
+| 7b | Quality Agent | 🤖 LLM Sonnet | Cross-model evaluation |
 
-Steps 1 and 2 run in parallel — saves ~750ms per request.
+**Crew 3 runs in background** — customer receives response in ~8s while evaluation happens asynchronously (~10s later in Operator Dashboard).
 
 ---
 
-## LLM vs Deterministic
+## LLM vs Deterministic Decision Matrix
 
-### Uses LLM — where intelligence adds value
+### 🤖 Uses LLM (CrewAI Agents)
 
-| Component | Reason for LLM | Avg Tokens | Avg Cost/Call |
-|-----------|---------------|-----------|--------------|
-| Classification | Linguistic nuance + language detection (PT/EN/ES/FR) | ~170 | ~$0.000200 |
-| Sentiment Analysis | Detects irony, sarcasm, cultural context | ~145 | ~$0.000178 |
-| Response Generation | Empathy, context-awareness, personalization | ~620 | ~$0.001199 |
-| Summary Generation | Concise 2-line operator summary | ~200 | ~$0.000250 |
-| Logistics Alert Message | Personalized with real CEP + city data | ~180 | ~$0.000220 |
-| Weather Alert Message | Uses real temperature + conditions from API | ~180 | ~$0.000220 |
-| Refund Status Message | Empathetic, adapted to customer sentiment | ~200 | ~$0.000245 |
-| Step-by-step Guidance | Dynamic instructions with links from knowledge base | ~350 | ~$0.000430 |
-| Quality Evaluation | LLM-as-a-judge for faithfulness + relevance | ~300 | ~$0.000370 |
+| Component | Agent | Model | Avg Tokens | Avg Cost |
+|-----------|-------|-------|-----------|---------|
+| Classification | Classification Agent | Haiku 4.5 | ~170 | ~$0.000200 |
+| Sentiment Analysis | Sentiment Agent | Haiku 4.5 | ~145 | ~$0.000178 |
+| Knowledge Synthesis | Knowledge Agent | Haiku 4.5 | ~200 | ~$0.000245 |
+| Response Generation | Response Agent | Haiku 4.5 | ~620 | ~$0.001199 |
+| Logistics Alert Message | Response Agent | Haiku 4.5 | ~180 | ~$0.000220 |
+| Weather Alert Message | Response Agent | Haiku 4.5 | ~180 | ~$0.000220 |
+| Refund Status Message | Response Agent | Haiku 4.5 | ~200 | ~$0.000245 |
+| Operator Summary | Summary Agent | Haiku 4.5 | ~200 | ~$0.000250 |
+| Quality Evaluation | Quality Agent | **Sonnet 4.6** | ~300 | ~$0.001200 |
 
-> Important: External APIs (ViaCEP, OpenWeatherMap) are called deterministically.
-> But the response messages based on their data are generated by LLM for personalization.
+> **Note:** External APIs (ViaCEP, OpenWeatherMap) are called deterministically.
+> The **response messages** based on their data are generated by LLM for personalization.
 
-### Uses Deterministic Rules — where reliability matters more
+### ⚙️ Uses Deterministic Rules (No LLM)
 
-| Component | Reason for Rules | Avg Latency |
-|-----------|-----------------|-------------|
-| Routing Engine | Business rules must be predictable and auditable | ~2ms |
-| Escalation Evaluator | Compliance critical — cannot hallucinate | ~2ms |
-| Knowledge Retrieval | Local search is instant, free, reliable | ~45ms |
-| CEP Validation (API call) | REST API call — no LLM needed | ~420ms |
-| Weather Check (API call) | REST API call — no LLM needed | ~380ms |
-| Refund DB Lookup | SQLite query — deterministic by definition | ~12ms |
-| Escalation Keyword Detection | Regex is faster and more auditable | <1ms |
-| Retry/Timeout/Fallback | Must be deterministic for reliability | <1ms |
+| Component | Why Deterministic | Latency |
+|-----------|-----------------|---------|
+| Routing Engine | Business rules must be auditable | ~2ms |
+| Escalation Evaluator | Compliance — cannot hallucinate | ~2ms |
+| Knowledge RAG retrieval | Local search, instant, free | ~45ms |
+| ViaCEP API call | REST API — no LLM needed | ~420ms |
+| OpenWeatherMap call | REST API — no LLM needed | ~380ms |
+| Refund DB lookup | SQLite query — deterministic | ~12ms |
+| Pending Actions lookup | SQLite query — deterministic | ~8ms |
+| Escalation keyword detection | Regex — faster and auditable | <1ms |
 
-### Cost Optimization Insight
+### 💡 Cost Per Ticket
 
 ```
-Current cost breakdown per ticket:
-  Classification:  $0.000200  (12.5%)
-  Sentiment:       $0.000178  (11.1%)
-  Response:        $0.001199  (74.9%)
-  Summary:         $0.000050  (3.1%)
-  Total:          ~$0.001627 per ticket
-
-Potential optimization:
-  Switch Classification + Sentiment to deterministic
-  -> Save ~23.6% per ticket
-  -> Response Agent still uses LLM (highest value)
-  -> Dashboard shows this recommendation automatically
+Classification:   $0.000200  (6.5%)
+Sentiment:        $0.000178  (5.7%)
+Knowledge:        $0.000245  (7.9%)
+Response:         $0.001199  (38.7%)
+Summary:          $0.000250  (8.1%)
+Quality (Sonnet): $0.001200  (38.7%)
+──────────────────────────────────
+Total:           ~$0.003272 per ticket
 ```
 
 ---
 
 ## External API Integrations
 
-### ViaCEP (Address Validation)
+### 📍 ViaCEP (Address Validation)
 
 ```
 Purpose:  Validates Brazilian postal codes
 URL:      https://viacep.com.br/ws/{cep}/json/
-Auth:     None required
-Latency:  ~420ms avg
-Retries:  2 attempts, 5s timeout
-Fallback: Proceeds without validation if unavailable
+Auth:     None (free, no limits)
+Client:   httpx.AsyncClient (truly async)
+Latency:  ~420ms avg | Retries: 2 | Timeout: 5s
 ```
 
-Business rule:
+**Business rule:**
 ```
 CEP from Sul/Sudeste (SP, RJ, MG, ES, PR, SC, RS)
-  -> Logistics alert active (fleet maintenance)
-  -> LLM generates personalized response with city/address
-  -> Auto-resolved
+  → Logistics alert (fleet maintenance)
+  → LLM Response Agent generates personalized message
+  → Auto-resolved
 
 CEP from other regions
-  -> No alert -> normal routing flow
+  → No alert → normal routing
 ```
 
-### OpenWeatherMap (Weather Check)
+### 🌤️ OpenWeatherMap (Weather Check)
 
 ```
 Purpose:  Real-time weather for customer city
 URL:      https://api.openweathermap.org/data/2.5/weather
 Auth:     OPENWEATHER_API_KEY (free: 1000 calls/day)
-Latency:  ~380ms avg
-Retries:  2 attempts, 429 rate limit handling
-Fallback: Proceeds without weather data if unavailable
+Client:   httpx.AsyncClient (truly async)
+Latency:  ~380ms avg | Retries: 2 | Timeout: 5s
+City extraction: LLM-based (handles any location mention)
 ```
 
-Business rule:
+**Business rules:**
 ```
-City in Sul + adverse_conditions = true
-  -> Weather delay alert
-  -> LLM generates response with real temp + conditions
-  -> Auto-resolved
+Adverse weather (rain/storm/snow)
+  → Weather delay alert
+  → LLM generates response with REAL temperature + conditions
+  → Auto-resolved
 
-Clear weather
-  -> No alert -> normal routing flow
+Clear weather + no order number
+  → "☀️ Clima normal em {city}. Preciso do número do pedido."
+  → Awaiting form
+
+Clear weather + has order number
+  → "☀️ Clima normal. Escalando para investigar."
+  → Escalate
 ```
 
-### Refund Database (SQLite)
+### 🗄️ Refund Database (SQLite → Neon in production)
 
 ```
 Purpose:  Lookup refund status by order number
-Type:     Local SQLite table
 Latency:  ~12ms avg
-Seed:     10 realistic records (orders 11111-99999)
+Seed:     10 realistic records (orders 11111–99999)
 ```
 
-Business rules:
+**Refund seed data:**
+
+| Order | Status | Value | Product |
+|-------|--------|-------|---------|
+| 11111 | aprovado | R$150,00 | Tênis Nike Air |
+| 22222 | pendente | R$89,90 | Camiseta Adidas |
+| 33333 | negado | R$45,00 | Acessório USB |
+| 44444 | processado | R$299,00 | Smartwatch |
+| 55555 | aprovado | R$199,90 | Mochila Escolar |
+| 66666 | pendente | R$520,00 | Monitor 24" |
+| 77777 | processado | R$35,00 | Carregador USB-C |
+| 88888 | aprovado | R$750,00 | iPhone Case Premium |
+| 99999 | negado | R$180,00 | Perfume Importado |
+| 10000 | em_analise | R$440,00 | Notebook Sleeve |
+
+**Business rules:**
 ```
-aprovado / processado / pendente / em_analise
-  -> LLM generates empathetic status message
-  -> Auto-resolved with feedback buttons
+aprovado/processado/pendente/em_analise
+  → LLM generates empathetic status message
+  → Auto-resolved with feedback buttons 👍 👎
 
 negado
-  -> Shows 3 options: accept / dispute / talk to human
+  → Customer gets 3 options:
+    👍 I understand → closes
+    👎 I disagree → dispute form → escalates
+    👤 Talk to human → HITL
 
 Not found
-  -> Investigation form (required fields)
-  -> Escalates with collected details
+  → Investigation form (required fields, no skip)
+  → Escalates with collected details
 ```
+
+### ⏳ Pending Actions Database
+
+```
+Purpose:  Detect open cases requiring customer action
+Seed:     7 realistic scenarios (orders 77701–77707)
+```
+
+| Order | Status | Product | Action Required |
+|-------|--------|---------|-----------------|
+| 77701 | AWAITING_PHOTO | Tênis Nike Air Max | Send damage photo |
+| 77702 | LABEL_EXPIRED | Smartwatch Samsung | Generate new return label |
+| 77703 | AWAITING_RETURN_SHIPMENT | Notebook Dell | Ship product back (deadline expired!) |
+| 77704 | AWAITING_DOCUMENTATION | iPhone Case | Send payment proof |
+| 77705 | DELIVERY_FAILED | Monitor LG 27" | Reschedule delivery (deadline 25/05!) |
+| 77706 | UNDER_TECHNICAL_ANALYSIS | Fone Sony WH-1000XM5 | Wait for technical report |
+| 77707 | AWAITING_RETURN | Cafeteira Nespresso | Return product today! |
 
 ---
 
@@ -233,24 +284,22 @@ Not found
 
 Token-controlled retrieval from local markdown documents.
 
-Documents:
 ```
 knowledge/
-  order_issues.md       <- tracking, wrong items, damaged
-  billing.md            <- refunds, charges, invoices
-  account_access.md     <- password reset, locked accounts, 2FA
-  technical_issues.md   <- site errors, payment failures
-  general_support.md    <- return policy, cancellation, contact
-  escalation_policy.md  <- when to escalate, PT + EN keywords
+  order_issues.md       ← tracking, wrong items, damaged
+  billing.md            ← refunds, charges, invoices
+  account_access.md     ← password reset, locked accounts, 2FA
+  technical_issues.md   ← site errors, payment failures
+  general_support.md    ← return policy, cancellation, contact
+  escalation_policy.md  ← when to escalate, PT + EN keywords
 ```
 
-Token control:
+**Token control:**
 ```python
 MAX_KNOWLEDGE_SNIPPETS = 3    # max snippets per query
 MAX_SNIPPET_CHARS = 800       # max chars per snippet
 # Result: max ~600 tokens of context sent to LLM
-# vs ~5,000+ tokens if full documents were sent
-# Savings: ~88% fewer knowledge tokens
+# vs ~5,000+ if full documents were sent (~88% savings)
 ```
 
 ---
@@ -261,112 +310,183 @@ Priority-based routing decision matrix:
 
 | Priority | Condition | Action |
 |----------|-----------|--------|
-| 1 | Logistics alert (Sul/Sudeste CEP) | Auto-resolve + LLM message |
-| 2 | Weather delay (city + adverse) | Auto-resolve + LLM message |
-| 3 | Refund found in DB | Auto-resolve + LLM message |
-| 4 | Refund denied | Show options (accept/dispute/human) |
-| 5 | Explicit escalation keyword | Escalate immediately |
-| 6 | Billing category | Always escalate |
-| 7 | Account hacked/unauthorized | Always escalate |
-| 8 | Order Issues + has order number | Escalate (enough info) |
-| 9 | Order Issues + no order number | Awaiting (request info) |
-| 10 | Account Access (normal) | Step-by-step guidance |
-| 11 | Technical Issue + has details | Step-by-step guidance |
-| 12 | Technical Issue + no details | Awaiting + screenshot upload |
-| 13 | General Support | Auto-resolve |
+| 1 | Logistics alert (Sul/Sudeste CEP) | ✅ Auto-resolve + LLM message |
+| 2 | Adverse weather (city detected) | ✅ Auto-resolve + LLM message |
+| 3 | Pending action found (orders 77701–77707) | ⏳ Awaiting + action instructions |
+| 4 | Refund found in DB | ✅ Auto-resolve + LLM message |
+| 5 | Refund denied | 🔴 Show 3 options (accept/dispute/human) |
+| 6 | Explicit escalation keyword | 🚨 Escalate immediately |
+| 7 | Billing category | 🚨 Always escalate |
+| 8 | Account hacked/unauthorized | 🚨 Always escalate |
+| 9 | Order Issues + has order number | 🚨 Escalate (enough info) |
+| 10 | Order Issues + no order number | ⏳ Awaiting (request info) |
+| 11 | Account Access (normal) | 📋 Step-by-step guidance |
+| 12 | Technical Issue | ⏳ Awaiting + screenshot upload |
+| 13 | General Support | ✅ Auto-resolve |
+
+**Intake data stripping:**
+```python
+# Phone/email from intake form stripped before routing
+# Prevents false order number detection
+_clean_for_routing("My order\nPhone: 11999999999")
+→ "My order" (phone not detected as order number)
+```
 
 ---
 
-## HITL
-
-Human-in-the-Loop review workflow:
+## HITL Human in the Loop
 
 ```
 Escalated ticket
       |
       v
-Operator Dashboard
+Operator Dashboard — Response tab
       |
-      +-- Approve & Resolve  -> RESOLVED
-      +-- Awaiting Customer  -> AWAITING
-      +-- Reject             -> back to queue
+      +── ✅ Approve & Resolve  → status: completed
+      |    (buttons disappear, shows "Resolved by human review")
+      +── ⏳ Awaiting Customer  → status: awaiting_customer_info
+      +── ❌ Reject             → returns to queue
+
+Auto-resolved tickets:
+  → Show "✅ Resolved automatically by AI" badge
+  → NO HITL buttons shown
 ```
 
-Pre-escalation modal: Collects info BEFORE escalating billing/refund:
-- Order number, purchase date, amount (R$), reason (dropdown)
+**Pre-escalation modal:** Collects info BEFORE escalating:
+- Order number, purchase date, amount (R$), reason
 
-Awaiting form: Dynamic fields based on exactly what is missing:
-- Order number, email, screenshot (drag and drop + clipboard paste)
+**Awaiting form:** Dynamic fields based on what's missing:
+- Order number, email, screenshot (drag and drop)
+
+---
+
+## Quality Evaluation LLM as Judge
+
+**Cross-model evaluation: Claude Sonnet 4.6 judges Claude Haiku 4.5 responses.**
+
+```python
+# Industry pattern: stronger model evaluates weaker model
+JUDGE_MODEL = "claude-sonnet-4-20250514"   # evaluator
+RESPONSE_MODEL = "claude-haiku-4-5"         # responder
+```
+
+**Evaluation dimensions (0-10):**
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| **Faithfulness** | Did it use real data? Any hallucinations? |
+| **Relevance** | Did it answer what was asked? |
+| **Empathy** | Was the tone warm and professional? |
+| **Completeness** | Was enough info provided to help? |
+
+**Grade scale:**
+
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| A | ≥ 8.5 | Excellent |
+| B | ≥ 7.0 | Good |
+| C | ≥ 5.5 | Fair |
+| D | ≥ 4.0 | Poor |
+| F | < 4.0 | Failed |
+
+**Hallucination detection:** Sonnet explicitly checks if the response invented facts not present in the context (knowledge base or external API data).
+
+**Runs in background** — does not block customer response. Results appear in Operator Dashboard ~10s after ticket creation.
 
 ---
 
 ## Observability and Metrics
 
-Per-ticket (Observability tab):
+### Per-ticket (Operator → Observability tab)
+
 ```
 Token Usage per Agent:
-  Classification:  in=145  out=21   cost=$0.000200
-  Sentiment:       in=256  out=28   cost=$0.000317
-  Knowledge:       -       -        - (local, free)
-  Response:        in=716  out=362  cost=$0.002021
-  Escalation:      -       -        - (rules, free)
-  Total:           1,117   411      $0.002538
+  Analysis Crew:   in=401  out=49   cost=$0.000378
+  Knowledge Agent: in=312  out=89   cost=$0.000422
+  Response Agent:  in=716  out=362  cost=$0.002021
+  Summary Agent:   in=245  out=67   cost=$0.000321
+  Quality Agent:   in=812  out=134  cost=$0.003450
+  ─────────────────────────────────────────────────
+  Total:           2,486   701      $0.006592
 ```
 
-Aggregated (Analytics tab):
+### Aggregated (Analytics tab)
 
-Customer Metrics:
-- CSAT Score (from feedback buttons)
-- Top Not Helpful Reasons (from questionnaire)
+**Customer Metrics:**
+- CSAT Score (👍 👎 buttons)
+- Not Helpful top reasons
 - Tickets by category, sentiment, urgency
-- Ticket timeline (last 7 days)
+- Ticket timeline (last 7/30/90 days)
 - External API Business Impact
 
-System Metrics — Agent Health Dashboard (9 cards):
+**System Metrics — Agent Health Dashboard (9 cards):**
 
 | Row | Cards |
 |-----|-------|
 | Quality | Classification Accuracy, Avg Response Time, Model Confidence |
-| Operational | Cost per Ticket, Fallback Rate, Avg Pipeline Depth |
+| Operational | Cost per Ticket, Fallback Rate, Pipeline Depth |
 | Pipeline | KB Coverage, Throughput, Fallback Rate |
-| External APIs | ViaCEP Latency, OpenWeather Latency, Refund DB Latency, API Resilience |
+| External APIs | ViaCEP Latency, Weather Latency, Refund DB Latency, Resilience |
+
+**Additional Analytics:**
+- ⏱️ Resolution time by category (bar chart with color coding)
+- 💰 Cost forecasting (daily/weekly/monthly/yearly projections)
+- ⚖️ Quality Evaluation section (avg scores + grade distribution)
+- 🧠 Hallucination Rate card
 
 ---
 
-## LLM Quality Evaluation
+## Authentication and Privacy
 
-Built-in quality evaluation using LLM-as-a-judge pattern.
-No external libraries required.
+### JWT Guest Authentication
 
-```python
-evaluation_prompt = f"""
-Evaluate this support response:
-
-Customer inquiry: {inquiry}
-Generated response: {response}
-Category: {category}
-
-Score 0-10:
-- faithfulness: uses real data or hallucinates?
-- relevance: answers what was asked?
-- empathy: warm and professional?
-- completeness: answer is complete?
-
-Return JSON with scores + issues + suggestion.
-"""
+```
+Login screen → accept T&C + Privacy Policy (must scroll to read)
+      ↓
+POST /auth/guest → JWT token generated
+  {
+    "sub": "guest-{unique-12-char-id}",
+    "role": "guest",
+    "exp": 24 hours
+  }
+      ↓
+Token stored ONLY in browser localStorage
+NEVER sent to database
+      ↓
+All tickets linked to guest-{unique-id}
+Completely isolated from other users
+      ↓
+After 24 hours: token expires + tickets auto-deleted
 ```
 
-Why LLM-as-a-judge instead of DeepEval/Ragas:
+### Privacy (LGPD Compliant)
 
-| DeepEval/Ragas require | Our approach |
-|------------------------|--------------|
-| Pre-defined ground truth | No ground truth needed |
-| External API accounts | Uses existing Anthropic key |
-| Static evaluation dataset | Evaluates every response live |
-| Extra pip dependencies | Zero extra dependencies |
+```
+What we store in Neon:
+  ✅ Support tickets (linked to anonymous session ID)
+  ✅ Usage metrics (response time, category)
+  ❌ No real names, emails, or phone numbers
 
-Trade-off: LLM-as-a-judge has self-evaluation bias.
-For production, combining with DeepEval benchmarks is recommended.
+What we DON'T store:
+  ❌ JWT token (browser only)
+  ❌ IP addresses (Render processes, not stored)
+  ❌ Payment information
+
+Automatic deletion:
+  Guest tickets deleted after 24 hours
+  Historical demo data: permanent (not personal)
+
+Your rights (LGPD Art. 18):
+  Contact: beatrizcostaleal1996@gmail.com
+```
+
+### Data isolation
+
+```
+User A (guest-a1b2c3) → sees only their tickets
+User B (guest-x9y8z7) → sees only their tickets
+Historical mode → shared demo dataset (266 tickets)
+```
 
 ---
 
@@ -375,35 +495,67 @@ For production, combining with DeepEval benchmarks is recommended.
 Dual-view single-page application (vanilla JS, no framework):
 
 ### Customer Portal (light violet theme)
-- Intake form: name, email, phone, privacy checkbox
-- Quick Demo dropdown: 25+ pre-filled scenarios
+
+- Intake form: name, email, phone (not stored permanently)
+- ⚡ **Quick Demo dropdown** — 25+ pre-filled scenarios
 - Dynamic response cards:
-  - Auto-resolve: response + feedback buttons
-  - Step-by-step: numbered steps + clickable links
-  - Awaiting: dynamic fields + screenshot upload
-  - Escalation: reference ID + confirmation
-  - Refund denied: accept / dispute / talk to human
+  - ✅ Auto-resolve → response + 👍 👎 feedback
+  - 📋 Step-by-step → numbered steps + links
+  - ⏳ Awaiting → dynamic fields + screenshot upload
+  - 🚨 Escalation → reference ID + confirmation
+  - 💰 Refund denied → accept / dispute / talk to human
+  - ⏳ Pending action → contextual instructions with deadline
+- Not Helpful questionnaire (5 reasons)
 
 ### Operator Dashboard (dark glassmorphism theme)
-- Dataset Toggle: Live Demo vs Historical Data (read-only)
+
+- **Dataset Toggle:** Live (My Tickets) ↔ Historical Demo Dataset
+- Mode explanation banner (honest about isolation)
 - Ticket queue with filters: status, category, API tags
-- API tags: Logistics Alert, Weather Alert, Refund Found, Refund Denied
+- Quick filter pills: 🚨 Pending | ⏳ Awaiting | ✅ Resolved | 👤 Human Req
+- API tags on tickets: 🚛 Logistics | ⛈️ Weather | ✅ Refund Found | ❌ Denied
 - Ticket detail tabs:
-  - Response: AI response + AI Summary + HITL buttons + feedback
-  - Agent Timeline: colored dots, collab badges, deduplication
-  - Knowledge: expandable accordion with snippets sent to LLM
-  - Observability: token table per agent + cost breakdown
-- Analytics tab (customer + system metrics)
+  - **Response** — AI response + AI Summary + HITL buttons + Quality Evaluation
+  - **Agent Timeline** — colored dots, collab badges
+  - **Knowledge** — snippets sent to LLM
+  - **Observability** — token table + cost breakdown
+- Analytics tab (full metrics)
+- Export: 📊 Excel (4 sheets) + 📄 PDF (3 pages) with date filter
 - Demo Controls: clear tickets, manage backups
+
+---
+
+## Export Features
+
+### Excel (.xlsx) — 4 sheets
+
+| Sheet | Contents |
+|-------|---------|
+| 📊 Dashboard | KPI cards + pie chart + resolution time bars |
+| 🎫 Tickets | Full table with color-coded status + auto-filter |
+| 🤖 Agent Performance | Metrics table + cost bar chart |
+| 💰 Cost Analysis | Projections + agent breakdown |
+
+### PDF — 3 pages
+
+| Page | Contents |
+|------|---------|
+| 1 | Cover + Executive Summary + Category breakdown |
+| 2 | Resolution time table + Agent performance |
+| 3 | Cost forecasting + Agent cost breakdown |
+
+**Date filter:** Last 7 days / Last 30 days / Last 90 days / All time
 
 ---
 
 ## Setup and Installation
 
-Prerequisites: Python 3.11+, Git
+### Prerequisites
+- Python 3.11+
+- Git
 
 ```bash
-git clone https://github.com/your-username/agentic-support-platform.git
+git clone https://github.com/BeatrizCoder/agentic-support-platform.git
 cd agentic-support-platform
 
 python3 -m venv .venv
@@ -419,73 +571,60 @@ cp .env.example .env
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| ANTHROPIC_API_KEY | Yes | - | Claude Haiku 4.5 API key |
-| OPENWEATHER_API_KEY | Yes | - | OpenWeatherMap free tier |
-| INTERNAL_API_KEY | Yes | dev-key-change-in-production | Operator auth |
-| ALLOWED_ORIGINS | No | localhost | CORS origins |
-| MAX_KNOWLEDGE_SNIPPETS | No | 3 | Max RAG snippets |
-| MAX_SNIPPET_CHARS | No | 800 | Max chars per snippet |
-| USE_LLM | No | True | Enable/disable LLM |
-| CREWAI_VERBOSE | No | false | Verbose agent logs |
-| CREWAI_TRACING_ENABLED | No | true | CrewAI tracing |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | ✅ | Claude Haiku 4.5 + Sonnet 4.6 |
+| `OPENWEATHER_API_KEY` | ✅ | OpenWeatherMap free tier |
+| `INTERNAL_API_KEY` | ✅ | Operator dashboard auth |
+| `DATABASE_URL` | ✅ | PostgreSQL (Neon) or SQLite fallback |
+| `JWT_SECRET` | ✅ | Secret for JWT signing |
+| `ALLOWED_ORIGINS` | No | CORS origins (comma-separated) |
+| `MAX_KNOWLEDGE_SNIPPETS` | No | Default: 3 |
+| `MAX_SNIPPET_CHARS` | No | Default: 800 |
+| `USE_LLM` | No | Default: True |
+| `ENABLE_EXTERNAL_APIS` | No | Default: true |
+| `JWT_EXPIRE_HOURS` | No | Default: 24 |
 
 ---
 
 ## Running the Project
 
 ```bash
-# Option 1 - Start script
+# Option 1 — Start script
 chmod +x start_demo.sh
 ./start_demo.sh
 
-# Option 2 - Manual
-# Terminal 1
+# Option 2 — Manual
+# Terminal 1: Backend
 source .venv/bin/activate
 uvicorn aamad.backend:app --reload --port 8000
 
-# Terminal 2
+# Terminal 2: Frontend
 python3 -m http.server 5500
 ```
 
-Access:
+**URLs:**
 - Customer Portal: http://localhost:5500/index.html
-- Operator Dashboard: same URL -> Operator View
+- Operator Dashboard: same URL → Operator View
 - API Docs: http://127.0.0.1:8000/docs
 - Health Check: http://127.0.0.1:8000/health
 
 ---
 
-## Testing
+## Deploy
 
-```bash
-# External API tests
-python tests/test_external_tools.py
+| Service | Purpose | Plan |
+|---------|---------|------|
+| **Render** | Backend (FastAPI + Docker) | Free (cold start) |
+| **Vercel** | Frontend (static HTML) | Free |
+| **Neon** | PostgreSQL database | Free (0.5GB, São Paulo) |
+| **UptimeRobot** | Keep Render awake | Free (5min ping) |
 
-# Expected:
-# OK CEP valid -> Av. Paulista, Sao Paulo - SP (590ms)
-# OK CEP invalid -> error handled cleanly
-# OK CEP timeout -> fallback returned
-# OK Weather Sao Paulo -> conditions + temperature
-# OK Weather city not found -> fallback handled
+**Deploy flow:**
 ```
-
-Manual test scenarios:
-
-| Input | Expected |
-|-------|----------|
-| "Qual a politica de devolucao?" | Auto-resolve, PT |
-| "What is the return policy?" | Auto-resolve, EN |
-| "Esqueci minha senha" | Step-by-step |
-| "Minha conta foi hackeada" | Escalate immediately |
-| "Meu pedido nao chegou" | Awaiting (no order number) |
-| "Pedido 12345 nao chegou" | Escalate (has order number) |
-| "CEP 01310-100" | ViaCEP -> logistics alert |
-| "Sou de Curitiba, pedido atrasou" | OpenWeather -> real conditions |
-| "Reembolso pedido 11111" | DB -> approved R$150 |
-| "Reembolso pedido 33333" | DB -> denied -> 3 options |
-| "QUERO REEMBOLSO URGENTE" | Pre-escalation modal |
+git push → GitHub → Render auto-deploy (backend)
+                  → Vercel auto-deploy (frontend)
+```
 
 ---
 
@@ -493,43 +632,67 @@ Manual test scenarios:
 
 ```
 agentic-support-platform/
-|
-+-- src/aamad/
-|   +-- backend.py              # FastAPI + CrewAI SupportFlow
-|   +-- routing_engine.py       # Priority routing matrix
-|   +-- observability.py        # Structured event tracking
-|   +-- services.py             # KnowledgeService (RAG)
-|   +-- data_store.py           # SQLite via SQLAlchemy
-|
-+-- tools/
-|   +-- utils.py                    # clean_inquiry, detect_language
-|   +-- classification_tool.py      # LLM: category + language
-|   +-- sentiment_tool.py           # LLM: sentiment + urgency
-|   +-- knowledge_tool.py           # Local: RAG retrieval
-|   +-- response_tool.py            # LLM: response + alerts
-|   +-- escalation_tool.py          # Rules: keyword matching
-|   +-- address_validation_tool.py  # ViaCEP API
-|   +-- weather_check_tool.py       # OpenWeatherMap API
-|   +-- refund_lookup_tool.py       # SQLite refunds
-|   +-- quality_evaluator.py        # LLM-as-a-judge (Sonnet)
-|
-+-- knowledge/
-|   +-- order_issues.md
-|   +-- billing.md
-|   +-- account_access.md
-|   +-- technical_issues.md
-|   +-- general_support.md
-|   +-- escalation_policy.md
-|
-+-- tests/
-|   +-- test_external_tools.py  # 5/5 passing
-|
-+-- index.html                  # Full frontend (vanilla JS)
-+-- start_demo.sh               # Demo startup script
-+-- requirements.txt
-+-- .env.example
-+-- .gitignore
-+-- README.md
+│
+├── src/aamad/
+│   ├── backend.py              ← FastAPI app (49 lines — entry point only)
+│   ├── routing_engine.py       ← Priority routing matrix
+│   ├── observability.py        ← Structured event tracking
+│   ├── services.py             ← KnowledgeService (RAG)
+│   ├── data_store.py           ← SQLAlchemy + Neon PostgreSQL
+│   ├── auth.py                 ← JWT guest authentication
+│   ├── api/
+│   │   ├── models.py           ← Pydantic request/response models
+│   │   └── routes.py           ← 20+ FastAPI endpoints via APIRouter
+│   ├── agents/
+│   │   ├── definitions.py      ← 6 CrewAI Agent definitions
+│   │   ├── tasks.py            ← CrewAI Task factories
+│   │   └── crews.py            ← 3 CrewAI Crew orchestrators
+│   ├── exports/
+│   │   ├── excel_export.py     ← openpyxl Excel report (4 sheets)
+│   │   └── pdf_export.py       ← reportlab PDF report (3 pages)
+│   ├── flow/
+│   │   ├── state.py            ← SupportState model
+│   │   ├── steps.py            ← SupportFlowStepsMixin
+│   │   └── support_flow.py     ← CrewAI Flow orchestrator
+│   └── core/
+│       ├── config.py           ← Env vars, JWT, rate limiter
+│       └── services.py         ← Singleton container
+│
+├── tools/
+│   ├── utils.py                    ← clean_inquiry, detect_language
+│   ├── classification_tool.py      ← (legacy, replaced by CrewAI Agent)
+│   ├── sentiment_tool.py           ← (legacy, replaced by CrewAI Agent)
+│   ├── knowledge_tool.py           ← ⚙️ Local RAG retrieval
+│   ├── response_tool.py            ← (legacy, replaced by CrewAI Agent)
+│   ├── escalation_tool.py          ← ⚙️ Keyword matching
+│   ├── address_validation_tool.py  ← 🌐 ViaCEP (httpx async)
+│   ├── weather_check_tool.py       ← 🌐 OpenWeatherMap (httpx async)
+│   ├── refund_lookup_tool.py       ← 🗄️ SQLite refunds table
+│   ├── pending_action_tool.py      ← 🗄️ SQLite pending actions
+│   └── quality_evaluator.py        ← 🤖 Sonnet LLM-as-judge
+│
+├── knowledge/
+│   ├── order_issues.md
+│   ├── billing.md
+│   ├── account_access.md
+│   ├── technical_issues.md
+│   ├── general_support.md
+│   └── escalation_policy.md
+│
+├── tests/
+│   └── test_external_tools.py  ← 5/5 passing
+│
+├── index.html          ← Full frontend (vanilla JS, ~8000 lines)
+├── Dockerfile          ← Python 3.11-slim for Render
+├── start_demo.sh       ← Local startup script
+├── prepare_demo.sh     ← Pre-demo: backup + merge + clean
+├── Procfile            ← Render deploy command
+├── railway.toml        ← Railway deploy config
+├── render.yaml         ← Render deploy config
+├── vercel.json         ← Vercel static deploy config
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
 ---
@@ -539,13 +702,21 @@ agentic-support-platform/
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Backend | FastAPI | Fast, async, auto-docs |
-| AI Orchestration | CrewAI Flow | Multi-agent pipeline |
-| LLM | Claude Haiku 4.5 | Fast + cost-effective |
-| Database | SQLite + SQLAlchemy | Zero-config, reliable |
-| Address API | ViaCEP | Brazilian CEPs, free |
-| Weather API | OpenWeatherMap | Real-time, free tier |
-| Frontend | Vanilla JS | Zero dependencies |
-| Observability | Custom service | Token + cost tracking |
+| AI Orchestration | CrewAI Flow | Multi-agent pipeline with state |
+| AI Agents | CrewAI (Agents + Tasks + Crews) | Real agent roles, goals, backstories |
+| LLM (agents) | Claude Haiku 4.5 | Fast + cost-effective |
+| LLM (judge) | Claude Sonnet 4.6 | Stronger model for evaluation |
+| HTTP Client | httpx (async) | Truly async, no thread blocking |
+| Database | PostgreSQL via Neon | Production-grade, AWS São Paulo |
+| ORM | SQLAlchemy | Type-safe, migration support |
+| Auth | JWT (python-jose) | Stateless, 24h sessions |
+| Rate Limiting | slowapi | FastAPI-native, IP-based |
+| Export | openpyxl + reportlab | Professional Excel + PDF |
+| Frontend | Vanilla JS | Zero dependencies, fast |
+| Deploy (backend) | Render + Docker | Container-based, Python 3.11 |
+| Deploy (frontend) | Vercel | CDN, instant, free |
+| Database hosting | Neon | Serverless PostgreSQL, free tier |
+| Monitoring | UptimeRobot | Prevents cold start |
 
 ---
 
@@ -553,21 +724,25 @@ agentic-support-platform/
 
 ```
 Near term:
-  - Vector DB for semantic RAG (ChromaDB/Pinecone)
   - Streaming responses (SSE/WebSocket)
-  - JWT authentication
-  - Cloud deploy (Railway/Render)
+  - Vector DB for semantic RAG (ChromaDB/Pinecone)
+  - Railway or GCP Cloud Run (more stable than Render free)
+  - JWT with real user accounts (email + password)
 
 LLM quality:
-  - Hallucination detection benchmark
-  - Faithfulness scoring with ground truth
+  - Ground truth evaluation dataset
   - A/B testing prompts
   - DeepEval/Ragas integration
 
 Analytics:
   - NPS tracking
-  - Resolution time by category
-  - Cost forecasting per category
+  - Predictive escalation (ML model)
+  - Multi-language support expansion
 ```
 
 ---
+
+*Built by Beatriz Costa — May 2026*  
+*Course: "Become An Agentic Architect" by Carmelo Iaria*  
+*Open source for educational purposes — github.com/BeatrizCoder*
+
