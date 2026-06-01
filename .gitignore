@@ -1,0 +1,45 @@
+# Build artifacts
+dist/
+build/
+
+# Packaging metadata
+*.egg-info/
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Test cache
+.pytest_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local-only docs (not on remote)
+docs/
+
+# Logs
+*.log
+*.log.*
+backend.log
+frontend.log
+
+# Database files
+*.db
+*.sqlite
+src/aamad/data/tickets.db
+src/aamad/data/tickets.json
+src/aamad/data/memory.json
+src/aamad/data/observability_events.json
+
+# Memory
+memory.json
+
+# Migration scripts
+migrate_json_to_sqlite.py

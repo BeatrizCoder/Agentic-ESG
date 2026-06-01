@@ -1,0 +1,84 @@
+classify_task:
+  description: >-
+    Analyze the customer inquiry: "{inquiry}"
+    Classify it into one of these categories: Order Issues, Billing, Account Access, Technical Issue, General Support.
+    Look for keywords related to orders, billing, accounts, technical problems, or general questions.
+  expected_output: >-
+    Return only the category name and a confidence score (0-100) in JSON format:
+    {"category": "Category Name", "confidence": 85}
+  agent: classifier_agent
+
+sentiment_task:
+  description: >-
+    Analyze the emotional tone and urgency in this customer inquiry: "{inquiry}"
+    Look for negative words (angry, upset, frustrated, disappointed, unhappy, mad, annoyed, worried, concerned, terrible)
+    or urgent words (urgent, asap, immediately, right away, now).
+    Determine if the customer is concerned, urgent, or neutral.
+  expected_output: >-
+    Return sentiment analysis in JSON format:
+    {"sentiment": "Concerned|Urgent|Neutral", "confidence": 80, "urgency": "High|Medium|Low"}
+  agent: sentiment_agent
+  context:
+    - classify_task
+
+knowledge_task:
+  description: >-
+    Based on the category "{category}", retrieve relevant knowledge base articles.
+    Available articles by category:
+    Order Issues: "Order Delivery Delays", "Tracking Your Package", "Order Status & Estimated Delivery"
+    Billing: "Refunds and Billing Questions", "Understanding Your Invoice", "Payment Methods & Authorization Holds"
+    Account Access: "Resetting Your Password", "Recovering a Locked Account", "Updating Account Information"
+    Technical Issue: "Troubleshooting Login Errors", "Resolving Site Performance Problems", "Clearing Browser Cache"
+    General Support: "Contacting Customer Service", "Using Our Help Center"
+  expected_output: >-
+    Return relevant articles in JSON format:
+    {"articles": ["Article 1", "Article 2", "Article 3"]}
+  agent: knowledge_agent
+  context:
+    - classify_task
+
+response_task:
+  description: >-
+    Create a helpful response for this customer inquiry: "{inquiry}"
+    Category: {category}
+    Sentiment: {sentiment}
+    Urgency: {urgency}
+    Relevant articles: {articles}
+
+    Use appropriate response templates based on category:
+    Order Issues: Apologize for delay and provide tracking info
+    Billing: Address billing concerns and offer review
+    Account Access: Guide through password reset or account recovery
+    Technical Issue: Suggest troubleshooting steps
+    General Support: Provide general assistance
+
+    If urgency is High, add priority messaging.
+    Keep response professional, empathetic, and helpful.
+  expected_output: >-
+    Return the response and confidence in JSON format:
+    {"response": "Full response text here", "confidence": 85}
+  agent: response_agent
+  context:
+    - classify_task
+    - sentiment_task
+    - knowledge_task
+
+escalation_task:
+  description: >-
+    Evaluate if this case needs human escalation.
+    Response confidence: {response_confidence}
+    Customer sentiment: {sentiment}
+    Available articles: {articles}
+
+    Escalate if:
+    - Response confidence < 55
+    - Sentiment is "Concerned" and confidence < 70
+    - No relevant articles found
+
+    Generate a unique reference ID if escalating.
+  expected_output: >-
+    Return escalation decision in JSON format:
+    {"escalation_required": false, "reason": "Sufficient confidence", "reference_id": "ESC-2026-XXXX"}
+  agent: escalation_agent
+  context:
+    - response_task

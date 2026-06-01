@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climate Sentinel — ESG Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    /* ── Dark theme (default) ────────────────────────────────────────────── */
+    :root {
+      --bg:       #0d1117;
+      --bg2:      #131b22;
+      --bg3:      #1a2636;
+      --border:   rgba(99,140,160,0.18);
+      --teal:     #2e7d9a;
+      --teal2:    #1a5068;
+      --teal-lt:  #4aa8c8;
+      --offwht:   #e8ede8;
+      --offwht2:  #b8c8b8;
+      --muted:    #6a8898;
+      --shadow:   rgba(0,0,0,0.4);
+
+      --risk-low-bg:  #0d2218; --risk-low-fg:  #3aaa78;
+      --risk-med-bg:  #221c08; --risk-med-fg:  #c4ae3a;
+      --risk-high-bg: #221208; --risk-high-fg: #c46a2a;
+      --risk-crit-bg: #220808; --risk-crit-fg: #c42a2a;
+    }
+
+    /* ── Light theme ─────────────────────────────────────────────────────── */
+    [data-theme="light"] {
+      --bg:       #f4f6f4;
+      --bg2:      #ffffff;
+      --bg3:      #eef2f0;
+      --border:   rgba(26,95,122,0.15);
+      --teal:     #1a5f7a;
+      --teal2:    #0d3d52;
+      --teal-lt:  #2e7d9a;
+      --offwht:   #1a2a2a;
+      --offwht2:  #2a3a3a;
+      --muted:    #5a7888;
+      --shadow:   rgba(0,0,0,0.08);
+
+      --risk-low-bg:  #e6f7ee; --risk-low-fg:  #1e7a46;
+      --risk-med-bg:  #fdf6dc; --risk-med-fg:  #8a6e00;
+      --risk-high-bg: #fdf0e6; --risk-high-fg: #8a4a00;
+      --risk-crit-bg: #fde8e8; --risk-crit-fg: #8a1a1a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Smooth theme transitions */
+    body, header, footer, .card, .score-meta-item, .rec-item,
+    .compliance-item, .preset-btn, .lang-toggle, .lang-toggle button,
+    .export-btn, .analyze-btn, #status-bar,
+    .field-group input, .field-group select {
+      transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+    }
+
+    body {
+      font-family: 'Sora', sans-serif;
+      background: var(--bg);
+      color: var(--offwht);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Light mode card accents */
+    [data-theme="light"] .score-card {
+      border-top: 3px solid var(--risk-low-fg);
+    }
+    [data-theme="light"] .score-card.risk-low      { border-top-color: var(--risk-low-fg);  }
+    [data-theme="light"] .score-card.risk-medium   { border-top-color: var(--risk-med-fg);  }
+    [data-theme="light"] .score-card.risk-high     { border-top-color: var(--risk-high-fg); }
+    [data-theme="light"] .score-card.risk-critical { border-top-color: var(--risk-crit-fg); }
+
+    [data-theme="light"] .charts-card {
+      border-top: 2px solid var(--teal);
+    }
+
+    [data-theme="light"] .card {
+      box-shadow: 0 1px 6px var(--shadow);
+    }
+
+    /* ── Topbar ──────────────────────────────────────────────────────────── */
+    header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { display: flex; align-items: baseline; gap: .5rem; }
+    .logo-name { font-size: 1rem; font-weight: 600; color: var(--offwht); letter-spacing: -.01em; }
+    .logo-dot  { color: var(--teal-lt); }
+    .logo-tag  { font-size: .6rem; font-weight: 500; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+    .topbar-right { display: flex; align-items: center; gap: 1.5rem; }
+    .powered-by { font-size: .7rem; color: var(--muted); letter-spacing: .04em; }
+    .powered-by span { color: var(--teal-lt); }
+    .lang-toggle { display: flex; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .lang-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .7rem; padding: .25rem .55rem; cursor: pointer; transition: background .15s, color .15s; }
+    .lang-toggle button.active { background: var(--teal2); color: var(--offwht); }
+
+    .theme-toggle {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      transition: border-color .15s, color .15s;
+    }
+    .theme-toggle:hover { border-color: var(--teal); color: var(--teal-lt); }
+    .theme-toggle svg  { width: 14px; height: 14px; fill: currentColor; }
+
+    /* ── Main ────────────────────────────────────────────────────────────── */
+    main { flex: 1; padding: 2rem; max-width: 1320px; margin: 0 auto; width: 100%; }
+
+    /* ── Search ──────────────────────────────────────────────────────────── */
+    .search-section { margin-bottom: 2rem; }
+    .search-section h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: .35rem; }
+    .search-section p  { font-size: .8rem; color: var(--muted); margin-bottom: 1.25rem; }
+
+    .search-row { display: grid; grid-template-columns: 1fr 1fr auto auto 1fr 1fr auto; gap: .75rem; align-items: end; }
+
+    .field-group { display: flex; flex-direction: column; gap: .3rem; }
+    .field-group label { font-size: .65rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .field-group input,
+    .field-group select {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--offwht); font-family: 'DM Mono', monospace; font-size: .85rem;
+      padding: .55rem .75rem; outline: none; transition: border-color .15s; width: 100%;
+    }
+    .field-group input:focus,
+    .field-group select:focus { border-color: var(--teal); }
+    .field-group select option { background: var(--bg3); }
+
+    .analyze-btn {
+      background: var(--teal); border: none; border-radius: 6px; color: #fff;
+      font-family: 'Sora', sans-serif; font-size: .85rem; font-weight: 600;
+      padding: .55rem 1.4rem; cursor: pointer; white-space: nowrap;
+      transition: background .15s; align-self: flex-end;
+    }
+    .analyze-btn:hover:not(:disabled) { background: var(--teal2); }
+    .analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .presets { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+    .preset-btn {
+      background: none; border: 1px solid var(--border); border-radius: 4px;
+      color: var(--muted); font-size: .7rem; padding: .2rem .6rem; cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .preset-btn:hover { border-color: var(--teal); color: var(--teal-lt); }
+
+    /* ── Status ──────────────────────────────────────────────────────────── */
+    #status-bar {
+      display: none; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; padding: .65rem 1rem; margin-bottom: 1.5rem;
+      font-size: .8rem; color: var(--offwht2); align-items: center; gap: .6rem;
+    }
+    #status-bar.visible { display: flex; }
+    .spinner {
+      width: 14px; height: 14px; border: 2px solid var(--border);
+      border-top-color: var(--teal-lt); border-radius: 50%;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results ─────────────────────────────────────────────────────────── */
+    #results { display: none; }
+    #results.visible { display: block; }
+
+    /* ── Tab bar ─────────────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'Sora', sans-serif;
+      font-size: .78rem;
+      font-weight: 500;
+      padding: .55rem 1.1rem;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+      letter-spacing: .02em;
+    }
+    .tab-btn:hover  { color: var(--offwht2); }
+    .tab-btn.active { color: var(--teal-lt); border-bottom-color: var(--teal-lt); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Data Sources panel ──────────────────────────────────────────────── */
+    .ds-section { margin-bottom: 1.25rem; }
+    .ds-section-title {
+      font-size: .6rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .75rem;
+    }
+    .ds-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .ds-row {
+      display: contents;
+    }
+    .ds-row:not(:last-child) > * {
+      border-bottom: 1px solid var(--border);
+    }
+    .ds-key {
+      padding: .55rem .85rem;
+      font-size: .73rem;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--bg3);
+      display: flex;
+      align-items: flex-start;
+    }
+    .ds-val {
+      padding: .55rem .85rem;
+      font-family: 'DM Mono', monospace;
+      font-size: .72rem;
+      color: var(--offwht);
+      word-break: break-all;
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: .78rem;
+    }
+    .agent-table th {
+      background: var(--bg3);
+      color: var(--muted);
+      font-size: .6rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: .5rem .85rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .agent-table th.num { text-align: right; }
+    .agent-table td {
+      padding: .55rem .85rem;
+      color: var(--offwht2);
+      border-bottom: 1px solid var(--border);
+    }
+    .agent-table td.num {
+      font-family: 'DM Mono', monospace;
+      font-size: .72rem;
+      text-align: right;
+      color: var(--offwht);
+    }
+    .agent-table td.model-cell {
+      font-family: 'DM Mono', monospace;
+      font-size: .7rem;
+      color: var(--teal-lt);
+    }
+    .agent-table tr:last-child td { border-bottom: none; }
+    .agent-table tr.total-row td {
+      background: var(--bg3);
+      font-weight: 600;
+      color: var(--offwht);
+      border-top: 1px solid var(--border);
+    }
+    .agent-table tr.total-row td.num { color: var(--teal-lt); }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 1rem;
+    }
+
+    /* ── Card base ───────────────────────────────────────────────────────── */
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .card-label { font-size: .6rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .75rem; }
+
+    /* ── Score card ──────────────────────────────────────────────────────── */
+    .score-card { grid-column: 1; grid-row: 1; }
+    .risk-score-row { display: flex; align-items: flex-end; gap: .75rem; margin-bottom: .75rem; }
+    .risk-score-number { font-family: 'DM Mono', monospace; font-size: 4rem; font-weight: 500; line-height: 1; }
+    .risk-score-max    { font-family: 'DM Mono', monospace; font-size: 1.1rem; color: var(--muted); padding-bottom: .3rem; }
+
+    .risk-badge {
+      display: inline-block; font-family: 'DM Mono', monospace; font-size: .65rem;
+      font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+      padding: .25rem .6rem; border-radius: 4px; margin-bottom: .75rem;
+    }
+    .risk-badge.low      { background: var(--risk-low-bg);  color: var(--risk-low-fg);  border: 1px solid var(--risk-low-fg); }
+    .risk-badge.medium   { background: var(--risk-med-bg);  color: var(--risk-med-fg);  border: 1px solid var(--risk-med-fg); }
+    .risk-badge.high     { background: var(--risk-high-bg); color: var(--risk-high-fg); border: 1px solid var(--risk-high-fg); }
+    .risk-badge.critical { background: var(--risk-crit-bg); color: var(--risk-crit-fg); border: 1px solid var(--risk-crit-fg); }
+
+    .score-meter { height: 4px; background: var(--bg3); border-radius: 2px; margin-bottom: .75rem; }
+    .score-meter-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+
+    .confidence-row {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: 1rem;
+    }
+    .confidence-label {
+      font-size: .65rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .confidence-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: .72rem;
+      font-weight: 500;
+      padding: .15rem .5rem;
+      border-radius: 3px;
+      transition: background .2s, color .2s;
+    }
+    .confidence-badge.high   { background: rgba(46,125,90,.18);  color: #3aaa78; border: 1px solid rgba(58,170,120,.3); }
+    .confidence-badge.medium { background: rgba(138,122,42,.18); color: #c4ae3a; border: 1px solid rgba(196,174,58,.3); }
+    .confidence-badge.low    { background: rgba(138,74,26,.18);  color: #c46a2a; border: 1px solid rgba(196,106,42,.3); }
+    .confidence-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .confidence-dot.high   { background: #3aaa78; }
+    .confidence-dot.medium { background: #c4ae3a; }
+    .confidence-dot.low    { background: #c46a2a; }
+
+    .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .5rem .65rem; }
+    .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
+    .score-meta-value { font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--offwht); }
+
+    /* ── Map card ────────────────────────────────────────────────────────── */
+    .map-card { grid-column: 2; grid-row: 1 / 3; padding: 0; overflow: hidden; }
+    .map-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .map-coords { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
+    .map-source-tag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: .15rem .5rem; }
+    #map { height: 360px; width: 100%; background: var(--bg3); }
+
+    /* ── Charts card ─────────────────────────────────────────────────────── */
+    .charts-card { grid-column: 1; grid-row: 2; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; }
+    .chart-item-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .15rem; }
+    .chart-item-value { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--offwht); }
+    .chart-item-delta { font-family: 'DM Mono', monospace; font-size: .7rem; margin-bottom: .4rem; }
+    .chart-item-delta.up   { color: var(--risk-crit-fg); }
+    .chart-item-delta.down { color: var(--risk-low-fg); }
+    .chart-item-delta.warn { color: var(--risk-high-fg); }
+    canvas.mini-bar { width: 100%; height: 42px; display: block; }
+
+    /* ── Summary ─────────────────────────────────────────────────────────── */
+    .summary-card { grid-column: 1 / 3; }
+    .summary-text { font-size: .85rem; line-height: 1.7; color: var(--offwht2); }
+
+    /* ── Compliance ──────────────────────────────────────────────────────── */
+    .projections-card { grid-column: 1 / 3; }
+    .compliance-card  { grid-column: 1 / 3; }
+
+    /* ── Projection chart ────────────────────────────────────────────────── */
+    .proj-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+    .proj-toggle { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .proj-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .68rem; padding: .2rem .55rem; cursor: pointer; transition: background .15s, color .15s; }
+    .proj-toggle button.active { background: var(--teal2); color: var(--offwht); }
+    .proj-legend { display: flex; gap: 1.1rem; margin-bottom: .5rem; }
+    .proj-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); }
+    .proj-legend-line { width: 22px; height: 2px; }
+    .proj-legend-line.solid  { background: var(--teal-lt); }
+    .proj-legend-line.dashed { background: repeating-linear-gradient(90deg, #c46a2a 0, #c46a2a 4px, transparent 4px, transparent 8px); }
+    #canvas-proj { width: 100%; height: 160px; display: block; }
+    .compliance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    .compliance-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; }
+    .compliance-framework { font-size: .6rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--teal-lt); margin-bottom: .35rem; }
+    .compliance-exposure { display: inline-block; font-family: 'DM Mono', monospace; font-size: .65rem; padding: .15rem .4rem; border-radius: 3px; margin-bottom: .4rem; }
+    .compliance-text { font-size: .75rem; color: var(--offwht2); line-height: 1.5; }
+
+    /* ── Recommendations ─────────────────────────────────────────────────── */
+    .recs-card { grid-column: 1 / 3; }
+    .rec-list { display: flex; flex-direction: column; gap: .65rem; }
+    .rec-item { display: grid; grid-template-columns: 2rem 1fr auto; gap: .75rem; align-items: start; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: .75rem 1rem; }
+    .rec-rank   { font-family: 'DM Mono', monospace; font-size: .85rem; font-weight: 500; color: var(--muted); padding-top: .05rem; }
+    .rec-action { font-size: .82rem; color: var(--offwht); line-height: 1.55; margin-bottom: .3rem; }
+    .rec-article{ font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--muted); }
+    .rec-tags   { display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
+
+    .tag { font-family: 'DM Mono', monospace; font-size: .6rem; font-weight: 500; letter-spacing: .06em; padding: .15rem .45rem; border-radius: 3px; white-space: nowrap; }
+    .tag.csrd        { background: rgba(46,125,154,.2);  color: var(--teal-lt); border: 1px solid rgba(46,125,154,.3); }
+    .tag.issb        { background: rgba(138,122,42,.2);  color: #d4b84a;        border: 1px solid rgba(138,122,42,.3); }
+    .tag.eu-taxonomy { background: rgba(46,125,90,.2);   color: #3aaa78;        border: 1px solid rgba(46,125,90,.3); }
+    .tag.operational { background: rgba(99,99,99,.15);   color: var(--muted);   border: 1px solid rgba(99,99,99,.2); }
+    .timeline-tag    { font-size: .6rem; color: var(--muted); }
+
+    /* ── Investment badge ────────────────────────────────────────────────── */
+    .investment-badge {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .55rem .8rem;
+      border-radius: 7px;
+      margin-bottom: .75rem;
+      border: 1px solid;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .investment-badge .inv-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .investment-badge .inv-text {
+      font-size: .75rem;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: .01em;
+    }
+    .investment-badge .inv-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      opacity: .75;
+    }
+    .investment-badge.approved   { background: rgba(46,125,90,.12);  color: #3aaa78; border-color: rgba(58,170,120,.25); }
+    .investment-badge.conditioned{ background: rgba(138,122,42,.12); color: #c4ae3a; border-color: rgba(196,174,58,.25); }
+    .investment-badge.restricted { background: rgba(138,74,26,.12);  color: #c46a2a; border-color: rgba(196,106,42,.25); }
+    .investment-badge.suspended  { background: rgba(138,26,26,.12);  color: #c42a2a; border-color: rgba(196,42,42,.25); }
+
+    /* ── Offset targets card ─────────────────────────────────────────────── */
+    .offset-card  { grid-column: 1 / 3; }
+    .offset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    .offset-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: .85rem; display: flex; flex-direction: column; gap: .4rem;
+    }
+    .offset-icon-row { display: flex; align-items: center; gap: .5rem; }
+    .offset-icon { font-size: 1.1rem; line-height: 1; }
+    .offset-category {
+      font-size: .7rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--teal-lt);
+    }
+    .offset-req {
+      font-size: .78rem; color: var(--offwht2); line-height: 1.55; flex: 1;
+    }
+    .offset-footer { display: flex; align-items: center; justify-content: space-between; gap: .4rem; flex-wrap: wrap; margin-top: .1rem; }
+    .offset-urgency {
+      font-family: 'DM Mono', monospace; font-size: .6rem; font-weight: 500;
+      padding: .15rem .45rem; border-radius: 3px; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .offset-urgency.immediate { background: rgba(196,42,42,.18);   color: #c42a2a; border: 1px solid rgba(196,42,42,.3); }
+    .offset-urgency.short_term{ background: rgba(196,106,42,.18);  color: #c46a2a; border: 1px solid rgba(196,106,42,.3); }
+    .offset-urgency.long_term { background: rgba(46,125,90,.15);   color: #3aaa78; border: 1px solid rgba(58,170,120,.25); }
+    .offset-framework {
+      font-family: 'DM Mono', monospace; font-size: .62rem; color: var(--muted);
+    }
+
+    /* ── Double materiality ──────────────────────────────────────────────── */
+    .dm-panels { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .dm-panel {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: .85rem;
+    }
+    .dm-panel-label {
+      font-size: .6rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--teal-lt); margin-bottom: .3rem;
+    }
+    .dm-direction {
+      font-size: .72rem; color: var(--muted); font-style: italic; margin-bottom: .6rem;
+    }
+    .dm-summary { font-size: .78rem; color: var(--offwht2); line-height: 1.55; margin-bottom: .6rem; }
+    .dm-impacts { display: flex; flex-direction: column; gap: .3rem; }
+    .dm-impact-item {
+      display: flex; align-items: flex-start; gap: .4rem;
+      font-size: .74rem; color: var(--offwht2); line-height: 1.45;
+    }
+    .dm-impact-dot {
+      width: 4px; height: 4px; border-radius: 50%; background: var(--teal);
+      flex-shrink: 0; margin-top: .45rem;
+    }
+    .dm-note { font-size: .68rem; color: var(--muted); font-style: italic; margin-top: .75rem; }
+
+    /* ── Export ──────────────────────────────────────────────────────────── */
+    .export-row { display: none; grid-column: 1 / 3; justify-content: flex-end; gap: .75rem; margin-top: .25rem; }
+    .export-row.visible { display: flex; }
+    .export-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--offwht2); font-size: .78rem; padding: .45rem 1rem; cursor: pointer; transition: border-color .15s, color .15s; }
+    .export-btn:hover { border-color: var(--teal); color: var(--teal-lt); }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer { background: var(--bg2); border-top: 1px solid var(--border); padding: .65rem 2rem; text-align: center; font-size: .68rem; color: var(--muted); }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .search-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+      .analyze-btn { grid-column: 1 / 3; }
+      .results-grid { grid-template-columns: 1fr; }
+      .map-card  { grid-column: 1; grid-row: auto; }
+      .summary-card, .projections-card, .compliance-card, .recs-card, .offset-card, .export-row { grid-column: 1; }
+      .offset-grid, .dm-panels { grid-template-columns: 1fr; }
+      .compliance-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- Topbar -->
+<header>
+  <div class="logo">
+    <span class="logo-name">Climate<span class="logo-dot">Sentinel</span></span>
+    <span class="logo-tag">ESG Intelligence</span>
+  </div>
+  <div class="topbar-right">
+    <span class="powered-by">Powered by <span>NASA POWER</span> · <span>Claude AI</span></span>
+    <div class="lang-toggle">
+      <button class="active" onclick="setLang('en')">EN</button>
+      <button onclick="setLang('pt')">PT</button>
+    </div>
+    <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
+      <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+      <svg id="icon-sun"  viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Search -->
+  <section class="search-section">
+    <h1 id="t-headline">Physical Climate Risk Analysis</h1>
+    <p id="t-sub">Enter coordinates or select a preset region to run a 10-year NASA POWER analysis with ESG compliance mapping.</p>
+    <div class="search-row">
+      <div class="field-group">
+        <label id="t-lat">Latitude</label>
+        <input id="inp-lat" type="number" step="0.0001" min="-90" max="90" value="-15.7801" />
+      </div>
+      <div class="field-group">
+        <label id="t-lon">Longitude</label>
+        <input id="inp-lon" type="number" step="0.0001" min="-180" max="180" value="-47.9292" />
+      </div>
+      <div class="field-group">
+        <label id="t-from">From</label>
+        <select id="inp-start">
+          <option value="2000">2000</option><option value="2001">2001</option>
+          <option value="2002">2002</option><option value="2003">2003</option>
+          <option value="2004">2004</option><option value="2005">2005</option>
+          <option value="2006">2006</option><option value="2007">2007</option>
+          <option value="2008">2008</option><option value="2009">2009</option>
+          <option value="2010">2010</option><option value="2011">2011</option>
+          <option value="2012">2012</option><option value="2013">2013</option>
+          <option value="2014" selected>2014</option>
+          <option value="2015">2015</option><option value="2016">2016</option>
+          <option value="2017">2017</option><option value="2018">2018</option>
+          <option value="2019">2019</option><option value="2020">2020</option>
+          <option value="2021">2021</option><option value="2022">2022</option>
+          <option value="2023">2023</option><option value="2024">2024</option>
+          <option value="2025">2025</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label id="t-to">To</label>
+        <select id="inp-end">
+          <option value="2025">2025</option>
+          <option value="2026">2026 ✦</option><option value="2027">2027 ✦</option>
+          <option value="2028">2028 ✦</option><option value="2029">2029 ✦</option>
+          <option value="2030">2030 ✦</option><option value="2031">2031 ✦</option>
+          <option value="2032">2032 ✦</option><option value="2033">2033 ✦</option>
+          <option value="2034">2034 ✦</option><option value="2035">2035 ✦</option>
+          <option value="2036">2036 ✦</option><option value="2037">2037 ✦</option>
+          <option value="2038">2038 ✦</option><option value="2039">2039 ✦</option>
+          <option value="2040">2040 ✦</option><option value="2041">2041 ✦</option>
+          <option value="2042">2042 ✦</option><option value="2043">2043 ✦</option>
+          <option value="2044">2044 ✦</option><option value="2045">2045 ✦</option>
+          <option value="2046">2046 ✦</option><option value="2047">2047 ✦</option>
+          <option value="2048">2048 ✦</option><option value="2049">2049 ✦</option>
+          <option value="2050">2050 ✦</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label id="t-region">Region label</label>
+        <input id="inp-label" type="text" maxlength="120" value="Brasília, Brazil" />
+      </div>
+      <div class="field-group">
+        <label id="t-sector">Sector</label>
+        <select id="inp-sector">
+          <option value="General" selected>General</option>
+          <option value="Real Estate">Real Estate</option>
+          <option value="Agriculture & Food">Agriculture &amp; Food</option>
+          <option value="Infrastructure">Infrastructure</option>
+          <option value="Manufacturing">Manufacturing</option>
+          <option value="Finance & Banking">Finance &amp; Banking</option>
+          <option value="Energy & Utilities">Energy &amp; Utilities</option>
+          <option value="Retail & Logistics">Retail &amp; Logistics</option>
+        </select>
+      </div>
+      <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
+    </div>
+    <div class="presets">
+      <button class="preset-btn" onclick="setPreset(-15.7801,-47.9292,'Brasília, Brazil')">Brasília</button>
+      <button class="preset-btn" onclick="setPreset(-23.5505,-46.6333,'São Paulo, Brazil')">São Paulo</button>
+      <button class="preset-btn" onclick="setPreset(-22.9068,-43.1729,'Rio de Janeiro, Brazil')">Rio de Janeiro</button>
+      <button class="preset-btn" onclick="setPreset(-3.7172,-38.5248,'Fortaleza, Brazil')">Fortaleza</button>
+      <button class="preset-btn" onclick="setPreset(-12.9714,-38.5014,'Salvador, Brazil')">Salvador</button>
+      <button class="preset-btn" onclick="setPreset(52.5200,13.4050,'Berlin, Germany')">Berlin</button>
+      <button class="preset-btn" onclick="setPreset(51.5074,-0.1278,'London, UK')">London</button>
+    </div>
+    <p style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
+      ✦ Years after 2025 use OpenMeteo IPCC EC_Earth3P_HR climate projections
+    </p>
+  </section>
+
+  <!-- Status -->
+  <div id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-text">Running pipeline…</span>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-btn-overview"   onclick="switchTab('overview')"    id="t-tab-overview">Overview</button>
+      <button class="tab-btn"        id="tab-btn-datasources" onclick="switchTab('datasources')" id="t-tab-datasources">Data Sources</button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="tab-panel active" id="tab-overview">
+    <div class="results-grid">
+
+      <!-- Score -->
+      <div class="card score-card">
+        <div class="card-label" id="t-risk-label">Climate Risk Score</div>
+        <div class="risk-score-row">
+          <span class="risk-score-number" id="score-num">—</span>
+          <span class="risk-score-max">/100</span>
+        </div>
+        <!-- Investment Status Badge -->
+        <div class="investment-badge" id="investment-badge" style="display:none">
+          <div class="inv-dot" id="inv-dot"></div>
+          <div>
+            <div class="inv-text" id="inv-text">—</div>
+            <div class="inv-sub" id="inv-sub"></div>
+          </div>
+        </div>
+        <div id="risk-badge" class="risk-badge">—</div>
+        <div class="score-meter"><div class="score-meter-fill" id="score-fill" style="width:0%"></div></div>
+        <div class="confidence-row" id="confidence-row" style="display:none">
+          <div class="confidence-dot" id="confidence-dot"></div>
+          <span class="confidence-label">Analysis confidence</span>
+          <span class="confidence-badge" id="confidence-badge">—</span>
+        </div>
+        <div class="score-meta-grid">
+          <div class="score-meta-item">
+            <div class="score-meta-label" id="t-temp-delta">Temperature Change</div>
+            <div class="score-meta-value" id="meta-temp">—</div>
+          </div>
+          <div class="score-meta-item">
+            <div class="score-meta-label" id="t-precip-delta">Precipitation Change</div>
+            <div class="score-meta-value" id="meta-precip">—</div>
+          </div>
+          <div class="score-meta-item">
+            <div class="score-meta-label" id="t-compliance-exp">Compliance Exposure</div>
+            <div class="score-meta-value" id="meta-compliance" style="font-size:.72rem">—</div>
+          </div>
+          <div class="score-meta-item">
+            <div class="score-meta-label" id="t-hottest">Hottest / Driest Year</div>
+            <div class="score-meta-value" id="meta-years">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div class="card map-card">
+        <div class="map-header">
+          <div>
+            <div class="card-label" id="t-map-label">Location</div>
+            <div class="map-coords" id="map-coords">—</div>
+          </div>
+          <span class="map-source-tag">NASA POWER</span>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="card charts-card">
+        <div class="card-label" id="t-trends">10-Year Climate Trends</div>
+        <div class="chart-grid">
+          <div class="chart-item">
+            <div class="chart-item-label" id="t-chart-temp">Temp Mean (°C)</div>
+            <div class="chart-item-value" id="chart-temp-val">—</div>
+            <div class="chart-item-delta" id="chart-temp-delta"></div>
+            <canvas class="mini-bar" id="canvas-temp"></canvas>
+          </div>
+          <div class="chart-item">
+            <div class="chart-item-label" id="t-chart-precip">Precipitation (mm/yr)</div>
+            <div class="chart-item-value" id="chart-precip-val">—</div>
+            <div class="chart-item-delta" id="chart-precip-delta"></div>
+            <canvas class="mini-bar" id="canvas-precip"></canvas>
+          </div>
+          <div class="chart-item">
+            <div class="chart-item-label" id="t-chart-solar">Solar (kWh/m²/day)</div>
+            <div class="chart-item-value" id="chart-solar-val">—</div>
+            <div class="chart-item-delta" id="chart-solar-delta"></div>
+            <canvas class="mini-bar" id="canvas-solar"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive Summary -->
+      <div class="card summary-card">
+        <div class="card-label" id="t-summary-label">Executive Summary</div>
+        <p class="summary-text" id="summary-text">—</p>
+      </div>
+
+      <!-- Climate Projections -->
+      <div class="card projections-card" id="proj-card" style="display:none">
+        <div class="proj-header">
+          <div>
+            <div class="card-label">Climate Projections 2024–2050 · OpenMeteo IPCC EC_Earth3P_HR</div>
+          </div>
+          <div class="proj-toggle">
+            <button class="active" id="proj-btn-temp"   onclick="switchProjMetric('temp')">Temperature</button>
+            <button             id="proj-btn-precip" onclick="switchProjMetric('precip')">Precipitation</button>
+          </div>
+        </div>
+        <div class="proj-legend">
+          <div class="proj-legend-item"><div class="proj-legend-line solid"></div> Historical · NASA POWER</div>
+          <div class="proj-legend-item"><div class="proj-legend-line dashed"></div> Projected · OpenMeteo IPCC</div>
+        </div>
+        <canvas id="canvas-proj"></canvas>
+      </div>
+
+      <!-- Compliance -->
+      <div class="card compliance-card">
+        <div class="card-label" id="t-compliance-label">Compliance Framework Mapping</div>
+        <div class="compliance-grid" id="compliance-grid"></div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="card recs-card">
+        <div class="card-label" id="t-recs-label">Prioritised Recommendations</div>
+        <div class="rec-list" id="rec-list"></div>
+      </div>
+
+      <!-- Ecosystem Offset Targets -->
+      <div class="card offset-card" id="offset-card" style="display:none">
+        <div class="card-label">Ecosystem Offset Targets · Physical Risk Mitigation</div>
+        <div class="offset-grid" id="offset-grid"></div>
+      </div>
+
+      <!-- Export -->
+      <div class="export-row" id="export-row">
+        <button class="export-btn" onclick="exportPdf()" id="t-export-pdf">Export PDF ↓</button>
+      </div>
+
+    </div><!-- .results-grid -->
+    </div><!-- #tab-overview -->
+
+    <!-- Tab: Data Sources -->
+    <div class="tab-panel" id="tab-datasources">
+
+      <div class="ds-section">
+        <div class="ds-section-title">NASA POWER API</div>
+        <div class="ds-grid">
+          <div class="ds-row"><span class="ds-key">Label</span><span class="ds-val" style="color:var(--teal-lt)">Historical · NASA POWER</span></div>
+          <div class="ds-row"><span class="ds-key">Endpoint</span><span class="ds-val" id="ds-url">—</span></div>
+          <div class="ds-row"><span class="ds-key">Parameters</span><span class="ds-val">T2M · PRECTOTCORR · ALLSKY_SFC_SW_DWN</span></div>
+          <div class="ds-row"><span class="ds-key">Period covered</span><span class="ds-val" id="ds-period">—</span></div>
+          <div class="ds-row"><span class="ds-key">Annual records</span><span class="ds-val" id="ds-annual">—</span></div>
+          <div class="ds-row"><span class="ds-key">Daily datapoints</span><span class="ds-val" id="ds-datapoints">—</span></div>
+          <div class="ds-row"><span class="ds-key">Community</span><span class="ds-val">RE (Renewable Energy)</span></div>
+          <div class="ds-row"><span class="ds-key">Analysis timestamp</span><span class="ds-val" id="ds-timestamp">—</span></div>
+        </div>
+      </div>
+
+      <div class="ds-section" id="ds-om-section">
+        <div class="ds-section-title">OpenMeteo · IPCC Climate Projections</div>
+        <div class="ds-grid">
+          <div class="ds-row"><span class="ds-key">Label</span><span class="ds-val" style="color:#c46a2a" id="ds-om-label">—</span></div>
+          <div class="ds-row"><span class="ds-key">Endpoint</span><span class="ds-val" id="ds-om-proj">—</span></div>
+          <div class="ds-row"><span class="ds-key">IPCC model</span><span class="ds-val" id="ds-om-model">—</span></div>
+          <div class="ds-row"><span class="ds-key">Period covered</span><span class="ds-val" id="ds-om-years">—</span></div>
+          <div class="ds-row"><span class="ds-key">Annual records</span><span class="ds-val" id="ds-om-records">—</span></div>
+        </div>
+      </div>
+
+      <div class="ds-section" id="ds-dm-section" style="display:none">
+        <div class="ds-section-title">Double Materiality Assessment · CSRD ESRS 1</div>
+        <div class="dm-panels" id="dm-panels">
+          <div class="dm-panel">
+            <div class="dm-panel-label">Input A — Physical Risk · Outside-In</div>
+            <div class="dm-direction">What climate does to the operation</div>
+            <div class="dm-summary" id="dm-physical-summary">—</div>
+            <div class="dm-impacts" id="dm-physical-impacts"></div>
+          </div>
+          <div class="dm-panel">
+            <div class="dm-panel-label">Input B — Impact Risk · Inside-Out</div>
+            <div class="dm-direction">What the operation does to the climate</div>
+            <div class="dm-summary" id="dm-impact-summary">—</div>
+            <div class="dm-impacts" id="dm-impact-impacts"></div>
+          </div>
+        </div>
+        <p class="dm-note"><em>CSRD requires disclosure of both dimensions. Most ESG tools only assess one.</em></p>
+      </div>
+
+      <div class="ds-section">
+        <div class="ds-section-title">Agent Pipeline — Token Usage</div>
+        <table class="agent-table" id="ds-agent-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Agent</th>
+              <th>Model</th>
+              <th class="num">Input tokens</th>
+              <th class="num">Output tokens</th>
+              <th class="num">Total tokens</th>
+            </tr>
+          </thead>
+          <tbody id="ds-agent-tbody"></tbody>
+        </table>
+      </div>
+
+    </div><!-- #tab-datasources -->
+
+  </div><!-- #results -->
+
+</main>
+
+<footer id="t-footer">
+  Session data stored as temporary cookie only. No personal data collected or retained.
+  &nbsp;·&nbsp; Powered by NASA POWER API &amp; Claude AI (Anthropic)
+</footer>
+
+<script>
+/* ── Config ──────────────────────────────────────────────────────────────── */
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? `http://${window.location.hostname}:8001`
+  : '';
+
+/* ── i18n ────────────────────────────────────────────────────────────────── */
+const I18N = {
+  en: {
+    'headline':        'Physical Climate Risk Analysis',
+    'sub':             'Enter coordinates or select a preset region to run a 10-year NASA POWER analysis with ESG compliance mapping.',
+    'lat': 'Latitude', 'lon': 'Longitude', 'from': 'From', 'to': 'To', 'region': 'Region label',
+    'risk-label':      'Climate Risk Score',
+    'temp-delta':      'Temperature Change',
+    'precip-delta':    'Precipitation Change',
+    'compliance-exp':  'Compliance Exposure',
+    'hottest':         'Hottest / Driest Year',
+    'map-label':       'Location',
+    'trends':          '10-Year Climate Trends',
+    'chart-temp':      'Temp Mean (°C)',
+    'chart-precip':    'Precipitation (mm/yr)',
+    'chart-solar':     'Solar (kWh/m²/day)',
+    'summary-label':   'Executive Summary',
+    'compliance-label':'Compliance Framework Mapping',
+    'recs-label':      'Prioritised Recommendations',
+    'export-pdf':      'Export PDF ↓',
+    'footer':          'Session data stored as temporary cookie only. No personal data collected or retained. · Powered by NASA POWER API & Claude AI (Anthropic)',
+  },
+  pt: {
+    'headline':        'Análise de Risco Climático Físico',
+    'sub':             'Insira coordenadas ou selecione uma região para executar análise de 10 anos com mapeamento de conformidade ESG.',
+    'lat': 'Latitude', 'lon': 'Longitude', 'from': 'De', 'to': 'Até', 'region': 'Nome da região',
+    'risk-label':      'Score de Risco Climático',
+    'temp-delta':      'Variação de Temperatura',
+    'precip-delta':    'Variação de Precipitação',
+    'compliance-exp':  'Exposição Regulatória',
+    'hottest':         'Ano + Quente / + Seco',
+    'map-label':       'Localização',
+    'trends':          'Tendências Climáticas (10 anos)',
+    'chart-temp':      'Temp. Média (°C)',
+    'chart-precip':    'Precipitação (mm/ano)',
+    'chart-solar':     'Solar (kWh/m²/dia)',
+    'summary-label':   'Sumário Executivo',
+    'compliance-label':'Mapeamento de Frameworks ESG',
+    'recs-label':      'Recomendações Prioritárias',
+    'export-pdf':      'Exportar PDF ↓',
+    'footer':          'Dados da sessão armazenados apenas como cookie temporário. Nenhum dado pessoal coletado ou retido. · Powered by NASA POWER API & Claude AI (Anthropic)',
+  }
+};
+
+let _lang = 'en';
+function setLang(l) {
+  _lang = l;
+  document.querySelectorAll('.lang-toggle button').forEach(b => b.classList.toggle('active', b.textContent === l.toUpperCase()));
+  const d = I18N[l];
+  for (const [k, v] of Object.entries(d)) {
+    const el = document.getElementById('t-' + k);
+    if (el) el.textContent = v;
+  }
+}
+
+/* ── Preset ──────────────────────────────────────────────────────────────── */
+function setPreset(lat, lon, label) {
+  document.getElementById('inp-lat').value   = lat;
+  document.getElementById('inp-lon').value   = lon;
+  document.getElementById('inp-label').value = label;
+}
+
+/* ── Map ─────────────────────────────────────────────────────────────────── */
+let _map = null, _marker = null, _circle = null;
+
+function initMap(lat, lon) {
+  if (!_map) {
+    _map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(_map);
+  } else {
+    _map.setView([lat, lon], 6);
+  }
+  if (_marker) { _map.removeLayer(_marker); _map.removeLayer(_circle); }
+  _marker = L.circleMarker([lat, lon], {
+    radius: 8, fillColor: '#4aa8c8', color: '#2e7d9a', weight: 2, fillOpacity: .85
+  }).addTo(_map);
+  _circle = L.circle([lat, lon], {
+    radius: 120000, color: '#2e7d9a', weight: 1, fillColor: '#2e7d9a', fillOpacity: .07, dashArray: '4 4'
+  }).addTo(_map);
+}
+
+/* ── Mini bar chart ──────────────────────────────────────────────────────── */
+function drawBars(canvasId, values, rgbColor) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !values.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
+  const barW = w / values.length, pad = 2;
+  ctx.clearRect(0, 0, w, h);
+  values.forEach((v, i) => {
+    const barH = ((v - min) / range) * (h - 4) + 2;
+    const alpha = 0.3 + (i / values.length) * 0.7;
+    ctx.fillStyle = `rgba(${rgbColor},${alpha})`;
+    ctx.beginPath();
+    ctx.roundRect(i * barW + pad / 2, h - barH, barW - pad, barH, 2);
+    ctx.fill();
+  });
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function meterColor(s) {
+  return s <= 25 ? '#3aaa78' : s <= 50 ? '#c4ae3a' : s <= 75 ? '#c46a2a' : '#c42a2a';
+}
+
+function setDelta(id, val, unit, clsIfPos, clsIfNeg) {
+  const el = document.getElementById(id);
+  if (!el || val == null) return;
+  el.textContent = `${val > 0 ? '+' : ''}${Number(val).toFixed(2)} ${unit}`;
+  el.className = `chart-item-delta ${val > 0 ? clsIfPos : clsIfNeg}`;
+}
+
+/* ── Compliance render ───────────────────────────────────────────────────── */
+function renderCompliance(mapping) {
+  const grid = document.getElementById('compliance-grid');
+  const clrMap = { low: '#3aaa78', medium: '#c4ae3a', high: '#c46a2a', critical: '#c42a2a', partial: '#c4ae3a', misaligned: '#c42a2a', aligned: '#3aaa78', not_assessed: '#6a8898' };
+  const items = [
+    { fw: 'CSRD',        exp: mapping.csrd_exposure,         summary: mapping.csrd_summary,         arts: mapping.csrd_articles },
+    { fw: 'ISSB S2',     exp: mapping.issb_s2_exposure,      summary: mapping.issb_s2_summary,      arts: mapping.issb_s2_scenarios },
+    { fw: 'EU Taxonomy', exp: mapping.eu_taxonomy_alignment, summary: mapping.eu_taxonomy_summary,  arts: mapping.eu_taxonomy_criteria },
+  ];
+  grid.innerHTML = items.map(it => {
+    const lvl = it.exp || 'low';
+    const fg  = clrMap[lvl] || '#6a8898';
+    const bg  = fg + '22';
+    const arts = (it.arts || []).slice(0,3).join(' · ');
+    return `<div class="compliance-item">
+      <div class="compliance-framework">${it.fw}</div>
+      <div class="compliance-exposure" style="background:${bg};color:${fg};border:1px solid ${fg}44">${lvl.toUpperCase()}</div>
+      <div class="compliance-text">${it.summary || ''}</div>
+      ${arts ? `<div class="rec-article" style="margin-top:.35rem">${arts}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ── Recommendations render ──────────────────────────────────────────────── */
+function renderRecs(recs) {
+  const fwClass = { CSRD: 'csrd', ISSB_S2: 'issb', EU_TAXONOMY: 'eu-taxonomy', OPERATIONAL: 'operational' };
+  document.getElementById('rec-list').innerHTML = recs.map(r => `
+    <div class="rec-item">
+      <span class="rec-rank">${String(r.rank).padStart(2,'0')}</span>
+      <div>
+        <div class="rec-action">${r.action}</div>
+        <div class="rec-article">${r.article || ''}</div>
+      </div>
+      <div class="rec-tags">
+        <span class="tag ${fwClass[r.framework] || 'operational'}">${r.framework}</span>
+        <span class="timeline-tag">${(r.timeline||'').replace(/_/g,' ')}</span>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Main analysis ───────────────────────────────────────────────────────── */
+let _currentId = null;
+
+async function runAnalysis() {
+  const lat   = parseFloat(document.getElementById('inp-lat').value);
+  const lon   = parseFloat(document.getElementById('inp-lon').value);
+  const label = document.getElementById('inp-label').value.trim();
+  const start = parseInt(document.getElementById('inp-start').value);
+  const end   = parseInt(document.getElementById('inp-end').value);
+  if (isNaN(lat) || isNaN(lon)) { alert('Enter valid coordinates.'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = _lang === 'pt' ? 'Analisando…' : 'Analyzing…';
+
+  const steps = _lang === 'pt'
+    ? ['Passo 1/4 — Coletando dados NASA POWER…','Passo 2/4 — Analisando tendências climáticas…','Passo 3/4 — Mapeando conformidade ESG…','Passo 4/4 — Gerando relatório executivo…']
+    : ['Step 1/4 — Fetching NASA POWER data…','Step 2/4 — Analysing climate trends…','Step 3/4 — Mapping ESG compliance…','Step 4/4 — Generating executive report…'];
+
+  let stepIdx = 0;
+  const statusBar  = document.getElementById('status-bar');
+  const statusText = document.getElementById('status-text');
+  statusBar.classList.add('visible');
+  statusText.textContent = steps[0];
+  const stepTimer = setInterval(() => {
+    stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+    statusText.textContent = steps[stepIdx];
+  }, 14000);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude: lat, longitude: lon, region_label: label, start_year: start, end_year: end, sector: document.getElementById('inp-sector').value }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    _currentId = data.analysis_id;
+    renderResults(data);
+  } catch (err) {
+    statusText.textContent = `Error: ${err.message}`;
+    setTimeout(() => statusBar.classList.remove('visible'), 5000);
+  } finally {
+    clearInterval(stepTimer);
+    statusBar.classList.remove('visible');
+    btn.disabled = false;
+    btn.textContent = _lang === 'pt' ? 'Analisar →' : 'Analyze →';
+  }
+}
+
+/* ── Render ──────────────────────────────────────────────────────────────── */
+function renderResults(data) {
+  const score  = data.risk_score  || 0;
+  const level  = data.risk_level  || 'low';
+  const badge  = data.risk_badge_label || level.toUpperCase() + ' RISK';
+  const km     = data.key_metrics || {};
+  const annual = data.annual_records || [];
+  const comp   = data.compliance_mapping || {};
+  const cf     = data.climate_findings  || {};
+
+  /* score */
+  document.getElementById('score-num').textContent = score;
+  const badgeEl = document.getElementById('risk-badge');
+  badgeEl.textContent = badge;
+  badgeEl.className = `risk-badge ${level}`;
+  const fill = document.getElementById('score-fill');
+  fill.style.width      = score + '%';
+  fill.style.background = meterColor(score);
+
+  /* meta */
+  document.getElementById('meta-temp').textContent       = km.temp_change_label            || '—';
+  document.getElementById('meta-precip').textContent     = km.precip_change_label           || '—';
+  document.getElementById('meta-compliance').textContent = km.compliance_exposure_label      || '—';
+  document.getElementById('meta-years').textContent      = `${km.hottest_year || '—'} / ${km.driest_year || '—'}`;
+
+  /* map */
+  document.getElementById('map-coords').textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
+  initMap(data.latitude, data.longitude);
+
+  /* summary */
+  document.getElementById('summary-text').textContent = data.executive_summary || '—';
+
+  /* charts */
+  if (annual.length) {
+    const last    = annual[annual.length - 1];
+    const temps   = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
+    const precips = annual.map(r => r.precip_total_mm   ?? 0);
+    const solars  = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
+
+    document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
+    document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
+    document.getElementById('chart-solar-val').textContent  = (last.solar_mean_kwh_m2   ?? 0).toFixed(2);
+
+    setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,      '°C/decade', 'up',   'down');
+    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade,  '%/decade',  'down', 'up');
+
+    setTimeout(() => {
+      drawBars('canvas-temp',   temps,   '196,106,42');
+      drawBars('canvas-precip', precips, '46,125,154');
+      drawBars('canvas-solar',  solars,  '196,174,58');
+    }, 50);
+  }
+
+  /* projections chart — reads source field from unified annual_records */
+  renderProjections(annual);
+
+  /* compliance + recs */
+  renderCompliance(comp);
+  renderRecs(data.recommendations || []);
+
+  /* investment status badge */
+  renderInvestmentBadge(score);
+
+  /* confidence badge */
+  renderConfidence(data.confidence_score, data.quality_evaluation);
+
+  /* offset targets */
+  renderOffsetTargets(data.offset_targets);
+
+  /* light mode score-card accent border */
+  _updateScoreCardRiskClass();
+
+  /* data sources tab (includes double materiality) */
+  renderDataSources(data);
+  renderDoubleMateriality(data.compliance_mapping);
+
+  /* show panels — always land on Overview */
+  switchTab('overview');
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('export-row').classList.add('visible');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── PDF export ──────────────────────────────────────────────────────────── */
+function exportPdf() {
+  if (!_currentId) return;
+  const a = document.createElement('a');
+  a.href     = `${API_BASE}/api/analyses/${_currentId}/export/pdf`;
+  a.download = `cs_report_${_currentId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/* ── Investment status badge ─────────────────────────────────────────────── */
+function renderInvestmentBadge(score) {
+  const el     = document.getElementById('investment-badge');
+  const dotEl  = document.getElementById('inv-dot');
+  const textEl = document.getElementById('inv-text');
+  const subEl  = document.getElementById('inv-sub');
+  if (!el) return;
+
+  let cls, text, sub;
+  if (score <= 40) {
+    cls = 'approved';    text = 'Investment Approved';       sub = 'Standard ESG Compliance';
+  } else if (score <= 70) {
+    cls = 'conditioned'; text = 'Investment Conditioned';    sub = 'Climate Adaptation Plan Required';
+  } else if (score <= 90) {
+    cls = 'restricted';  text = 'Investment Restricted';     sub = 'Mandatory Transition Plan Required';
+  } else {
+    cls = 'suspended';   text = 'Investment Suspended';      sub = 'Ecological Restoration Priority';
+  }
+
+  el.className = `investment-badge ${cls}`;
+  dotEl.style.background = getComputedStyle(el).color;
+  textEl.textContent = text;
+  subEl.textContent  = sub;
+  el.style.display   = 'flex';
+}
+
+/* ── Offset targets ──────────────────────────────────────────────────────── */
+const OFFSET_ICONS = { Reforestation: '🌳', 'Water Security': '💧', 'Soil & Biodiversity': '🌿' };
+
+function renderOffsetTargets(offsets) {
+  const card = document.getElementById('offset-card');
+  const grid = document.getElementById('offset-grid');
+  if (!offsets || !offsets.length) { if (card) card.style.display = 'none'; return; }
+
+  grid.innerHTML = offsets.map(o => {
+    const icon = OFFSET_ICONS[o.category] || '🌱';
+    const urgClass = (o.urgency || 'long_term').replace('_', '_');
+    const urgLabel = (o.urgency || 'long_term').replace('_', ' ');
+    return `<div class="offset-item">
+      <div class="offset-icon-row">
+        <span class="offset-icon">${icon}</span>
+        <span class="offset-category">${o.category}</span>
+      </div>
+      <p class="offset-req">${o.requirement}</p>
+      <div class="offset-footer">
+        <span class="offset-urgency ${urgClass}">${urgLabel}</span>
+        <span class="offset-framework">${o.framework_ref || ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+  card.style.display = '';
+}
+
+/* ── Double materiality ──────────────────────────────────────────────────── */
+function renderDoubleMateriality(complianceMapping) {
+  const dm = (complianceMapping || {}).double_materiality;
+  const section = document.getElementById('ds-dm-section');
+  if (!dm || !section) return;
+
+  document.getElementById('dm-physical-summary').textContent = dm.physical_risk_summary || '—';
+  document.getElementById('dm-impact-summary').textContent   = dm.impact_risk_summary   || '—';
+
+  const mkImpacts = (items, elId) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = (items || []).map(i =>
+      `<div class="dm-impact-item"><div class="dm-impact-dot"></div><span>${i}</span></div>`
+    ).join('');
+  };
+  mkImpacts(dm.physical_impacts, 'dm-physical-impacts');
+  mkImpacts(dm.impact_risks,     'dm-impact-impacts');
+
+  section.style.display = '';
+}
+
+/* ── Projection chart ────────────────────────────────────────────────────── */
+let _projHistorical = [];
+let _projFuture     = [];
+let _projMetric     = 'temp';
+
+function switchProjMetric(metric) {
+  _projMetric = metric;
+  document.getElementById('proj-btn-temp').classList.toggle('active',   metric === 'temp');
+  document.getElementById('proj-btn-precip').classList.toggle('active', metric === 'precip');
+  _drawProjectionChart();
+}
+
+function renderProjections(annualRecords) {
+  // Split unified annual_records by source field
+  _projHistorical = annualRecords
+    .filter(r => (r.source || 'nasa') === 'nasa')
+    .map(r => ({
+      year: r.year,
+      temp: r.temp_mean_celsius ?? r.temp_mean_c ?? 0,
+      precip: r.precip_total_mm ?? 0,
+    }));
+  _projFuture = annualRecords
+    .filter(r => r.source === 'projection')
+    .map(r => ({
+      year: r.year,
+      temp: r.temp_mean_celsius ?? r.temp_mean_c ?? 0,
+      precip: r.precip_total_mm ?? 0,
+    }));
+
+  // Show chart even for NASA-only analyses (solid line only)
+  if (_projHistorical.length < 2) return;
+  document.getElementById('proj-card').style.display = '';
+  setTimeout(_drawProjectionChart, 60);
+}
+
+function _drawProjectionChart() {
+  const canvas = document.getElementById('canvas-proj');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const PAD = { top: 8, right: 12, bottom: 26, left: 44 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+
+  const isTemp = _projMetric === 'temp';
+  const histVals = _projHistorical.map(r => isTemp ? r.temp   : r.precip);
+  const projVals = _projFuture.map(r    => isTemp ? r.temp   : r.precip);
+  const allVals  = [...histVals, ...projVals].filter(v => v > 0);
+  if (!allVals.length) return;
+
+  const minV = Math.min(...allVals) * (isTemp ? 0.98 : 0.6);
+  const maxV = Math.max(...allVals) * (isTemp ? 1.02 : 1.1);
+  const allYears = [..._projHistorical, ..._projFuture].map(r => r.year);
+  const minY = Math.min(...allYears), maxY = Math.max(...allYears);
+  const rangeY = maxY - minY || 1, rangeV = maxV - minV || 1;
+
+  const xOf = year  => PAD.left + (year - minY) / rangeY * chartW;
+  const yOf = value => PAD.top  + (1 - (value - minV) / rangeV) * chartH;
+
+  // Background grid
+  ctx.strokeStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--border').trim() || 'rgba(99,140,160,0.12)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (i / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+  }
+
+  // Historical line — solid teal
+  if (_projHistorical.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#4aa8c8';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    _projHistorical.forEach((r, i) => {
+      const val = isTemp ? r.temp : r.precip;
+      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val)) : ctx.lineTo(xOf(r.year), yOf(val));
+    });
+    ctx.stroke();
+    // Dots
+    ctx.fillStyle = '#4aa8c8';
+    _projHistorical.forEach(r => {
+      const val = isTemp ? r.temp : r.precip;
+      ctx.beginPath(); ctx.arc(xOf(r.year), yOf(val), 3, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  // Projection line — dashed orange
+  if (_projFuture.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#c46a2a';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    _projFuture.forEach((r, i) => {
+      const val = isTemp ? r.temp : r.precip;
+      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val)) : ctx.lineTo(xOf(r.year), yOf(val));
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // X-axis labels — every 5 years
+  ctx.fillStyle = '#6a8898';
+  ctx.font = `${10 * (1 / dpr + (dpr - 1) * 0.5)}px "DM Mono", monospace`;
+  ctx.textAlign = 'center';
+  for (let y = Math.ceil(minY / 5) * 5; y <= maxY; y += 5) {
+    ctx.fillText(y, xOf(y), H - 6);
+  }
+
+  // Y-axis labels
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const val = minV + (1 - i / 4) * rangeV;
+    const label = isTemp ? val.toFixed(1) + '°' : Math.round(val) + 'mm';
+    ctx.fillText(label, PAD.left - 4, PAD.top + (i / 4) * chartH + 4);
+  }
+
+  // Transition marker
+  if (_projHistorical.length && _projFuture.length) {
+    const x = xOf(2024);
+    ctx.strokeStyle = 'rgba(99,140,160,0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(99,140,160,0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText('2024', x, PAD.top + 10);
+  }
+}
+
+/* ── Confidence badge ────────────────────────────────────────────────────── */
+function renderConfidence(score, qe) {
+  if (!score) return;
+  const tier = score >= 80 ? 'high' : score >= 60 ? 'medium' : 'low';
+  const verdict = (qe || {}).verdict || '';
+  const label = verdict === 'flagged' ? `${score}% ⚠` : `${score}%`;
+
+  const row   = document.getElementById('confidence-row');
+  const badge = document.getElementById('confidence-badge');
+  const dot   = document.getElementById('confidence-dot');
+
+  badge.textContent = label;
+  badge.className   = `confidence-badge ${tier}`;
+  dot.className     = `confidence-dot ${tier}`;
+  row.style.display = 'flex';
+}
+
+/* ── Tab switching ───────────────────────────────────────────────────────── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-btn-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+/* ── Render Data Sources tab ─────────────────────────────────────────────── */
+function renderDataSources(data) {
+  const md = data.pipeline_metadata || {};
+
+  /* NASA section */
+  const url    = md.nasa_request_url || '—';
+  const params = md.nasa_params || {};
+  const start  = params.start || '';
+  const end    = params.end   || '';
+  const periodStr = start && end
+    ? `${start.slice(0,4)}-${start.slice(4,6)}-${start.slice(6,8)} → ${end.slice(0,4)}-${end.slice(4,6)}-${end.slice(6,8)}`
+    : '—';
+
+  document.getElementById('ds-url').textContent        = url;
+  document.getElementById('ds-period').textContent     = periodStr;
+  document.getElementById('ds-annual').textContent     = md.annual_records_count != null
+    ? `${md.annual_records_count} years` : '—';
+  document.getElementById('ds-datapoints').textContent = md.total_daily_datapoints != null
+    ? `${md.total_daily_datapoints.toLocaleString()} (3 variables × daily)` : '—';
+  document.getElementById('ds-timestamp').textContent = data.created_at || '—';
+
+  // NASA period label from metadata
+  const nasaStart = md.nasa_start_year || md.start_year || '—';
+  const nasaEnd   = md.nasa_end_year   || md.end_year   || '—';
+  document.getElementById('ds-period').textContent = `${nasaStart}–${nasaEnd}`;
+  document.getElementById('ds-annual').textContent = md.nasa_records_count != null
+    ? `${md.nasa_records_count} years` : '—';
+
+  /* OpenMeteo section */
+  const om      = data.openmeteo_data || {};
+  const omUsed  = md.openmeteo_used || (om.used === true);
+  document.getElementById('ds-om-section').style.opacity = omUsed ? '1' : '0.4';
+  document.getElementById('ds-om-label').textContent  = omUsed
+    ? `Projected · OpenMeteo IPCC (${md.openmeteo_start_year || 2026}–${md.openmeteo_end_year || '?'})`
+    : 'Not used for this analysis period (end year ≤ 2025)';
+  document.getElementById('ds-om-proj').textContent   = md.openmeteo_projection_url || om.projection_url || (omUsed ? '—' : 'N/A');
+  document.getElementById('ds-om-model').textContent  = md.openmeteo_model || om.model || (omUsed ? '—' : 'N/A');
+  document.getElementById('ds-om-years').textContent  = omUsed
+    ? `${md.openmeteo_start_year || 2026}–${md.openmeteo_end_year || '?'}`
+    : 'N/A';
+  document.getElementById('ds-om-records').textContent = omUsed
+    ? `${md.openmeteo_projection_years || om.projection_records?.length || 0} years` : 'N/A';
+
+  /* Agent table */
+  const agents  = md.agents || [];
+  const tbody   = document.getElementById('ds-agent-tbody');
+  const fmt     = n => n != null ? Number(n).toLocaleString() : '—';
+  const qe      = data.quality_evaluation || {};
+  const verdict = qe.verdict || '';
+  const verdictClr = { validated: '#3aaa78', needs_review: '#c4ae3a', flagged: '#c46a2a' };
+
+  const totalIn  = agents.reduce((s, a) => s + (a.input_tokens  || 0), 0);
+  const totalOut = agents.reduce((s, a) => s + (a.output_tokens || 0), 0);
+  const totalAll = agents.reduce((s, a) => s + (a.total_tokens  || 0), 0);
+
+  tbody.innerHTML = agents.map(a => {
+    const isJudge  = a.name === 'Quality Judge';
+    const extraCol = isJudge && verdict
+      ? `<span style="font-size:.6rem;margin-left:.4rem;color:${verdictClr[verdict]||'#6a8898'}">${verdict.replace('_',' ')}</span>`
+      : '';
+    return `<tr${isJudge ? ' style="border-top:1px solid var(--border)"' : ''}>
+      <td>${a.step}</td>
+      <td>${a.name}${extraCol}</td>
+      <td class="model-cell">${a.model}</td>
+      <td class="num">${a.total_tokens ? fmt(a.input_tokens)  : '—'}</td>
+      <td class="num">${a.total_tokens ? fmt(a.output_tokens) : '—'}</td>
+      <td class="num">${a.total_tokens ? fmt(a.total_tokens)  : '—'}</td>
+    </tr>`;
+  }).join('') + `
+    <tr class="total-row">
+      <td colspan="3">Total LLM tokens</td>
+      <td class="num">${fmt(totalIn)}</td>
+      <td class="num">${fmt(totalOut)}</td>
+      <td class="num">${fmt(totalAll)}</td>
+    </tr>`;
+}
+
+/* ── Theme toggle ────────────────────────────────────────────────────────── */
+function toggleTheme() {
+  const html   = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  const next   = isDark ? 'light' : 'dark';
+  _applyTheme(next);
+  localStorage.setItem('cs-theme', next);
+}
+
+function _applyTheme(theme) {
+  const html = document.documentElement;
+  if (theme === 'light') {
+    html.setAttribute('data-theme', 'light');
+  } else {
+    html.removeAttribute('data-theme');
+  }
+  document.getElementById('icon-moon').style.display = theme === 'light' ? 'none'  : '';
+  document.getElementById('icon-sun').style.display  = theme === 'light' ? ''      : 'none';
+  _updateScoreCardRiskClass();
+}
+
+function _updateScoreCardRiskClass() {
+  const scoreCard = document.querySelector('.score-card');
+  if (!scoreCard) return;
+  ['risk-low','risk-medium','risk-high','risk-critical'].forEach(c => scoreCard.classList.remove(c));
+  const level = document.getElementById('risk-badge')?.className?.match(/\b(low|medium|high|critical)\b/)?.[1];
+  if (level) scoreCard.classList.add('risk-' + level);
+}
+
+/* Apply saved preference on load */
+(function () {
+  const saved = localStorage.getItem('cs-theme') ||
+    (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  _applyTheme(saved);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "escalation_criteria": [
+    "Customer requests human agent",
+    "Complex technical issues",
+    "Billing disputes over $100",
+    "Damaged or missing items",
+    "Repeated contact about same issue"
+  ],
+  "escalation_process": [
+    "Flag ticket for review",
+    "Assign to senior support agent",
+    "Contact customer within 24 hours",
+    "Provide resolution or update"
+  ],
+  "priority_levels": {
+    "high": ["damaged items", "account security", "large refunds"],
+    "medium": ["technical issues", "billing questions"],
+    "low": ["general inquiries", "order status"]
+  }
+}
