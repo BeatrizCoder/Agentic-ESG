@@ -43,3 +43,6 @@ memory.json
 
 # Migration scripts
 migrate_json_to_sqlite.py
+venv/
+__pycache__/
+*.pyc
