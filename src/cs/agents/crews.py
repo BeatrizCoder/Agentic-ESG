@@ -11,13 +11,13 @@ from crewai import Crew, Process
 logger = logging.getLogger(__name__)
 
 
-def _kickoff_silent(crew: Crew):
-    """Run crew.kickoff() suppressing rich/console TTY errors on non-TTY servers."""
+async def _kickoff_silent(crew: Crew):
+    """Run crew.kickoff_async() suppressing rich/console TTY errors on non-TTY servers."""
     old_stdout, old_stderr = sys.stdout, sys.stderr
     try:
         sys.stdout = io.StringIO()
         sys.stderr = io.StringIO()
-        return crew.kickoff()
+        return await crew.kickoff_async()
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
@@ -51,7 +51,7 @@ def _extract_json(raw: str) -> dict:
         raise
 
 
-def run_climate_analysis_crew(serialised_records: str) -> tuple[dict, dict]:
+async def run_climate_analysis_crew(serialised_records: str) -> tuple[dict, dict]:
     """Agent 2 — Climate Analyst. Returns (findings, tokens)."""
     from .tasks import make_climate_analysis_task
     from .definitions import climate_analyst_agent
@@ -62,7 +62,7 @@ def run_climate_analysis_crew(serialised_records: str) -> tuple[dict, dict]:
         process=Process.sequential,
         verbose=False,
     )
-    result = _kickoff_silent(crew)
+    result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
@@ -71,7 +71,7 @@ def run_climate_analysis_crew(serialised_records: str) -> tuple[dict, dict]:
         return {"error": str(error), "key_findings": [], "data_quality": "poor"}, tokens
 
 
-def run_esg_strategy_crew(
+async def run_esg_strategy_crew(
     climate_summary: str, region_label: str, sector: str = "General"
 ) -> tuple[dict, dict]:
     """Agent 3 — ESG Strategist. Returns (compliance_mapping, tokens)."""
@@ -84,7 +84,7 @@ def run_esg_strategy_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = _kickoff_silent(crew)
+    result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
@@ -93,7 +93,7 @@ def run_esg_strategy_crew(
         return {"error": str(error), "compliance_urgency": "unknown", "key_compliance_findings": []}, tokens
 
 
-def run_report_crew(
+async def run_report_crew(
     climate_summary: str,
     compliance_summary: str,
     region_label: str,
@@ -110,7 +110,7 @@ def run_report_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = _kickoff_silent(crew)
+    result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
@@ -122,7 +122,7 @@ def run_report_crew(
         }, tokens
 
 
-def run_quality_judge_crew(
+async def run_quality_judge_crew(
     climate_summary: str,
     compliance_summary: str,
     report_summary: str,
@@ -137,7 +137,7 @@ def run_quality_judge_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = _kickoff_silent(crew)
+    result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens

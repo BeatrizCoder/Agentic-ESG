@@ -32,7 +32,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Session-ID"],
     expose_headers=["Content-Disposition"],
 )
 
@@ -43,7 +43,7 @@ async def _cors_preflight(request: Request, call_next):
     response = await call_next(request)
     response.headers["access-control-allow-origin"] = origin or "*"
     response.headers["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS"
-    response.headers["access-control-allow-headers"] = "Content-Type, Authorization"
+    response.headers["access-control-allow-headers"] = "Content-Type, Authorization, X-Session-ID"
     response.headers["access-control-expose-headers"] = "Content-Disposition"
     if request.method == "OPTIONS":
         headers = dict(response.headers)

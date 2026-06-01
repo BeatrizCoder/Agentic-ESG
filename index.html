@@ -498,6 +498,139 @@
       font-size: .72rem; color: var(--muted); font-style: italic; margin-bottom: .6rem;
     }
     .dm-summary { font-size: .78rem; color: var(--offwht2); line-height: 1.55; margin-bottom: .6rem; }
+
+    /* ── Cookie Consent Banner ───────────────────────────────────────────── */
+    #cookie-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg2);
+      border-top: 2px solid var(--teal);
+      padding: 1rem 2rem;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 -4px 12px var(--shadow);
+    }
+    #cookie-banner.visible { display: block; }
+    .cookie-content {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+    .cookie-text {
+      font-size: .8rem;
+      color: var(--offwht2);
+      line-height: 1.6;
+      flex: 1;
+    }
+    .cookie-buttons {
+      display: flex;
+      gap: .75rem;
+      flex-shrink: 0;
+    }
+    .cookie-btn {
+      font-family: 'Sora', sans-serif;
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .6rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .cookie-btn.accept {
+      background: var(--teal);
+      border: none;
+      color: #fff;
+    }
+    .cookie-btn.accept:hover { background: var(--teal2); }
+    .cookie-btn.decline {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .cookie-btn.decline:hover {
+      border-color: var(--teal);
+      color: var(--teal-lt);
+    }
+
+    /* ── History Section ─────────────────────────────────────────────────── */
+    #history-section {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    #history-section.visible { display: block; }
+    .history-header {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .75rem;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: .75rem;
+      align-items: center;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .6rem .85rem;
+      transition: border-color .15s;
+    }
+    .history-item:hover { border-color: var(--teal); }
+    .history-info {
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+    }
+    .history-region {
+      font-size: .8rem;
+      color: var(--offwht);
+      font-weight: 500;
+    }
+    .history-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      color: var(--muted);
+    }
+    .history-risk {
+      font-family: 'DM Mono', monospace;
+      font-size: .7rem;
+      padding: .2rem .5rem;
+      border-radius: 3px;
+    }
+    .history-risk.low      { background: var(--risk-low-bg);  color: var(--risk-low-fg); }
+    .history-risk.medium   { background: var(--risk-med-bg);  color: var(--risk-med-fg); }
+    .history-risk.high     { background: var(--risk-high-bg); color: var(--risk-high-fg); }
+    .history-risk.critical { background: var(--risk-crit-bg); color: var(--risk-crit-fg); }
+    .history-view-btn {
+      background: var(--teal);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-family: 'Sora', sans-serif;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .35rem .75rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .history-view-btn:hover { background: var(--teal2); }
     .dm-impacts { display: flex; flex-direction: column; gap: .3rem; }
     .dm-impact-item {
       display: flex; align-items: flex-start; gap: .4rem;
@@ -636,6 +769,12 @@
     <p style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
       ✦ Years after 2025 use OpenMeteo IPCC EC_Earth3P_HR climate projections
     </p>
+
+    <!-- History Section -->
+    <div id="history-section">
+      <div class="history-header">Your Recent Analyses</div>
+      <div class="history-list" id="history-list"></div>
+    </div>
   </section>
 
   <!-- Status -->
@@ -857,15 +996,136 @@
 </main>
 
 <footer id="t-footer">
-  Session data stored as temporary cookie only. No personal data collected or retained.
+  Analysis history is stored for 24 hours using an anonymous session cookie. No personal data is collected.
   &nbsp;·&nbsp; Powered by NASA POWER API &amp; Claude AI (Anthropic)
+
+<!-- Cookie Consent Banner -->
+<div id="cookie-banner">
+  <div class="cookie-content">
+    <div class="cookie-text">
+      We use essential cookies only to save your analysis history for this session. No personal data is collected or shared.
+    </div>
+    <div class="cookie-buttons">
+      <button class="cookie-btn accept" onclick="acceptCookies()">Accept Essential Cookies</button>
+      <button class="cookie-btn decline" onclick="declineCookies()">Decline</button>
+    </div>
+  </div>
+</div>
 </footer>
 
 <script>
 /* ── Config ──────────────────────────────────────────────────────────────── */
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? `http://${window.location.hostname}:8001`
-  : '';
+  : window.location.origin;
+
+/* ── Cookie & Session Management ─────────────────────────────────────────── */
+let SESSION_ID = null;
+let COOKIES_ACCEPTED = false;
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+function setCookie(name, value, maxAgeSeconds) {
+  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+}
+
+function deleteCookie(name) {
+  document.cookie = `${name}=; path=/; max-age=0`;
+}
+
+function generateSessionId() {
+  return crypto.randomUUID();
+}
+
+function acceptCookies() {
+  COOKIES_ACCEPTED = true;
+  SESSION_ID = generateSessionId();
+  setCookie('cs_session_id', SESSION_ID, 86400); // 24 hours
+  setCookie('cs_consent', 'accepted', 86400);
+  document.getElementById('cookie-banner').classList.remove('visible');
+  loadHistory();
+}
+
+function declineCookies() {
+  COOKIES_ACCEPTED = false;
+  SESSION_ID = null;
+  deleteCookie('cs_session_id');
+  setCookie('cs_consent', 'declined', 86400);
+  document.getElementById('cookie-banner').classList.remove('visible');
+}
+
+function checkCookieConsent() {
+  const consent = getCookie('cs_consent');
+  if (!consent) {
+    // First visit - show banner
+    document.getElementById('cookie-banner').classList.add('visible');
+  } else if (consent === 'accepted') {
+    COOKIES_ACCEPTED = true;
+    SESSION_ID = getCookie('cs_session_id');
+    if (!SESSION_ID) {
+      // Cookie expired, generate new one
+      SESSION_ID = generateSessionId();
+      setCookie('cs_session_id', SESSION_ID, 86400);
+    }
+    loadHistory();
+  }
+}
+
+/* ── History Management ──────────────────────────────────────────────────── */
+async function loadHistory() {
+  if (!COOKIES_ACCEPTED || !SESSION_ID) return;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/analyses/history`, {
+      headers: { 'X-Session-ID': SESSION_ID }
+    });
+    
+    if (!response.ok) return;
+    
+    const analyses = await response.json();
+    if (analyses.length === 0) return;
+    
+    const historyList = document.getElementById('history-list');
+    historyList.innerHTML = analyses.map(a => {
+      const date = new Date(a.created_at).toLocaleString();
+      const riskClass = a.risk_level.toLowerCase();
+      return `
+        <div class="history-item">
+          <div class="history-info">
+            <div class="history-region">${a.region_label || 'Unknown'}</div>
+            <div class="history-meta">Score: ${a.risk_score}/100 · ${date}</div>
+          </div>
+          <div class="history-risk ${riskClass}">${a.risk_level.toUpperCase()}</div>
+          <button class="history-view-btn" onclick="viewAnalysis('${a.analysis_id}')">View</button>
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('history-section').classList.add('visible');
+  } catch (err) {
+    console.error('Failed to load history:', err);
+  }
+}
+
+async function viewAnalysis(analysisId) {
+  try {
+    const response = await fetch(`${API_BASE}/api/analyses/${analysisId}`);
+    if (!response.ok) throw new Error('Analysis not found');
+    
+    const data = await response.json();
+    renderResults(data);
+    
+    // Scroll to results
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    alert('Failed to load analysis: ' + err.message);
+  }
+}
 
 /* ── i18n ────────────────────────────────────────────────────────────────── */
 const I18N = {
@@ -1053,15 +1313,25 @@ async function runAnalysis() {
   }, 14000);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (COOKIES_ACCEPTED && SESSION_ID) {
+      headers['X-Session-ID'] = SESSION_ID;
+    }
+    
     const res = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({ latitude: lat, longitude: lon, region_label: label, start_year: start, end_year: end, sector: document.getElementById('inp-sector').value }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     _currentId = data.analysis_id;
     renderResults(data);
+    
+    // Reload history after successful analysis
+    if (COOKIES_ACCEPTED && SESSION_ID) {
+      setTimeout(() => loadHistory(), 1000);
+    }
   } catch (err) {
     statusText.textContent = `Error: ${err.message}`;
     setTimeout(() => statusBar.classList.remove('visible'), 5000);
@@ -1515,6 +1785,11 @@ function _updateScoreCardRiskClass() {
     (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   _applyTheme(saved);
 })();
+
+/* Initialize cookie consent on page load */
+window.addEventListener('DOMContentLoaded', () => {
+  checkCookieConsent();
+});
 </script>
 
 </body>

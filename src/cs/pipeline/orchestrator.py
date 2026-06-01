@@ -180,7 +180,7 @@ async def run_analysis(
     from ..agents.crews import run_climate_analysis_crew
 
     logger.info("Step 2/5 — Climate Analyst: analysing trends")
-    climate_findings, tokens_analyst = run_climate_analysis_crew(serialised_records)
+    climate_findings, tokens_analyst = await run_climate_analysis_crew(serialised_records)
     logger.info(
         "Step 2/4 complete: heat_stress=%s drought=%s flood=%s tokens=%s",
         climate_findings.get("heat_stress_risk"),
@@ -194,7 +194,7 @@ async def run_analysis(
 
     logger.info("Step 3/5 — ESG Strategist: mapping compliance frameworks")
     climate_summary = _climate_summary_for_agents(climate_findings)
-    compliance_mapping, tokens_strategist = run_esg_strategy_crew(
+    compliance_mapping, tokens_strategist = await run_esg_strategy_crew(
         climate_summary=climate_summary,
         region_label=label,
         sector=sector,
@@ -212,7 +212,7 @@ async def run_analysis(
 
     logger.info("Step 4/5 — Report Writer: generating executive report")
     compliance_summary = _compliance_summary_for_agents(compliance_mapping)
-    report, tokens_writer = run_report_crew(
+    report, tokens_writer = await run_report_crew(
         climate_summary=climate_summary,
         compliance_summary=compliance_summary,
         region_label=label,
@@ -247,7 +247,7 @@ async def run_analysis(
             for r in report.get("recommendations", [])[:5]
         ],
     })
-    quality_evaluation, tokens_judge = run_quality_judge_crew(
+    quality_evaluation, tokens_judge = await run_quality_judge_crew(
         climate_summary=climate_summary,
         compliance_summary=compliance_summary,
         report_summary=report_summary_for_judge,

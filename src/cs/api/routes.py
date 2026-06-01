@@ -3,13 +3,13 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Header
 from fastapi.responses import StreamingResponse
 
 from ..core.config import limiter
 from ..db.mongo import delete_analysis as _db_delete
 from ..db.mongo import get_analysis as _db_get
-from ..db.mongo import get_recent_analyses, save_analysis
+from ..db.mongo import get_recent_analyses, get_session_history, save_analysis
 from ..pipeline.orchestrator import run_analysis
 from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest
 
@@ -30,18 +30,23 @@ async def health(request: Request) -> dict:
 
 @router.post("/api/analyze", response_model=AnalysisResponse)
 @limiter.limit("5/minute")
-async def analyze(request: Request, body: AnalyzeRequest) -> AnalysisResponse:
+async def analyze(
+    request: Request,
+    body: AnalyzeRequest,
+    x_session_id: str | None = Header(None, alias="X-Session-ID")
+) -> AnalysisResponse:
     """Run the full 4-agent CS pipeline and persist the result."""
     if body.end_year <= body.start_year:
         raise HTTPException(status_code=400, detail="end_year must be greater than start_year")
 
     logger.info(
-        "POST /api/analyze: region=%r lat=%.4f lon=%.4f years=%d-%d",
+        "POST /api/analyze: region=%r lat=%.4f lon=%.4f years=%d-%d session_id=%s",
         body.region_label or "(unnamed)",
         body.latitude,
         body.longitude,
         body.start_year,
         body.end_year,
+        x_session_id or "none",
     )
 
     result = await run_analysis(
@@ -54,7 +59,7 @@ async def analyze(request: Request, body: AnalyzeRequest) -> AnalysisResponse:
     )
 
     try:
-        await save_analysis(result)
+        await save_analysis(result, session_id=x_session_id)
     except Exception:
         logger.exception("Failed to persist analysis %s", result.analysis_id)
 
@@ -89,6 +94,33 @@ async def analyze(request: Request, body: AnalyzeRequest) -> AnalysisResponse:
 async def list_analyses(request: Request) -> list[AnalysisSummary]:
     """Return the 50 most recent analyses (summary only, no heavy payloads)."""
     rows = await get_recent_analyses(limit=50)
+    return [
+        AnalysisSummary(
+            analysis_id=r["analysis_id"],
+            region_label=r["region_label"],
+            latitude=r["latitude"],
+            longitude=r["longitude"],
+            risk_score=r["risk_score"],
+            risk_level=r["risk_level"],
+            risk_badge_label=r["risk_badge_label"],
+            created_at=r["created_at"],
+            pipeline_duration_sec=r["pipeline_duration_sec"],
+        )
+        for r in rows
+    ]
+
+
+@router.get("/api/analyses/history", response_model=list[AnalysisSummary])
+@limiter.limit("30/minute")
+async def get_history(
+    request: Request,
+    x_session_id: str | None = Header(None, alias="X-Session-ID")
+) -> list[AnalysisSummary]:
+    """Return the most recent analyses for the current session (last 10)."""
+    if not x_session_id:
+        raise HTTPException(status_code=400, detail="X-Session-ID header required")
+    
+    rows = await get_session_history(x_session_id, limit=10)
     return [
         AnalysisSummary(
             analysis_id=r["analysis_id"],
