@@ -996,7 +996,8 @@
       border-bottom: 0.5px solid var(--border); flex-shrink: 0;
     }
     .modal-body {
-      overflow-y: auto; padding: 1.25rem 1.5rem;
+      flex: 1 1 0; min-height: 0;
+      overflow-y: scroll; padding: 1.25rem 1.5rem;
       font-size: .82rem; color: var(--text2); line-height: 1.75;
     }
     .modal-body h3 {
@@ -1012,6 +1013,42 @@
       font-size: .72rem; color: var(--muted); font-style: italic;
       border-top: 0.5px solid var(--border); padding-top: .75rem; margin-top: .75rem;
     }
+    .modal-footer {
+      flex-shrink: 0; padding: .9rem 1.5rem;
+      border-top: 0.5px solid var(--border);
+      background: var(--bg3); display: flex; justify-content: flex-end;
+      border-radius: 0 0 16px 16px;
+    }
+    .modal-accept-btn {
+      border-radius: 8px; font-family: inherit; font-size: .8rem; font-weight: 600;
+      padding: .55rem 1.4rem; transition: all .25s ease; white-space: nowrap;
+      background: var(--bg2); color: var(--muted);
+      border: 0.5px solid var(--border); cursor: not-allowed; opacity: .55;
+    }
+    .modal-accept-btn.ready {
+      cursor: pointer; opacity: 1;
+      background: var(--green); color: #fff; border-color: var(--green);
+      box-shadow: 0 2px 8px rgba(58,107,53,0.3);
+    }
+    .modal-accept-btn.ready:hover { background: var(--green2); box-shadow: 0 4px 12px rgba(58,107,53,0.4); }
+    .modal-accept-btn.accepted { cursor: default; opacity: 1; background: var(--green); color: #fff; border-color: var(--green); }
+
+    /* ── Terms gate banner ────────────────────────────────────────────────── */
+    #terms-gate {
+      display: none; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+      background: var(--terra-lt); border: 0.5px solid var(--terra);
+      border-radius: 10px; padding: .75rem 1.25rem;
+      font-size: .8rem; color: var(--terra);
+      max-width: 900px; margin: 0 auto 1.5rem;
+    }
+    .gate-link {
+      background: var(--terra); border: none; border-radius: 6px;
+      color: #fff; cursor: pointer; font-family: inherit; font-size: .75rem;
+      font-weight: 600; padding: .35rem .85rem; white-space: nowrap;
+      transition: opacity .2s; flex-shrink: 0;
+    }
+    .gate-link:hover { opacity: .85; }
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 900px) {
@@ -1048,6 +1085,12 @@
 </header>
 
 <main>
+
+  <!-- Terms gate -->
+  <div id="terms-gate">
+    <span>Please review and accept our <strong>Terms of Use</strong> and <strong>Privacy Policy</strong> before running an analysis.</span>
+    <button class="gate-link" onclick="openModal('modal-terms')">Review &amp; Accept →</button>
+  </div>
 
   <!-- Hero Section -->
   <section class="hero-section">
@@ -2224,26 +2267,99 @@ function _updateScoreCardRiskClass() {
   _applyTheme(saved);
 })();
 
-/* Initialize cookie consent on page load */
+/* Initialize cookie consent and terms gate on page load */
 window.addEventListener('DOMContentLoaded', () => {
   checkCookieConsent();
+  checkTermsGate();
 });
 
-/* ── Modal helpers ───────────────────────────────────────────────────────── */
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-  document.body.style.overflow = 'hidden';
+/* ── Modal scroll-to-accept ──────────────────────────────────────────────── */
+function _termsAccepted() {
+  return getCookie('cs_terms_accepted') === 'true' && getCookie('cs_privacy_accepted') === 'true';
 }
+
+function _setAcceptBtn(btn, state) {
+  btn.dataset.state = state;
+  if (state === 'unread') {
+    btn.disabled = true;
+    btn.textContent = 'Please read to continue';
+    btn.className = 'modal-accept-btn';
+  } else if (state === 'ready') {
+    btn.disabled = false;
+    btn.textContent = 'I have read and accept';
+    btn.className = 'modal-accept-btn ready';
+  } else if (state === 'accepted') {
+    btn.disabled = false;
+    btn.textContent = 'Already accepted ✓';
+    btn.className = 'modal-accept-btn accepted';
+  }
+}
+
+function _checkScroll(bodyEl, btn) {
+  if (btn.dataset.state !== 'unread') return;
+  if (bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 10) {
+    _setAcceptBtn(btn, 'ready');
+  }
+}
+
+function openModal(id) {
+  const overlay = document.getElementById(id);
+  const bodyEl  = overlay.querySelector('.modal-body');
+  const btn     = overlay.querySelector('.modal-accept-btn');
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  if (!btn) return;
+
+  if (_termsAccepted()) {
+    _setAcceptBtn(btn, 'accepted');
+    return;
+  }
+
+  bodyEl.scrollTop = 0;
+  _setAcceptBtn(btn, 'unread');
+  // Handle content short enough that no scroll is needed
+  setTimeout(() => _checkScroll(bodyEl, btn), 60);
+
+  if (bodyEl._onScroll) bodyEl.removeEventListener('scroll', bodyEl._onScroll);
+  bodyEl._onScroll = () => _checkScroll(bodyEl, btn);
+  bodyEl.addEventListener('scroll', bodyEl._onScroll);
+}
+
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+  const overlay = document.getElementById(id);
+  const bodyEl  = overlay.querySelector('.modal-body');
+  if (bodyEl && bodyEl._onScroll) {
+    bodyEl.removeEventListener('scroll', bodyEl._onScroll);
+    bodyEl._onScroll = null;
+  }
+  overlay.classList.remove('open');
   document.body.style.overflow = '';
 }
+
+function acceptModalTerms(modalId) {
+  setCookie('cs_terms_accepted',   'true', 365 * 86400);
+  setCookie('cs_privacy_accepted', 'true', 365 * 86400);
+  closeModal(modalId);
+  // Mark the other modal's button too, so it shows accepted next open
+  document.querySelectorAll('.modal-accept-btn').forEach(btn => {
+    if (btn.dataset.state !== 'accepted') _setAcceptBtn(btn, 'accepted');
+  });
+  const gate = document.getElementById('terms-gate');
+  if (gate) gate.style.display = 'none';
+}
+
+function checkTermsGate() {
+  if (!_termsAccepted()) {
+    const gate = document.getElementById('terms-gate');
+    if (gate) gate.style.display = 'flex';
+  }
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    document.querySelectorAll('.modal-overlay.open').forEach(m => {
-      m.classList.remove('open');
-      document.body.style.overflow = '';
-    });
+    document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
   }
 });
 </script>
@@ -2281,6 +2397,10 @@ document.addEventListener('keydown', e => {
 
       <p class="modal-note">Last updated: June 2026. Climate Sentinel is a research and educational platform.</p>
     </div>
+    <div class="modal-footer">
+      <button class="modal-accept-btn" id="modal-privacy-accept" data-state="unread" disabled
+              onclick="acceptModalTerms('modal-privacy')">Please read to continue</button>
+    </div>
   </div>
 </div>
 
@@ -2317,6 +2437,10 @@ document.addEventListener('keydown', e => {
       <p>For authorisation requests or enquiries: <a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
 
       <p class="modal-note">Last updated: June 2026. Governed by Brazilian law.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-accept-btn" id="modal-terms-accept" data-state="unread" disabled
+              onclick="acceptModalTerms('modal-terms')">Please read to continue</button>
     </div>
   </div>
 </div>
