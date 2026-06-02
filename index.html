@@ -230,7 +230,7 @@
     /* ── Search ──────────────────────────────────────────────────────────── */
     .search-section { margin-bottom: 2rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
-    .search-row { display: grid; grid-template-columns: 1fr 1fr auto auto 1fr 1fr 1fr 1fr auto; gap: .75rem; align-items: end; }
+    .search-row { display: grid; grid-template-columns: 2fr auto auto 1fr 1fr auto auto; gap: .75rem; align-items: end; }
 
     .field-group { display: flex; flex-direction: column; gap: .3rem; }
     .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -294,6 +294,95 @@
       color: var(--green);
       background: var(--green-lt);
     }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: .5rem .65rem;
+      transition: all .3s ease;
+      align-self: flex-end;
+    }
+    .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+
+    .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .6rem;
+      font-weight: 700;
+      cursor: help;
+      margin-left: 4px;
+      position: relative;
+      vertical-align: middle;
+    }
+    .tooltip-icon:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .5rem .75rem;
+      font-size: .7rem;
+      color: var(--text2);
+      white-space: pre-line;
+      min-width: 220px;
+      max-width: 280px;
+      line-height: 1.5;
+      box-shadow: 0 4px 12px var(--shadow);
+      z-index: 100;
+      font-weight: 400;
+      font-family: 'Sora', sans-serif;
+    }
+
+    .geocoder-wrap { position: relative; }
+    .geo-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      list-style: none;
+      margin: 0; padding: .25rem 0;
+      z-index: 200;
+      box-shadow: 0 4px 16px var(--shadow);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .geo-dropdown.hidden { display: none; }
+    .geo-dropdown li {
+      padding: .45rem .75rem;
+      font-size: .78rem;
+      color: var(--text2);
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .geo-dropdown li:hover { background: var(--bg3); color: var(--text); }
+    .coords-toggle {
+      font-size: .6rem;
+      color: var(--muted);
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: .3rem;
+      display: inline-block;
+      transition: color .2s;
+    }
+    .coords-toggle:hover { color: var(--green); }
+    .manual-coords { display: none; gap: .5rem; margin-top: .3rem; }
+    .manual-coords.visible { display: flex; }
 
     /* ── Agent Progress Pipeline ─────────────────────────────────────────── */
     #status-bar {
@@ -1134,6 +1223,7 @@
     @media (max-width: 900px) {
       .search-row { grid-template-columns: 1fr 1fr; }
       .analyze-btn { grid-column: 1 / 3; }
+      .refresh-btn { grid-column: 1; }
       .results-grid { grid-template-columns: 1fr; }
       .map-card  { grid-column: 1; grid-row: auto; }
       .summary-card, .projections-card, .compliance-card, .recs-card, .offset-card, .export-row { grid-column: 1; }
@@ -1182,15 +1272,34 @@
   <section class="search-section">
     <div class="search-row">
       <div class="field-group">
-        <label id="t-lat">Latitude</label>
-        <input id="inp-lat" type="number" step="0.0001" min="-90" max="90" value="-15.7801" />
+        <label id="t-location">Location
+          <span class="tooltip-icon"
+            data-tooltip-en="Type any city or region. We'll find the coordinates automatically."
+            data-tooltip-pt="Digite qualquer cidade ou região. Encontraremos as coordenadas automaticamente."
+            data-tooltip="Type any city or region. We'll find the coordinates automatically.">i</span>
+        </label>
+        <div class="geocoder-wrap">
+          <input id="inp-location" type="text"
+            placeholder="City, region or address… / Cidade, região ou endereço…"
+            autocomplete="off" value="Brasília, Brazil" />
+          <ul class="geo-dropdown hidden" id="geo-dropdown"></ul>
+        </div>
+        <input type="hidden" id="inp-lat" value="-15.7801" />
+        <input type="hidden" id="inp-lon" value="-47.9292" />
+        <input type="hidden" id="inp-label" value="Brasília, Brazil" />
+        <div class="manual-coords" id="manual-coords">
+          <input id="inp-lat-manual" type="number" step="0.0001" min="-90" max="90" value="-15.7801" placeholder="Lat" style="flex:1" />
+          <input id="inp-lon-manual" type="number" step="0.0001" min="-180" max="180" value="-47.9292" placeholder="Lon" style="flex:1" />
+        </div>
+        <a class="coords-toggle" id="coords-toggle" href="#" onclick="toggleCoords(event)">📍 Use coordinates instead</a>
       </div>
       <div class="field-group">
-        <label id="t-lon">Longitude</label>
-        <input id="inp-lon" type="number" step="0.0001" min="-180" max="180" value="-47.9292" />
-      </div>
-      <div class="field-group">
-        <label id="t-from">From</label>
+        <label id="t-from">From
+          <span class="tooltip-icon"
+            data-tooltip-en="Start year for historical climate analysis (NASA POWER data available from 2000)"
+            data-tooltip-pt="Ano inicial para análise climática histórica (dados NASA POWER disponíveis a partir de 2000)"
+            data-tooltip="Start year for historical climate analysis (NASA POWER data available from 2000)">i</span>
+        </label>
         <select id="inp-start">
           <option value="2000">2000</option><option value="2001">2001</option>
           <option value="2002">2002</option><option value="2003">2003</option>
@@ -1209,7 +1318,12 @@
         </select>
       </div>
       <div class="field-group">
-        <label id="t-to">To</label>
+        <label id="t-to">To
+          <span class="tooltip-icon"
+            data-tooltip-en="End year. Years after 2025 use IPCC climate projections (OpenMeteo)"
+            data-tooltip-pt="Ano final. Anos após 2025 usam projeções climáticas IPCC (OpenMeteo)"
+            data-tooltip="End year. Years after 2025 use IPCC climate projections (OpenMeteo)">i</span>
+        </label>
         <select id="inp-end">
           <option value="2025">2025</option>
           <option value="2026">2026 ✦</option><option value="2027">2027 ✦</option>
@@ -1228,11 +1342,12 @@
         </select>
       </div>
       <div class="field-group">
-        <label id="t-region">Region label</label>
-        <input id="inp-label" type="text" maxlength="120" value="Brasília, Brazil" />
-      </div>
-      <div class="field-group">
-        <label id="t-sector">Sector</label>
+        <label id="t-sector">Sector
+          <span class="tooltip-icon"
+            data-tooltip-en="Your industry sector. Affects how ESG compliance risks are weighted and framed."
+            data-tooltip-pt="Seu setor de atividade. Afeta como os riscos de conformidade ESG são ponderados."
+            data-tooltip="Your industry sector. Affects how ESG compliance risks are weighted and framed.">i</span>
+        </label>
         <select id="inp-sector">
           <option value="General" selected>General</option>
           <option value="Real Estate">Real Estate</option>
@@ -1245,13 +1360,19 @@
         </select>
       </div>
       <div class="field-group">
-        <label>Scenario</label>
+        <label id="t-scenario">Scenario
+          <span class="tooltip-icon"
+            data-tooltip-en="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)"
+            data-tooltip-pt="Cenário de emissões IPCC para projeções futuras:&#10;SSP1-2.6: Otimista (forte ação climática, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas atuais, ~2–3°C)&#10;SSP5-8.5: Pessimista (altas emissões, ~4–5°C)"
+            data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">i</span>
+        </label>
         <select id="inp-scenario">
           <option value="SSP2-4.5" selected>SSP2-4.5</option>
           <option value="SSP1-2.6">SSP1-2.6</option>
           <option value="SSP5-8.5">SSP5-8.5</option>
         </select>
       </div>
+      <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
     </div>
     <div class="presets">
@@ -1662,8 +1783,8 @@ async function viewAnalysis(analysisId) {
 const I18N = {
   en: {
     'headline':        'Physical Climate Risk Analysis',
-    'sub':             'Enter coordinates or select a preset region to run a 10-year NASA POWER analysis with ESG compliance mapping.',
-    'lat': 'Latitude', 'lon': 'Longitude', 'from': 'From', 'to': 'To', 'region': 'Region label',
+    'sub':             'Enter a location or select a preset region to run a 10-year NASA POWER analysis with ESG compliance mapping.',
+    'location': 'Location', 'from': 'From', 'to': 'To', 'sector': 'Sector', 'scenario': 'Scenario',
     'risk-label':      'Climate Risk Score',
     'temp-delta':      'Temperature Change',
     'precip-delta':    'Precipitation Change',
@@ -1682,8 +1803,8 @@ const I18N = {
   },
   pt: {
     'headline':        'Análise de Risco Climático Físico',
-    'sub':             'Insira coordenadas ou selecione uma região para executar análise de 10 anos com mapeamento de conformidade ESG.',
-    'lat': 'Latitude', 'lon': 'Longitude', 'from': 'De', 'to': 'Até', 'region': 'Nome da região',
+    'sub':             'Insira uma localização ou selecione uma região para executar análise de 10 anos com mapeamento de conformidade ESG.',
+    'location': 'Localização', 'from': 'De', 'to': 'Até', 'sector': 'Setor', 'scenario': 'Cenário',
     'risk-label':      'Score de Risco Climático',
     'temp-delta':      'Variação de Temperatura',
     'precip-delta':    'Variação de Precipitação',
@@ -1711,13 +1832,112 @@ function setLang(l) {
     const el = document.getElementById('t-' + k);
     if (el) el.textContent = v;
   }
+  document.querySelectorAll('.tooltip-icon').forEach(el => {
+    const tt = el.getAttribute('data-tooltip-' + l);
+    if (tt) el.setAttribute('data-tooltip', tt);
+  });
 }
 
 /* ── Preset ──────────────────────────────────────────────────────────────── */
 function setPreset(lat, lon, label) {
-  document.getElementById('inp-lat').value   = lat;
-  document.getElementById('inp-lon').value   = lon;
-  document.getElementById('inp-label').value = label;
+  document.getElementById('inp-lat').value       = lat;
+  document.getElementById('inp-lon').value       = lon;
+  document.getElementById('inp-label').value     = label;
+  document.getElementById('inp-location').value  = label;
+  document.getElementById('inp-lat-manual').value = lat;
+  document.getElementById('inp-lon-manual').value = lon;
+}
+
+/* ── Geocoding ───────────────────────────────────────────────────────────── */
+let _geoTimer = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const locInput = document.getElementById('inp-location');
+  locInput.addEventListener('input', function () {
+    clearTimeout(_geoTimer);
+    const q = this.value.trim();
+    if (q.length < 3) { _hideGeoDrop(); return; }
+    _geoTimer = setTimeout(() => _geocodeSearch(q), 500);
+  });
+  locInput.addEventListener('blur', () => setTimeout(_hideGeoDrop, 200));
+
+  document.getElementById('inp-lat-manual').addEventListener('input', _syncManualCoords);
+  document.getElementById('inp-lon-manual').addEventListener('input', _syncManualCoords);
+});
+
+async function _geocodeSearch(q) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const results = await res.json();
+    _showGeoDrop(results);
+  } catch (_) { _hideGeoDrop(); }
+}
+
+function _showGeoDrop(results) {
+  const dd = document.getElementById('geo-dropdown');
+  if (!results.length) { _hideGeoDrop(); return; }
+  dd.innerHTML = results.map(r => {
+    const parts  = r.display_name.split(',');
+    const short  = parts.slice(0, 3).join(',').trim();
+    const safeLabel = r.display_name.replace(/'/g, "\\'");
+    return `<li onmousedown="event.preventDefault()" onclick="_selectGeo(${parseFloat(r.lat)},${parseFloat(r.lon)},'${safeLabel}')">${short}</li>`;
+  }).join('');
+  dd.classList.remove('hidden');
+}
+
+function _hideGeoDrop() {
+  document.getElementById('geo-dropdown').classList.add('hidden');
+}
+
+function _selectGeo(lat, lon, label) {
+  document.getElementById('inp-lat').value        = lat;
+  document.getElementById('inp-lon').value        = lon;
+  document.getElementById('inp-label').value      = label;
+  document.getElementById('inp-lat-manual').value = lat.toFixed(4);
+  document.getElementById('inp-lon-manual').value = lon.toFixed(4);
+  const parts = label.split(',');
+  document.getElementById('inp-location').value   = parts.slice(0, 2).join(',').trim();
+  _hideGeoDrop();
+}
+
+function _syncManualCoords() {
+  const lat = document.getElementById('inp-lat-manual').value;
+  const lon = document.getElementById('inp-lon-manual').value;
+  if (lat) document.getElementById('inp-lat').value = lat;
+  if (lon) document.getElementById('inp-lon').value = lon;
+}
+
+function toggleCoords(e) {
+  e && e.preventDefault();
+  const mc     = document.getElementById('manual-coords');
+  const toggle = document.getElementById('coords-toggle');
+  if (mc.classList.contains('visible')) {
+    mc.classList.remove('visible');
+    toggle.textContent = '📍 Use coordinates instead';
+  } else {
+    document.getElementById('inp-lat-manual').value = document.getElementById('inp-lat').value;
+    document.getElementById('inp-lon-manual').value = document.getElementById('inp-lon').value;
+    mc.classList.add('visible');
+    toggle.textContent = '✕ Hide coordinates';
+  }
+}
+
+function resetForm() {
+  document.getElementById('inp-location').value   = 'Brasília, Brazil';
+  document.getElementById('inp-lat').value         = '-15.7801';
+  document.getElementById('inp-lon').value         = '-47.9292';
+  document.getElementById('inp-label').value       = 'Brasília, Brazil';
+  document.getElementById('inp-lat-manual').value  = '-15.7801';
+  document.getElementById('inp-lon-manual').value  = '-47.9292';
+  document.getElementById('inp-start').value       = '2014';
+  document.getElementById('inp-end').value         = '2025';
+  document.getElementById('inp-sector').value      = 'General';
+  document.getElementById('inp-scenario').value    = 'SSP2-4.5';
+  _hideGeoDrop();
+  document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('export-row').classList.remove('visible');
 }
 
 /* ── Map ─────────────────────────────────────────────────────────────────── */
@@ -1825,7 +2045,7 @@ async function runAnalysis() {
   const end      = parseInt(document.getElementById('inp-end').value);
   const sector   = document.getElementById('inp-sector').value;
   const scenario = document.getElementById('inp-scenario').value;
-  if (isNaN(lat) || isNaN(lon)) { alert('Enter valid coordinates.'); return; }
+  if (isNaN(lat) || isNaN(lon)) { alert(_lang === 'pt' ? 'Selecione uma localização válida.' : 'Please select a valid location.'); return; }
 
   const btn = document.getElementById('analyze-btn');
   btn.disabled = true;
@@ -2409,13 +2629,13 @@ function _checkScroll(bodyEl, btn) {
 /* ── Gate helpers ────────────────────────────────────────────────────────── */
 function _disablePlatform() {
   document.querySelectorAll(
-    '#analyze-btn, .preset-btn, .field-group input, .field-group select'
+    '#analyze-btn, .preset-btn, .refresh-btn, .field-group input:not([type=hidden]), .field-group select'
   ).forEach(el => { el.disabled = true; });
 }
 
 function _enablePlatform() {
   document.querySelectorAll(
-    '#analyze-btn, .preset-btn, .field-group input, .field-group select'
+    '#analyze-btn, .preset-btn, .refresh-btn, .field-group input:not([type=hidden]), .field-group select'
   ).forEach(el => { el.disabled = false; });
 }
 
