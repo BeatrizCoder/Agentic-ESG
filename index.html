@@ -969,61 +969,84 @@
     }
     .footer-link:hover { opacity: .75; }
 
-    /* ── Modals ──────────────────────────────────────────────────────────── */
+    /* ── Modals (Agentic style) ──────────────────────────────────────────── */
     .modal-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
       z-index: 600; align-items: center; justify-content: center; padding: 1.5rem;
     }
     .modal-overlay.open { display: flex; }
     .modal-box {
       background: var(--bg2); border: 0.5px solid var(--border);
-      border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-      width: 100%; max-width: 600px; max-height: 82vh;
-      overflow: hidden; display: flex; flex-direction: column; position: relative;
+      border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+      width: 100%; max-width: 640px; max-height: 85vh;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 1.5rem; border-bottom: 0.5px solid var(--border); flex-shrink: 0;
+    }
+    .modal-header-title {
+      font-size: 1.1rem; font-weight: 700; color: var(--text);
+      letter-spacing: -.02em; margin-bottom: .25rem;
+    }
+    .modal-header-sub {
+      font-size: .7rem; color: var(--muted); letter-spacing: .02em;
     }
     .modal-close {
-      position: absolute; top: .9rem; right: .9rem;
       background: var(--bg3); border: 0.5px solid var(--border);
       border-radius: 50%; color: var(--muted); cursor: pointer;
       width: 28px; height: 28px; display: flex; align-items: center;
       justify-content: center; font-size: .75rem; transition: all .2s ease;
+      flex-shrink: 0; margin-left: 1rem;
     }
     .modal-close:hover { color: var(--text); border-color: var(--green); background: var(--green-lt); }
-    .modal-title {
-      font-size: .95rem; font-weight: 600; letter-spacing: -.01em;
-      color: var(--text); padding: 1.25rem 3rem 1rem 1.5rem;
-      border-bottom: 0.5px solid var(--border); flex-shrink: 0;
-    }
     .modal-body {
-      flex: 1 1 0; min-height: 0;
-      overflow-y: scroll; padding: 1.25rem 1.5rem;
-      font-size: .82rem; color: var(--text2); line-height: 1.75;
+      flex: 1 1 0; min-height: 0; overflow-y: scroll; padding: 1.25rem 1.5rem;
     }
-    .modal-body h3 {
-      font-size: .65rem; font-weight: 600; letter-spacing: .1em;
-      text-transform: uppercase; color: var(--green);
-      margin: 1.25rem 0 .35rem;
+    .modal-section {
+      padding-bottom: 1rem; margin-bottom: 1rem;
+      border-bottom: 0.5px solid var(--border);
     }
-    .modal-body h3:first-child { margin-top: 0; }
-    .modal-body p { margin-bottom: .65rem; }
-    .modal-body a { color: var(--green); text-decoration: none; }
-    .modal-body a:hover { text-decoration: underline; }
-    .modal-body .modal-note {
-      font-size: .72rem; color: var(--muted); font-style: italic;
-      border-top: 0.5px solid var(--border); padding-top: .75rem; margin-top: .75rem;
+    .modal-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .modal-section-title {
+      font-size: .75rem; font-weight: 700; color: var(--text);
+      letter-spacing: .01em; margin-bottom: .5rem;
     }
+    .modal-en {
+      font-size: .82rem; font-weight: 400; color: var(--text);
+      line-height: 1.65; margin: 0 0 .3rem;
+    }
+    .modal-pt {
+      font-size: .8rem; font-style: italic; color: var(--text2);
+      line-height: 1.6; margin: .3rem 0 0;
+      padding-top: .35rem; border-top: 0.5px solid var(--border);
+    }
+    .modal-en a, .modal-pt a { color: var(--green); text-decoration: none; }
+    .modal-en a:hover, .modal-pt a:hover { text-decoration: underline; }
     .modal-footer {
-      flex-shrink: 0; padding: .9rem 1.5rem;
+      flex-shrink: 0; padding: .85rem 1.5rem 1rem;
       border-top: 0.5px solid var(--border);
-      background: var(--bg3); display: flex; justify-content: flex-end;
-      border-radius: 0 0 16px 16px;
+      background: var(--bg3); border-radius: 0 0 16px 16px;
     }
+    .modal-scroll-hint {
+      text-align: center; font-size: .65rem; color: var(--muted);
+      letter-spacing: .04em; margin-bottom: .6rem;
+      transition: opacity .3s ease;
+    }
+    .modal-scroll-hint.hidden { opacity: 0; pointer-events: none; }
+    .modal-footer-btns { display: flex; gap: .65rem; justify-content: flex-end; }
+    .modal-close-btn {
+      background: transparent; border: 0.5px solid var(--border); border-radius: 8px;
+      color: var(--text2); cursor: pointer; font-family: inherit; font-size: .8rem;
+      font-weight: 500; padding: .55rem 1.1rem; transition: all .2s ease; white-space: nowrap;
+    }
+    .modal-close-btn:hover { border-color: var(--green); color: var(--green); }
     .modal-accept-btn {
       border-radius: 8px; font-family: inherit; font-size: .8rem; font-weight: 600;
-      padding: .55rem 1.4rem; transition: all .25s ease; white-space: nowrap;
-      background: var(--bg2); color: var(--muted);
-      border: 0.5px solid var(--border); cursor: not-allowed; opacity: .55;
+      padding: .55rem 1.3rem; transition: all .25s ease; white-space: nowrap;
+      background: var(--bg3); color: var(--muted);
+      border: 0.5px solid var(--border); cursor: not-allowed; opacity: .5;
     }
     .modal-accept-btn.ready {
       cursor: pointer; opacity: 1;
@@ -1433,9 +1456,9 @@
   <div class="footer-top">
     © 2026 Beatriz Costa Leal · Climate Sentinel
     &nbsp;·&nbsp;
-    <button class="footer-link" onclick="openModal('modal-privacy')">Privacy Policy</button>
+    <button class="footer-link" onclick="openModal('modal-privacy')">Privacy Policy / Política de Privacidade</button>
     &nbsp;·&nbsp;
-    <button class="footer-link" onclick="openModal('modal-terms')">Terms of Use</button>
+    <button class="footer-link" onclick="openModal('modal-terms')">Terms of Use / Termos de Uso</button>
   </div>
   <div class="footer-bottom" id="t-footer-text">
     🌿 Analysis history is stored for 24 hours using an anonymous session cookie. No personal data is collected.
@@ -2280,18 +2303,20 @@ function _termsAccepted() {
 
 function _setAcceptBtn(btn, state) {
   btn.dataset.state = state;
+  const hint = btn.closest('.modal-footer')?.querySelector('.modal-scroll-hint');
   if (state === 'unread') {
     btn.disabled = true;
-    btn.textContent = 'Please read to continue';
     btn.className = 'modal-accept-btn';
+    if (hint) hint.classList.remove('hidden');
   } else if (state === 'ready') {
     btn.disabled = false;
-    btn.textContent = 'I have read and accept';
     btn.className = 'modal-accept-btn ready';
+    if (hint) hint.classList.add('hidden');
   } else if (state === 'accepted') {
     btn.disabled = false;
-    btn.textContent = 'Already accepted ✓';
+    btn.textContent = '✓ Already accepted / Já aceito';
     btn.className = 'modal-accept-btn accepted';
+    if (hint) hint.classList.add('hidden');
   }
 }
 
@@ -2367,39 +2392,53 @@ document.addEventListener('keydown', e => {
 <!-- Privacy Policy Modal -->
 <div class="modal-overlay" id="modal-privacy" onclick="if(event.target===this)closeModal('modal-privacy')">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeModal('modal-privacy')" aria-label="Close">✕</button>
-    <div class="modal-title">Privacy Policy</div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-header-title">🔒 Privacy Policy</div>
+        <div class="modal-header-sub">Política de Privacidade — Climate Sentinel</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-privacy')" aria-label="Close">✕</button>
+    </div>
     <div class="modal-body">
-      <h3>What we collect</h3>
-      <p>Climate Sentinel collects no personal data. The only storage used is an <strong>anonymous session cookie</strong> with a 24-hour TTL. This cookie holds a random session identifier and is used solely to display your recent analysis history during the session.</p>
-      <p>No name, email, IP address, or device fingerprint is stored or associated with any analysis.</p>
 
-      <h3>What we do not do</h3>
-      <p>We do not track users across sessions, serve advertising, share data with third parties, or use analytics services (no Google Analytics, no Mixpanel, no Hotjar).</p>
+      <div class="modal-section">
+        <div class="modal-section-title">1. Data We Collect / Dados que Coletamos</div>
+        <p class="modal-en">We collect no personal data. Only an anonymous session ID (UUID) is stored as a browser cookie for 24 hours to enable analysis history.</p>
+        <p class="modal-pt">Não coletamos dados pessoais. Apenas um ID de sessão anônimo (UUID) é armazenado como cookie por 24 horas para habilitar o histórico de análises.</p>
+      </div>
 
-      <h3>Data sources</h3>
-      <p>Climate data is retrieved in real-time from two fully public APIs:</p>
-      <p><strong>NASA POWER</strong> — public satellite climate data provided by NASA (power.larc.nasa.gov).<br>
-      <strong>OpenMeteo IPCC Climate API</strong> — public IPCC AR6 projections (open-meteo.com).</p>
-      <p>No data from these sources is stored beyond the 24-hour session window.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">2. Data Retention / Retenção de Dados</div>
+        <p class="modal-en">All session data is automatically deleted after 24 hours via MongoDB TTL index. No backups are kept. No data is sold or shared with third parties.</p>
+        <p class="modal-pt">Todos os dados de sessão são automaticamente excluídos após 24 horas via índice TTL do MongoDB. Nenhum backup é mantido. Nenhum dado é vendido ou compartilhado.</p>
+      </div>
 
-      <h3>AI processing</h3>
-      <p>Analysis is performed by Claude AI (Anthropic). Coordinates and climate metrics are passed to the model to generate ESG assessments. No user-identifying information is included in these requests.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">3. Third-Party Services / Serviços de Terceiros</div>
+        <p class="modal-en">NASA POWER API, OpenMeteo, Anthropic Claude API, and Railway are used to deliver the service. None of these services receive your personal data.</p>
+        <p class="modal-pt">NASA POWER API, OpenMeteo, Anthropic Claude API e Railway são utilizados para entregar o serviço. Nenhum desses serviços recebe seus dados pessoais.</p>
+      </div>
 
-      <h3>LGPD compliance</h3>
-      <p>This platform is designed to be compliant with Brazil's Lei Geral de Proteção de Dados (LGPD, Law 13.709/2018) by design: no personal data is collected, processed, or retained.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">4. Your Rights / Seus Direitos (LGPD / GDPR)</div>
+        <p class="modal-en">You may decline cookies at any time. Declining disables analysis history but does not affect core functionality.</p>
+        <p class="modal-pt">Você pode recusar os cookies a qualquer momento. Recusar desabilita o histórico de análises, mas não afeta a funcionalidade principal.</p>
+      </div>
 
-      <h3>Cookie consent</h3>
-      <p>Session cookies are only set after you explicitly accept the cookie banner. Declining disables analysis history; all other features remain available.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">5. Contact / Contato</div>
+        <p class="modal-en"><a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
+        <p class="modal-pt"><a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
+      </div>
 
-      <h3>Contact</h3>
-      <p>Questions about this policy: <a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
-
-      <p class="modal-note">Last updated: June 2026. Climate Sentinel is a research and educational platform.</p>
     </div>
     <div class="modal-footer">
-      <button class="modal-accept-btn" id="modal-privacy-accept" data-state="unread" disabled
-              onclick="acceptModalTerms('modal-privacy')">Please read to continue</button>
+      <div class="modal-scroll-hint" id="modal-privacy-hint">Scroll to read · Role para ler</div>
+      <div class="modal-footer-btns">
+        <button class="modal-close-btn" onclick="closeModal('modal-privacy')">Close / Fechar</button>
+        <button class="modal-accept-btn" id="modal-privacy-accept" data-state="unread" disabled
+                onclick="acceptModalTerms('modal-privacy')">✓ I Accept / Aceito</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2407,40 +2446,59 @@ document.addEventListener('keydown', e => {
 <!-- Terms of Use Modal -->
 <div class="modal-overlay" id="modal-terms" onclick="if(event.target===this)closeModal('modal-terms')">
   <div class="modal-box">
-    <button class="modal-close" onclick="closeModal('modal-terms')" aria-label="Close">✕</button>
-    <div class="modal-title">Terms of Use</div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-header-title">📋 Terms of Use</div>
+        <div class="modal-header-sub">Termos de Uso — Climate Sentinel</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-terms')" aria-label="Close">✕</button>
+    </div>
     <div class="modal-body">
-      <h3>Nature of the service</h3>
-      <p>Climate Sentinel provides <strong>AI-assisted decision support</strong> for physical climate risk and ESG compliance mapping. All outputs are generated by automated models and are intended for informational and research purposes only.</p>
-      <p><strong>This platform is not a substitute for professional ESG, legal, financial, or environmental advice.</strong> Always validate findings with qualified consultants before using them in regulatory filings, investment decisions, or public disclosures.</p>
 
-      <h3>Data sources</h3>
-      <p>Climate data is sourced from the <strong>NASA POWER API</strong> (public satellite observations) and the <strong>OpenMeteo IPCC Climate Projections API</strong> (public AR6 model outputs). Climate Sentinel does not warrant the accuracy, completeness, or fitness for any particular purpose of data provided by these third parties.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">1. Decision Support / Suporte à Decisão</div>
+        <p class="modal-en">Climate Sentinel provides AI-assisted climate risk intelligence for ESG and compliance purposes only. It is not a substitute for professional ESG, legal, or financial advice.</p>
+        <p class="modal-pt">O Climate Sentinel fornece inteligência de risco climático assistida por IA apenas para fins de ESG e conformidade regulatória. Não substitui aconselhamento profissional jurídico, financeiro ou de ESG.</p>
+      </div>
 
-      <h3>IPCC projections</h3>
-      <p>Projections beyond 2025 use IPCC AR6 scenario models (SSP1-2.6, SSP2-4.5, SSP5-8.5). These are probabilistic scenarios, not forecasts. Actual future climate conditions may differ materially from modelled values.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">2. Data Sources / Fontes de Dados</div>
+        <p class="modal-en">Climate data is sourced from NASA POWER API and OpenMeteo IPCC Climate API — both public, open-access datasets. Results are AI-generated and may contain errors. Validate before regulatory filings.</p>
+        <p class="modal-pt">Os dados climáticos são provenientes da NASA POWER API e da OpenMeteo IPCC Climate API — bases de dados públicas. Os resultados são gerados por IA e podem conter imprecisões. Valide antes de submissões regulatórias.</p>
+      </div>
 
-      <h3>ESG and regulatory mapping</h3>
-      <p>Compliance mappings to CSRD, ISSB S2, and EU Taxonomy are generated by AI and reflect the model's interpretation of publicly available regulatory guidance. They do not constitute legal advice and must be reviewed by qualified professionals before any regulatory submission.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">3. Intellectual Property / Propriedade Intelectual</div>
+        <p class="modal-en">© 2026 Beatriz Costa Leal. All rights reserved. Climate Sentinel is an independent project. Commercial use requires written authorization from the author.</p>
+        <p class="modal-pt">© 2026 Beatriz Costa Leal. Todos os direitos reservados. O Climate Sentinel é um projeto independente. O uso comercial requer autorização escrita da autora.</p>
+      </div>
 
-      <h3>Intellectual property</h3>
-      <p>© 2026 Beatriz Costa Leal. The Climate Sentinel platform, its design, codebase, and methodology are the intellectual property of the author. <strong>Commercial use requires prior written authorisation.</strong></p>
-      <p>NASA POWER data and OpenMeteo data are public domain / open-license; please refer to their respective usage policies.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">4. Availability / Disponibilidade</div>
+        <p class="modal-en">The platform runs on cloud services (Railway, MongoDB). No uptime guarantee is provided. The service may be temporarily unavailable due to maintenance.</p>
+        <p class="modal-pt">A plataforma é executada em serviços de nuvem (Railway, MongoDB). Nenhuma garantia de disponibilidade é fornecida. O serviço pode ficar temporariamente indisponível.</p>
+      </div>
 
-      <h3>Limitation of liability</h3>
-      <p>The platform is provided <strong>as-is</strong> for educational and research purposes. The author accepts no liability for decisions made based on Climate Sentinel outputs. Use at your own risk.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">5. Limitation of Liability / Limitação de Responsabilidade</div>
+        <p class="modal-en">The platform is provided as-is for educational and research purposes. The author is not liable for decisions made based on platform outputs.</p>
+        <p class="modal-pt">A plataforma é fornecida no estado em que se encontra para fins educacionais e de pesquisa. A autora não se responsabiliza por decisões tomadas com base nos resultados.</p>
+      </div>
 
-      <h3>Changes to these terms</h3>
-      <p>These terms may be updated at any time. Continued use of the platform constitutes acceptance of the current terms.</p>
+      <div class="modal-section">
+        <div class="modal-section-title">6. Contact / Contato</div>
+        <p class="modal-en"><a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
+        <p class="modal-pt"><a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
+      </div>
 
-      <h3>Contact</h3>
-      <p>For authorisation requests or enquiries: <a href="mailto:beatrizcostaleal1996@gmail.com">beatrizcostaleal1996@gmail.com</a></p>
-
-      <p class="modal-note">Last updated: June 2026. Governed by Brazilian law.</p>
     </div>
     <div class="modal-footer">
-      <button class="modal-accept-btn" id="modal-terms-accept" data-state="unread" disabled
-              onclick="acceptModalTerms('modal-terms')">Please read to continue</button>
+      <div class="modal-scroll-hint" id="modal-terms-hint">Scroll to read · Role para ler</div>
+      <div class="modal-footer-btns">
+        <button class="modal-close-btn" onclick="closeModal('modal-terms')">Close / Fechar</button>
+        <button class="modal-accept-btn" id="modal-terms-accept" data-state="unread" disabled
+                onclick="acceptModalTerms('modal-terms')">✓ I Accept Terms / Aceito os Termos</button>
+      </div>
     </div>
   </div>
 </div>
