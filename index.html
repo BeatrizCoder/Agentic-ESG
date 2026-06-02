@@ -1056,6 +1056,14 @@
     .modal-accept-btn.ready:hover { background: var(--green2); box-shadow: 0 4px 12px rgba(58,107,53,0.4); }
     .modal-accept-btn.accepted { cursor: default; opacity: 1; background: var(--green); color: #fff; border-color: var(--green); }
 
+    /* Terms modal — explicit scroll area height so detection works reliably */
+    #terms-content {
+      height: 50vh;
+      min-height: 300px;
+      overflow-y: scroll;
+      padding: 1.5rem;
+    }
+
     /* ── Full-page gate overlay ──────────────────────────────────────────── */
     #gate-overlay {
       display: none; position: fixed; inset: 0; z-index: 999;
@@ -2533,7 +2541,7 @@ document.addEventListener('keydown', e => {
       </div>
       <button class="modal-close" onclick="closeModal('modal-terms')" aria-label="Close">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" id="terms-content">
 
       <div class="modal-section">
         <div class="modal-section-title">1. Decision Support / Suporte à Decisão</div>
