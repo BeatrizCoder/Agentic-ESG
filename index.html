@@ -608,7 +608,7 @@
     .map-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .map-coords { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
     .map-source-tag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: .15rem .5rem; }
-    #map { height: 360px; width: 100%; background: var(--bg3); }
+    #map { height: 360px; min-height: 360px; width: 100%; background: var(--bg3); }
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
@@ -1718,6 +1718,7 @@ function renderResults(data) {
   /* map */
   document.getElementById('map-coords').textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
   initMap(data.latitude, data.longitude);
+  setTimeout(() => { if (_map) _map.invalidateSize(); }, 100);
 
   /* summary */
   document.getElementById('summary-text').textContent = data.executive_summary || '—';
