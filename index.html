@@ -210,7 +210,7 @@
     /* ── Search ──────────────────────────────────────────────────────────── */
     .search-section { margin-bottom: 2rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
-    .search-row { display: grid; grid-template-columns: 1fr 1fr auto auto 1fr 1fr auto; gap: .75rem; align-items: end; }
+    .search-row { display: grid; grid-template-columns: 1fr 1fr auto auto 1fr 1fr 1fr auto; gap: .75rem; align-items: end; }
 
     .field-group { display: flex; flex-direction: column; gap: .3rem; }
     .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -980,7 +980,7 @@
       <button class="preset-btn" onclick="setPreset(51.5074,-0.1278,'London, UK')">London</button>
     </div>
     <p style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
-      ✦ Years after 2025 use OpenMeteo IPCC EC_Earth3P_HR climate projections
+      ✦ Years after 2025 use OpenMeteo IPCC climate projections (model varies by scenario)
     </p>
 
     <!-- History Section -->
@@ -1098,7 +1098,7 @@
       <div class="card projections-card" id="proj-card" style="display:none">
         <div class="proj-header">
           <div>
-            <div class="card-label">Climate Projections 2024–2050 · OpenMeteo IPCC EC_Earth3P_HR</div>
+            <div class="card-label" id="proj-card-label">Climate Projections 2024–2050 · OpenMeteo IPCC</div>
           </div>
           <div class="proj-toggle">
             <button class="active" id="proj-btn-temp"   onclick="switchProjMetric('temp')">Temperature</button>
@@ -1500,11 +1500,13 @@ function renderRecs(recs) {
 let _currentId = null;
 
 async function runAnalysis() {
-  const lat   = parseFloat(document.getElementById('inp-lat').value);
-  const lon   = parseFloat(document.getElementById('inp-lon').value);
-  const label = document.getElementById('inp-label').value.trim();
-  const start = parseInt(document.getElementById('inp-start').value);
-  const end   = parseInt(document.getElementById('inp-end').value);
+  const lat      = parseFloat(document.getElementById('inp-lat').value);
+  const lon      = parseFloat(document.getElementById('inp-lon').value);
+  const label    = document.getElementById('inp-label').value.trim();
+  const start    = parseInt(document.getElementById('inp-start').value);
+  const end      = parseInt(document.getElementById('inp-end').value);
+  const sector   = document.getElementById('inp-sector').value;
+  const scenario = document.getElementById('inp-scenario').value;
   if (isNaN(lat) || isNaN(lon)) { alert('Enter valid coordinates.'); return; }
 
   const btn = document.getElementById('analyze-btn');
@@ -1534,7 +1536,15 @@ async function runAnalysis() {
     const res = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({ latitude: lat, longitude: lon, region_label: label, start_year: start, end_year: end, sector: document.getElementById('inp-sector').value }),
+      body: JSON.stringify({
+        latitude: lat,
+        longitude: lon,
+        region_label: label,
+        start_year: start,
+        end_year: end,
+        sector: sector,
+        scenario: scenario
+      }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -1917,17 +1927,26 @@ function renderDataSources(data) {
   /* OpenMeteo section */
   const om      = data.openmeteo_data || {};
   const omUsed  = md.openmeteo_used || (om.used === true);
+  const scenario = md.scenario || 'SSP2-4.5';
+  const model    = md.openmeteo_model || om.model || '—';
+  
   document.getElementById('ds-om-section').style.opacity = omUsed ? '1' : '0.4';
   document.getElementById('ds-om-label').textContent  = omUsed
-    ? `Projected · OpenMeteo IPCC (${md.openmeteo_start_year || 2026}–${md.openmeteo_end_year || '?'})`
+    ? `Projected · OpenMeteo IPCC ${scenario} (${md.openmeteo_start_year || 2026}–${md.openmeteo_end_year || '?'})`
     : 'Not used for this analysis period (end year ≤ 2025)';
   document.getElementById('ds-om-proj').textContent   = md.openmeteo_projection_url || om.projection_url || (omUsed ? '—' : 'N/A');
-  document.getElementById('ds-om-model').textContent  = md.openmeteo_model || om.model || (omUsed ? '—' : 'N/A');
+  document.getElementById('ds-om-model').textContent  = omUsed ? `${model} (${scenario})` : 'N/A';
   document.getElementById('ds-om-years').textContent  = omUsed
     ? `${md.openmeteo_start_year || 2026}–${md.openmeteo_end_year || '?'}`
     : 'N/A';
   document.getElementById('ds-om-records').textContent = omUsed
     ? `${md.openmeteo_projection_years || om.projection_records?.length || 0} years` : 'N/A';
+  
+  // Update projection card label with scenario
+  if (omUsed) {
+    document.getElementById('proj-card-label').textContent =
+      `Climate Projections 2024–2050 · OpenMeteo IPCC ${scenario} (${model})`;
+  }
 
   /* Agent table */
   const agents  = md.agents || [];

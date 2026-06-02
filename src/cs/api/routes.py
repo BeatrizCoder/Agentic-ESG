@@ -56,6 +56,7 @@ async def analyze(
         start_year=body.start_year,
         end_year=body.end_year,
         sector=body.sector,
+        scenario=body.scenario,
     )
 
     try:

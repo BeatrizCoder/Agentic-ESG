@@ -11,6 +11,7 @@ class AnalyzeRequest(BaseModel):
     start_year: int = Field(2014, ge=2000, le=2025)
     end_year: int = Field(2023, ge=2001, le=2050)
     sector: str = Field("General", max_length=60)
+    scenario: str = Field("SSP2-4.5", pattern="^(SSP1-2\\.6|SSP2-4\\.5|SSP5-8\\.5)$")
 
 
 class RecommendationItem(BaseModel):

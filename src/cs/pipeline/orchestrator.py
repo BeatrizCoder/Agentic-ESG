@@ -76,6 +76,7 @@ async def run_analysis(
     start_year: int = 2014,
     end_year: int = 2023,
     sector: str = "General",
+    scenario: str = "SSP2-4.5",
 ) -> AnalysisResult:
     """
     Full CS pipeline:
@@ -88,25 +89,25 @@ async def run_analysis(
     analysis_id = f"CS-{int(time.time())}"
     label = region_label or f"{latitude:.4f},{longitude:.4f}"
 
-    logger.info("Pipeline start: analysis_id=%s region=%r", analysis_id, label)
+    logger.info("Pipeline start: analysis_id=%s region=%r scenario=%s", analysis_id, label, scenario)
 
     # ── Step 1: Data Collector ─────────────────────────────────────────────────
     # 2000–2025 → NASA POWER (real observations)
-    # 2026–2050 → OpenMeteo IPCC EC_Earth3P_HR (projection)
+    # 2026–2050 → OpenMeteo IPCC (projection with selected scenario)
     nasa_end_year    = min(end_year, 2025)
     needs_projection = end_year > 2025
     om_start_year    = 2026
 
     if needs_projection:
         logger.info(
-            "Step 1/5 — Data Collector: NASA (%d–%d) + OpenMeteo IPCC (%d–%d) in parallel",
-            start_year, nasa_end_year, om_start_year, end_year,
+            "Step 1/5 — Data Collector: NASA (%d–%d) + OpenMeteo IPCC %s (%d–%d) in parallel",
+            start_year, nasa_end_year, scenario, om_start_year, end_year,
         )
         _nasa_task = fetch_climate_data(
             latitude=latitude, longitude=longitude, region_label=label,
             start_year=start_year, end_year=nasa_end_year,
         )
-        _om_task = fetch_projection_range(latitude, longitude, om_start_year, end_year)
+        _om_task = fetch_projection_range(latitude, longitude, om_start_year, end_year, scenario)
         nasa_result, om_raw = await asyncio.gather(_nasa_task, _om_task, return_exceptions=True)
     else:
         logger.info("Step 1/5 — Data Collector: NASA POWER (%d–%d) only", start_year, nasa_end_year)
@@ -281,6 +282,7 @@ async def run_analysis(
         "openmeteo_end_year":        end_year if needs_projection else None,
         "openmeteo_projection_years": len(om_result.projection_records),
         "openmeteo_error":           om_result.error or None,
+        "scenario":                  scenario,
         "total_records":             len(unified_records),
         "total_llm_tokens":          total_llm_tokens,
         "agents": [

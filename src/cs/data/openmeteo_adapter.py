@@ -10,8 +10,21 @@ logger = logging.getLogger(__name__)
 
 _FORECAST_URL    = "https://api.open-meteo.com/v1/forecast"
 _PROJECTION_URL  = "https://climate-api.open-meteo.com/v1/climate"
-_PROJECTION_MODEL = "EC_Earth3P_HR"
+_PROJECTION_MODEL = "EC_Earth3P_HR"  # Default: SSP2-4.5
 _FILL = -999.0
+
+# IPCC Shared Socioeconomic Pathways (SSP) scenario mapping
+SCENARIO_MODELS = {
+    "SSP1-2.6": "MPI_ESM1_2_XR",      # Optimistic: 1.5°C warming
+    "SSP2-4.5": "EC_Earth3P_HR",       # Moderate: 2-3°C warming (default)
+    "SSP5-8.5": "CMCC_CM2_VHR4",       # Pessimistic: 4-5°C warming
+}
+
+SCENARIO_DESCRIPTIONS = {
+    "SSP1-2.6": "Optimistic (1.5°C)",
+    "SSP2-4.5": "Moderate (2-3°C)",
+    "SSP5-8.5": "Pessimistic (4-5°C)",
+}
 
 
 @dataclass
@@ -121,20 +134,24 @@ async def fetch_projection_range(
     longitude: float,
     start_year: int = 2026,
     end_year: int = 2050,
+    scenario: str = "SSP2-4.5",
 ) -> "OpenMeteoResult":
-    """Fetch IPCC projections for an explicit year range (non-blocking entry point)."""
+    """Fetch IPCC projections for an explicit year range with specified scenario."""
+    model = SCENARIO_MODELS.get(scenario, SCENARIO_MODELS["SSP2-4.5"])
     try:
-        records, url = await _fetch_projections(latitude, longitude, start_year, end_year)
+        records, url = await _fetch_projections(
+            latitude, longitude, start_year, end_year, model
+        )
         logger.info(
-            "OpenMeteo projection range: lat=%.4f lon=%.4f years=%d-%d records=%d",
-            latitude, longitude, start_year, end_year, len(records),
+            "OpenMeteo projection: lat=%.4f lon=%.4f years=%d-%d scenario=%s model=%s records=%d",
+            latitude, longitude, start_year, end_year, scenario, model, len(records),
         )
         return OpenMeteoResult(
             latitude=latitude,
             longitude=longitude,
             projection_records=records,
             projection_url=url,
-            model=_PROJECTION_MODEL,
+            model=model,
         )
     except Exception as exc:
         logger.warning("fetch_projection_range failed: %s", exc)
@@ -146,13 +163,14 @@ async def _fetch_projections(
     longitude: float,
     start_year: int = 2024,
     end_year: int = 2050,
+    model: str = _PROJECTION_MODEL,
 ) -> tuple[list[ProjectionRecord], str]:
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "start_date": f"{start_year}-01-01",
         "end_date":   f"{end_year}-12-31",
-        "models": _PROJECTION_MODEL,
+        "models": model,
         "daily": "temperature_2m_mean,precipitation_sum",
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
