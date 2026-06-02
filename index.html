@@ -973,7 +973,7 @@
     .modal-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-      z-index: 600; align-items: center; justify-content: center; padding: 1.5rem;
+      z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;
     }
     .modal-overlay.open { display: flex; }
     .modal-box {
@@ -1055,6 +1055,26 @@
     }
     .modal-accept-btn.ready:hover { background: var(--green2); box-shadow: 0 4px 12px rgba(58,107,53,0.4); }
     .modal-accept-btn.accepted { cursor: default; opacity: 1; background: var(--green); color: #fff; border-color: var(--green); }
+
+    /* ── Full-page gate overlay ──────────────────────────────────────────── */
+    #gate-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #gate-overlay.active { display: block; }
+    /* Gate hint text — rendered inside each modal overlay (z-1000) */
+    .gate-modal-text {
+      display: none; position: absolute; bottom: 1.75rem;
+      left: 50%; transform: translateX(-50%);
+      text-align: center; font-size: .72rem; color: rgba(255,255,255,0.5);
+      line-height: 1.65; pointer-events: none; white-space: nowrap;
+    }
+    .gate-modal-text.visible { display: block; }
+    .gate-modal-text em {
+      display: block; font-style: italic;
+      color: rgba(255,255,255,0.3); font-size: .68rem; margin-top: .15rem;
+    }
 
     /* ── Terms gate banner ────────────────────────────────────────────────── */
     #terms-gate {
@@ -2290,10 +2310,9 @@ function _updateScoreCardRiskClass() {
   _applyTheme(saved);
 })();
 
-/* Initialize cookie consent and terms gate on page load */
+/* Initialize gate on page load — cookie consent deferred until gate passes */
 window.addEventListener('DOMContentLoaded', () => {
-  checkCookieConsent();
-  checkTermsGate();
+  initGate();
 });
 
 /* ── Modal scroll-to-accept ──────────────────────────────────────────────── */
@@ -2327,13 +2346,62 @@ function _checkScroll(bodyEl, btn) {
   }
 }
 
+/* ── Gate helpers ────────────────────────────────────────────────────────── */
+function _disablePlatform() {
+  document.querySelectorAll(
+    '#analyze-btn, .preset-btn, .field-group input, .field-group select'
+  ).forEach(el => { el.disabled = true; });
+}
+
+function _enablePlatform() {
+  document.querySelectorAll(
+    '#analyze-btn, .preset-btn, .field-group input, .field-group select'
+  ).forEach(el => { el.disabled = false; });
+}
+
+function _showGate() {
+  document.getElementById('gate-overlay').classList.add('active');
+  _disablePlatform();
+  // Hide the subtle gate banner — full-page gate supersedes it
+  const banner = document.getElementById('terms-gate');
+  if (banner) banner.style.display = 'none';
+}
+
+function _hideGate() {
+  document.getElementById('gate-overlay').classList.remove('active');
+  _enablePlatform();
+  const banner = document.getElementById('terms-gate');
+  if (banner) banner.style.display = 'none';
+  // Now safe to show the cookie consent banner
+  checkCookieConsent();
+}
+
+function initGate() {
+  if (_termsAccepted()) {
+    // Return visit — go straight to cookie consent
+    const banner = document.getElementById('terms-gate');
+    if (banner) banner.style.display = 'none';
+    checkCookieConsent();
+    return;
+  }
+  _showGate();
+  // Open Terms modal after a brief render delay
+  setTimeout(() => openModal('modal-terms'), 250);
+}
+
+/* ── Modal open / close ──────────────────────────────────────────────────── */
 function openModal(id) {
-  const overlay = document.getElementById(id);
-  const bodyEl  = overlay.querySelector('.modal-body');
-  const btn     = overlay.querySelector('.modal-accept-btn');
+  const overlay   = document.getElementById(id);
+  const bodyEl    = overlay.querySelector('.modal-body');
+  const btn       = overlay.querySelector('.modal-accept-btn');
+  const gateText  = overlay.querySelector('.gate-modal-text');
+  const gateActive = document.getElementById('gate-overlay').classList.contains('active');
 
   overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  // Only lock body scroll when gate is not active (gate already locks everything)
+  if (!gateActive) document.body.style.overflow = 'hidden';
+
+  if (gateText) gateText.classList.toggle('visible', gateActive);
 
   if (!btn) return;
 
@@ -2344,7 +2412,6 @@ function openModal(id) {
 
   bodyEl.scrollTop = 0;
   _setAcceptBtn(btn, 'unread');
-  // Handle content short enough that no scroll is needed
   setTimeout(() => _checkScroll(bodyEl, btn), 60);
 
   if (bodyEl._onScroll) bodyEl.removeEventListener('scroll', bodyEl._onScroll);
@@ -2353,32 +2420,38 @@ function openModal(id) {
 }
 
 function closeModal(id) {
-  const overlay = document.getElementById(id);
-  const bodyEl  = overlay.querySelector('.modal-body');
+  const overlay  = document.getElementById(id);
+  const bodyEl   = overlay.querySelector('.modal-body');
+  const gateText = overlay.querySelector('.gate-modal-text');
   if (bodyEl && bodyEl._onScroll) {
     bodyEl.removeEventListener('scroll', bodyEl._onScroll);
     bodyEl._onScroll = null;
   }
+  if (gateText) gateText.classList.remove('visible');
   overlay.classList.remove('open');
-  document.body.style.overflow = '';
+  // Only restore scroll if gate is not still active
+  if (!document.getElementById('gate-overlay').classList.contains('active')) {
+    document.body.style.overflow = '';
+  }
 }
 
+/* ── Accept handler — Terms → Privacy → unlock ───────────────────────────── */
 function acceptModalTerms(modalId) {
-  setCookie('cs_terms_accepted',   'true', 365 * 86400);
-  setCookie('cs_privacy_accepted', 'true', 365 * 86400);
-  closeModal(modalId);
-  // Mark the other modal's button too, so it shows accepted next open
-  document.querySelectorAll('.modal-accept-btn').forEach(btn => {
-    if (btn.dataset.state !== 'accepted') _setAcceptBtn(btn, 'accepted');
-  });
-  const gate = document.getElementById('terms-gate');
-  if (gate) gate.style.display = 'none';
-}
+  const gateActive = document.getElementById('gate-overlay').classList.contains('active');
 
-function checkTermsGate() {
-  if (!_termsAccepted()) {
-    const gate = document.getElementById('terms-gate');
-    if (gate) gate.style.display = 'flex';
+  if (modalId === 'modal-terms') {
+    setCookie('cs_terms_accepted', 'true', 365 * 86400);
+    closeModal('modal-terms');
+    if (gateActive) {
+      // Gate flow: advance to Privacy next
+      setTimeout(() => openModal('modal-privacy'), 150);
+    }
+  } else if (modalId === 'modal-privacy') {
+    setCookie('cs_privacy_accepted', 'true', 365 * 86400);
+    closeModal('modal-privacy');
+    if (gateActive && _termsAccepted()) {
+      _hideGate();
+    }
   }
 }
 
@@ -2388,6 +2461,9 @@ document.addEventListener('keydown', e => {
   }
 });
 </script>
+
+<!-- Gate overlay: full-page block, shows during first-visit onboarding -->
+<div id="gate-overlay"></div>
 
 <!-- Privacy Policy Modal -->
 <div class="modal-overlay" id="modal-privacy" onclick="if(event.target===this)closeModal('modal-privacy')">
@@ -2440,6 +2516,10 @@ document.addEventListener('keydown', e => {
                 onclick="acceptModalTerms('modal-privacy')">✓ I Accept / Aceito</button>
       </div>
     </div>
+  </div>
+  <div class="gate-modal-text" id="gate-text-privacy">
+    Please accept our Terms and Privacy Policy to continue.
+    <em>Por favor aceite os Termos e Política de Privacidade para continuar.</em>
   </div>
 </div>
 
@@ -2500,6 +2580,10 @@ document.addEventListener('keydown', e => {
                 onclick="acceptModalTerms('modal-terms')">✓ I Accept Terms / Aceito os Termos</button>
       </div>
     </div>
+  </div>
+  <div class="gate-modal-text" id="gate-text-terms">
+    Please accept our Terms and Privacy Policy to continue.
+    <em>Por favor aceite os Termos e Política de Privacidade para continuar.</em>
   </div>
 </div>
 
