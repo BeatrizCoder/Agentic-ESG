@@ -1,8 +1,13 @@
 # Climate Sentinel — Climate Risk Intelligence for ESG & Compliance
 
+[![Tests](https://github.com/BeatrizCoder/climate-sentinel/actions/workflows/tests.yml/badge.svg)](https://github.com/BeatrizCoder/climate-sentinel/actions/workflows/tests.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
-🌐 **Live Demo:** [Coming Soon]  
+🌐 **Live Demo:** [Coming Soon]
 📦 **GitHub:** https://github.com/BeatrizCoder/climate-sentinel
 
 ---
@@ -146,8 +151,9 @@ Location Input (lat/lon)
 - **Framework:** FastAPI (Python 3.11)
 - **AI Orchestration:** CrewAI (multi-agent framework)
 - **LLM Provider:** Anthropic Claude (Haiku 4.5 + Sonnet 4.6)
-- **HTTP Client:** httpx (async)
+- **HTTP Client:** httpx (async) with tenacity retry logic
 - **Rate Limiting:** slowapi
+- **Testing:** pytest with async support
 
 ### Data & APIs
 - **Climate Data:** NASA POWER API v2.5 (free, no auth required)
@@ -275,7 +281,7 @@ Climate Sentinel provides **decision support**, not legal advice. Organizations 
 ## Setup and Installation
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.10+ (3.11+ recommended)
 - MongoDB instance (local or Railway)
 - Anthropic API key
 
@@ -293,11 +299,28 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Install development dependencies (for testing)
+pip install -r requirements-dev.txt
+
 # Configure environment
 cp .env.example .env
 # Edit .env with your API keys:
 #   ANTHROPIC_API_KEY=your_key_here
 #   MONGO_URL=your_mongodb_connection_string
+#   ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=src/cs --cov-report=html
+
+# Run specific test file
+pytest tests/test_nasa_adapter.py -v
 ```
 
 ### Running Locally
@@ -388,6 +411,30 @@ docker run -p 8001:8001 \
   -e MONGO_URL=your_mongo_url \
   climate-sentinel
 ```
+
+---
+
+## Quality Assurance
+
+### Automated Testing
+- **Unit tests** for NASA adapter and data processing
+- **Integration tests** for API endpoints
+- **Mock-based testing** for external API calls
+- **GitHub Actions CI/CD** for automated testing on push
+
+### Code Quality
+- **Type hints** throughout codebase (Python 3.10+)
+- **Pydantic validation** for all API inputs
+- **Retry logic** for external API calls (tenacity)
+- **Comprehensive error handling** with user-friendly messages
+- **Configurable CORS** for production security
+
+### Security Features
+- Environment-based CORS configuration
+- Rate limiting per IP address
+- Input validation with Pydantic validators
+- Session-based storage with TTL
+- No hardcoded credentials
 
 ---
 

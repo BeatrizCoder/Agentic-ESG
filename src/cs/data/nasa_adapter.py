@@ -10,6 +10,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import httpx
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from ..core.config import (
     NASA_DEFAULT_END_YEAR,
@@ -51,6 +57,23 @@ class NasaClimateResult:
     total_daily_datapoints: int = 0
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+    reraise=True,
+)
+async def _fetch_nasa_with_retry(
+    client: httpx.AsyncClient,
+    params: dict,
+) -> dict:
+    """Fetch NASA data with automatic retry on network errors."""
+    prepared = client.build_request("GET", NASA_POWER_BASE_URL, params=params)
+    response = await client.send(prepared)
+    response.raise_for_status()
+    return response.json()
+
+
 async def fetch_climate_data(
     latitude: float,
     longitude: float,
@@ -58,7 +81,10 @@ async def fetch_climate_data(
     start_year: int = NASA_DEFAULT_START_YEAR,
     end_year: int = NASA_DEFAULT_END_YEAR,
 ) -> NasaClimateResult:
-    """Fetch daily climate data from NASA POWER and return annual aggregates."""
+    """Fetch daily climate data from NASA POWER and return annual aggregates.
+    
+    Includes automatic retry logic for network errors (up to 3 attempts).
+    """
     params = {
         "parameters": _PARAMETERS,
         "community": "RE",
@@ -78,12 +104,33 @@ async def fetch_climate_data(
         end_year,
     )
 
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        prepared = client.build_request("GET", NASA_POWER_BASE_URL, params=params)
-        request_url = str(prepared.url)
-        response = await client.send(prepared)
-        response.raise_for_status()
-        payload = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            prepared = client.build_request("GET", NASA_POWER_BASE_URL, params=params)
+            request_url = str(prepared.url)
+            
+            # Use retry wrapper for network resilience
+            payload = await _fetch_nasa_with_retry(client, params)
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "NASA POWER API error: status=%d url=%s",
+            e.response.status_code,
+            e.request.url,
+        )
+        raise ValueError(
+            f"NASA POWER API returned error {e.response.status_code}. "
+            "Please check coordinates and try again."
+        ) from e
+    except httpx.TimeoutException as e:
+        logger.error("NASA POWER API timeout after retries: %s", e)
+        raise ValueError(
+            "NASA POWER API timeout. The service may be temporarily unavailable."
+        ) from e
+    except httpx.NetworkError as e:
+        logger.error("NASA POWER API network error after retries: %s", e)
+        raise ValueError(
+            "Network error connecting to NASA POWER API. Please check your connection."
+        ) from e
 
     raw_parameters = payload["properties"]["parameter"]
     annual_records = _aggregate_by_year(raw_parameters, latitude, longitude)

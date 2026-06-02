@@ -41,16 +41,24 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:3000",
     "http://localhost:8000",
+    "http://localhost:8001",
 ]
 
-_configured = [
-    o.strip()
-    for o in os.environ.get("ALLOWED_ORIGINS", "").split(",")
-    if o.strip()
-]
-ALLOWED_ORIGINS = _configured + [
-    o for o in DEFAULT_ALLOWED_ORIGINS if o not in _configured
-]
+# Allow "*" only in development, otherwise use explicit origins
+_env_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+
+if _env_origins == "*":
+    # Wildcard only allowed if explicitly set (development mode)
+    ALLOWED_ORIGINS = ["*"]
+    logger.warning("CORS: Wildcard (*) enabled - NOT recommended for production")
+elif _env_origins:
+    # Production: use explicit comma-separated origins
+    ALLOWED_ORIGINS = [o.strip() for o in _env_origins.split(",") if o.strip()]
+    logger.info("CORS: Using configured origins: %s", ALLOWED_ORIGINS)
+else:
+    # Default: localhost origins for development
+    ALLOWED_ORIGINS = DEFAULT_ALLOWED_ORIGINS
+    logger.info("CORS: Using default localhost origins")
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)

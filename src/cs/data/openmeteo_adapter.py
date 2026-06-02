@@ -5,6 +5,12 @@ import logging
 from dataclasses import dataclass, field
 
 import httpx
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +98,20 @@ async def fetch_openmeteo_data(latitude: float, longitude: float) -> OpenMeteoRe
     except Exception as exc:
         logger.error("OpenMeteo fetch failed entirely: %s", exc)
         return OpenMeteoResult(latitude=latitude, longitude=longitude, error=str(exc))
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+    reraise=True,
+)
+async def _fetch_with_retry(url: str, params: dict) -> dict:
+    """Fetch data with automatic retry on network errors."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.get(url, params=params)
+        response.raise_for_status()
+        return response.json()
 
 
 async def _fetch_forecast(
