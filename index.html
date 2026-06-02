@@ -727,9 +727,10 @@
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
-    .chart-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    .chart-item { display: flex; flex-direction: column; gap: .25rem; }
     .chart-item-label {
-      font-size: .65rem;
+      font-size: .6rem;
       font-weight: 600;
       letter-spacing: .08em;
       text-transform: uppercase;
@@ -752,8 +753,8 @@
       align-items: center;
       gap: .25rem;
     }
-    .chart-item-delta.up   { color: var(--risk-crit); }
-    .chart-item-delta.down { color: var(--risk-low); }
+    .chart-item-delta.up   { color: var(--risk-low); }
+    .chart-item-delta.down { color: var(--risk-high); }
     .chart-item-delta.warn { color: var(--risk-high); }
     .chart-item-delta::before {
       content: '';
@@ -1990,12 +1991,16 @@ function drawBars(canvasId, values, rgbColor) {
   ctx.scale(dpr, dpr);
   const w = canvas.offsetWidth, h = canvas.offsetHeight;
   const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const barW = w / values.length, pad = 2;
+  const pad = 3;
+  const barW = w / values.length;
+  const isDeclining = values[values.length - 1] < values[0];
   ctx.clearRect(0, 0, w, h);
   values.forEach((v, i) => {
-    const barH = ((v - min) / range) * (h - 4) + 2;
-    const alpha = 0.3 + (i / values.length) * 0.7;
-    ctx.fillStyle = `rgba(${rgbColor},${alpha})`;
+    const barH = ((v - min) / range) * (h - 4) + 4;
+    const isLate = i >= values.length - 3;
+    ctx.fillStyle = (isLate && isDeclining)
+      ? 'rgba(196,106,42,0.8)'
+      : 'rgba(77,140,69,0.6)';
     ctx.beginPath();
     ctx.roundRect(i * barW + pad / 2, h - barH, barW - pad, barH, 2);
     ctx.fill();
@@ -2185,8 +2190,8 @@ function renderResults(data) {
     document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
     document.getElementById('chart-solar-val').textContent  = (last.solar_mean_kwh_m2   ?? 0).toFixed(2);
 
-    setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,      '°C/decade', 'up',   'down');
-    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade,  '%/decade',  'down', 'up');
+    setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,     '°C/decade', 'down', 'up');
+    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade, '%/decade',  'up',   'down');
 
     setTimeout(() => {
       drawBars('canvas-temp',   temps,   '196,106,42');
