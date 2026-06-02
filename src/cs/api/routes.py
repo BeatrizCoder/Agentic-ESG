@@ -142,9 +142,9 @@ async def get_history(
 @limiter.limit("30/minute")
 async def get_analysis(request: Request, analysis_id: str) -> AnalysisResponse:
     """Return the full payload for a single analysis."""
-    row = await get_analysis(analysis_id)
+    row = await _db_get(analysis_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Analysis not found")
+        raise HTTPException(status_code=404, detail=f"Analysis '{analysis_id}' not found")
     return AnalysisResponse(**row)
 
 
@@ -160,9 +160,9 @@ async def delete_analysis(request: Request, analysis_id: str) -> dict:
 @limiter.limit("5/minute")
 async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
     """Generate and stream a PDF report for the given analysis."""
-    row = await get_analysis(analysis_id)
+    row = await _db_get(analysis_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Analysis not found")
+        raise HTTPException(status_code=404, detail=f"Analysis '{analysis_id}' not found")
 
     try:
         from ..exports.pdf_report import generate_pdf

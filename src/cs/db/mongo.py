@@ -42,7 +42,7 @@ def _result_to_doc(result, session_id: str | None = None) -> dict:
 
 
 async def save_analysis(result, session_id: str | None = None) -> str:
-    """Persist an AnalysisResult and return its analysis_id."""
+    """Persist an AnalysisResult and return the MongoDB _id as string."""
     if analyses is None:
         logger.warning("save_analysis: MONGO_URL not configured, skipping")
         return getattr(result, "analysis_id", "")
@@ -53,19 +53,30 @@ async def save_analysis(result, session_id: str | None = None) -> str:
     existing = await analyses.find_one({"analysis_id": doc["analysis_id"]}, {"_id": 1})
     if existing:
         await analyses.replace_one({"analysis_id": doc["analysis_id"]}, doc)
+        mongo_id = str(existing["_id"])
     else:
-        await analyses.insert_one(doc)
+        insert_result = await analyses.insert_one(doc)
+        mongo_id = str(insert_result.inserted_id)
 
-    logger.info("MongoDB saved analysis %s (risk_score=%s, session_id=%s)",
-                doc["analysis_id"], doc.get("risk_score"), session_id or "none")
-    return doc["analysis_id"]
+    logger.info("MongoDB saved analysis %s (mongo_id=%s, risk_score=%s, session_id=%s)",
+                doc["analysis_id"], mongo_id, doc.get("risk_score"), session_id or "none")
+    return mongo_id
 
 
 async def get_analysis(analysis_id: str) -> dict | None:
-    """Return a single analysis document by its analysis_id (not MongoDB _id)."""
+    """Return a single analysis document by analysis_id field or MongoDB _id."""
     if analyses is None:
         return None
+    # Try the analysis_id UUID field first
     doc = await analyses.find_one({"analysis_id": analysis_id}, {"_id": 0})
+    if doc:
+        return doc
+    # Fall back to MongoDB ObjectId (history items expose the _id string)
+    try:
+        from bson import ObjectId
+        doc = await analyses.find_one({"_id": ObjectId(analysis_id)}, {"_id": 0})
+    except Exception:
+        pass
     return doc
 
 
@@ -86,14 +97,20 @@ async def delete_analysis(analysis_id: str) -> bool:
 
 
 async def get_session_history(session_id: str, limit: int = 10) -> list[dict]:
-    """Return the most recent analyses for a given session_id."""
+    """Return the most recent analyses for a given session_id.
+
+    Each item's analysis_id is set to the MongoDB _id string so the frontend
+    can fetch the full document via GET /api/analyses/{id} using ObjectId lookup.
+    """
     if analyses is None:
         return []
     cursor = analyses.find(
         {"session_id": session_id},
-        {"_id": 0}
     ).sort("created_at", -1).limit(limit)
-    return await cursor.to_list(length=limit)
+    items = await cursor.to_list(length=limit)
+    for item in items:
+        item["analysis_id"] = str(item.pop("_id"))
+    return items
 
 
 async def create_indexes() -> None:
