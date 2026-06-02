@@ -233,7 +233,7 @@
     .search-row { display: grid; grid-template-columns: 2fr auto auto 1fr 1fr auto auto; gap: .75rem; align-items: end; }
 
     .field-group { display: flex; flex-direction: column; gap: .3rem; }
-    .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
     .field-group input,
     .field-group select {
       background: var(--bg3);
@@ -308,24 +308,24 @@
     }
     .refresh-btn:hover { border-color: var(--green); color: var(--green); }
 
-    .tooltip-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 14px;
-      height: 14px;
+    .tooltip-trigger {
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
       background: var(--bg3);
       border: 1px solid var(--border);
       color: var(--muted);
       font-size: .6rem;
       font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: help;
-      margin-left: 4px;
+      line-height: 1;
+      flex-shrink: 0;
       position: relative;
-      vertical-align: middle;
     }
-    .tooltip-icon:hover::after {
+    .tooltip-trigger:hover::after {
       content: attr(data-tooltip);
       position: absolute;
       bottom: calc(100% + 6px);
@@ -372,12 +372,12 @@
     }
     .geo-dropdown li:hover { background: var(--bg3); color: var(--text); }
     .coords-toggle {
-      font-size: .6rem;
+      font-size: .65rem;
       color: var(--muted);
       text-decoration: none;
       cursor: pointer;
-      margin-top: .3rem;
-      display: inline-block;
+      display: block;
+      margin-top: 4px;
       transition: color .2s;
     }
     .coords-toggle:hover { color: var(--green); }
@@ -691,8 +691,8 @@
     .hitl-flag {
       display: flex;
       gap: .75rem;
-      background: rgba(184,134,11,0.08);
-      border: 1px solid rgba(184,134,11,0.25);
+      background: rgba(184,134,11,0.15);
+      border: 1px solid rgba(184,134,11,0.4);
       border-left: 3px solid var(--risk-med);
       border-radius: 8px;
       padding: .75rem 1rem;
@@ -700,27 +700,27 @@
     }
     .hitl-icon { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
     .hitl-title {
-      font-size: .75rem;
+      font-size: .8rem;
       font-weight: 600;
       color: var(--risk-med);
       margin-bottom: .2rem;
     }
     .hitl-desc {
       font-size: .72rem;
-      color: var(--text2);
+      color: var(--text);
       line-height: 1.5;
     }
     .hitl-reason {
       font-family: 'DM Mono', monospace;
       font-size: .65rem;
-      color: var(--muted);
+      color: var(--text2);
       margin-top: .3rem;
     }
 
-    .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-    .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .5rem .65rem; }
+    .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .65rem .75rem; min-height: 80px; }
     .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
-    .score-meta-value { font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--text); }
+    .score-meta-value { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--text); line-height: 1.5; margin-top: .25rem; }
 
     /* ── Map card ────────────────────────────────────────────────────────── */
     .map-card { grid-column: 2; grid-row: 1 / 3; padding: 0; overflow: hidden; }
@@ -1273,10 +1273,10 @@
     <div class="search-row">
       <div class="field-group">
         <label id="t-location">Location
-          <span class="tooltip-icon"
+          <span class="tooltip-trigger"
             data-tooltip-en="Type any city or region. We'll find the coordinates automatically."
             data-tooltip-pt="Digite qualquer cidade ou região. Encontraremos as coordenadas automaticamente."
-            data-tooltip="Type any city or region. We'll find the coordinates automatically.">i</span>
+            data-tooltip="Type any city or region. We'll find the coordinates automatically.">?</span>
         </label>
         <div class="geocoder-wrap">
           <input id="inp-location" type="text"
@@ -1295,58 +1295,82 @@
       </div>
       <div class="field-group">
         <label id="t-from">From
-          <span class="tooltip-icon"
+          <span class="tooltip-trigger"
             data-tooltip-en="Start year for historical climate analysis (NASA POWER data available from 2000)"
             data-tooltip-pt="Ano inicial para análise climática histórica (dados NASA POWER disponíveis a partir de 2000)"
-            data-tooltip="Start year for historical climate analysis (NASA POWER data available from 2000)">i</span>
+            data-tooltip="Start year for historical climate analysis (NASA POWER data available from 2000)">?</span>
         </label>
         <select id="inp-start">
-          <option value="2000">2000</option><option value="2001">2001</option>
-          <option value="2002">2002</option><option value="2003">2003</option>
-          <option value="2004">2004</option><option value="2005">2005</option>
-          <option value="2006">2006</option><option value="2007">2007</option>
-          <option value="2008">2008</option><option value="2009">2009</option>
-          <option value="2010">2010</option><option value="2011">2011</option>
-          <option value="2012">2012</option><option value="2013">2013</option>
+          <option value="2000">2000</option>
+          <option value="2001">2001</option>
+          <option value="2002">2002</option>
+          <option value="2003">2003</option>
+          <option value="2004">2004</option>
+          <option value="2005">2005</option>
+          <option value="2006">2006</option>
+          <option value="2007">2007</option>
+          <option value="2008">2008</option>
+          <option value="2009">2009</option>
+          <option value="2010">2010</option>
+          <option value="2011">2011</option>
+          <option value="2012">2012</option>
+          <option value="2013">2013</option>
           <option value="2014" selected>2014</option>
-          <option value="2015">2015</option><option value="2016">2016</option>
-          <option value="2017">2017</option><option value="2018">2018</option>
-          <option value="2019">2019</option><option value="2020">2020</option>
-          <option value="2021">2021</option><option value="2022">2022</option>
-          <option value="2023">2023</option><option value="2024">2024</option>
+          <option value="2015">2015</option>
+          <option value="2016">2016</option>
+          <option value="2017">2017</option>
+          <option value="2018">2018</option>
+          <option value="2019">2019</option>
+          <option value="2020">2020</option>
+          <option value="2021">2021</option>
+          <option value="2022">2022</option>
+          <option value="2023">2023</option>
+          <option value="2024">2024</option>
           <option value="2025">2025</option>
         </select>
       </div>
       <div class="field-group">
         <label id="t-to">To
-          <span class="tooltip-icon"
+          <span class="tooltip-trigger"
             data-tooltip-en="End year. Years after 2025 use IPCC climate projections (OpenMeteo)"
             data-tooltip-pt="Ano final. Anos após 2025 usam projeções climáticas IPCC (OpenMeteo)"
-            data-tooltip="End year. Years after 2025 use IPCC climate projections (OpenMeteo)">i</span>
+            data-tooltip="End year. Years after 2025 use IPCC climate projections (OpenMeteo)">?</span>
         </label>
         <select id="inp-end">
           <option value="2025">2025</option>
-          <option value="2026">2026 ✦</option><option value="2027">2027 ✦</option>
-          <option value="2028">2028 ✦</option><option value="2029">2029 ✦</option>
-          <option value="2030">2030 ✦</option><option value="2031">2031 ✦</option>
-          <option value="2032">2032 ✦</option><option value="2033">2033 ✦</option>
-          <option value="2034">2034 ✦</option><option value="2035">2035 ✦</option>
-          <option value="2036">2036 ✦</option><option value="2037">2037 ✦</option>
-          <option value="2038">2038 ✦</option><option value="2039">2039 ✦</option>
-          <option value="2040">2040 ✦</option><option value="2041">2041 ✦</option>
-          <option value="2042">2042 ✦</option><option value="2043">2043 ✦</option>
-          <option value="2044">2044 ✦</option><option value="2045">2045 ✦</option>
-          <option value="2046">2046 ✦</option><option value="2047">2047 ✦</option>
-          <option value="2048">2048 ✦</option><option value="2049">2049 ✦</option>
+          <option value="2026">2026 ✦</option>
+          <option value="2027">2027 ✦</option>
+          <option value="2028">2028 ✦</option>
+          <option value="2029">2029 ✦</option>
+          <option value="2030">2030 ✦</option>
+          <option value="2031">2031 ✦</option>
+          <option value="2032">2032 ✦</option>
+          <option value="2033">2033 ✦</option>
+          <option value="2034">2034 ✦</option>
+          <option value="2035">2035 ✦</option>
+          <option value="2036">2036 ✦</option>
+          <option value="2037">2037 ✦</option>
+          <option value="2038">2038 ✦</option>
+          <option value="2039">2039 ✦</option>
+          <option value="2040">2040 ✦</option>
+          <option value="2041">2041 ✦</option>
+          <option value="2042">2042 ✦</option>
+          <option value="2043">2043 ✦</option>
+          <option value="2044">2044 ✦</option>
+          <option value="2045">2045 ✦</option>
+          <option value="2046">2046 ✦</option>
+          <option value="2047">2047 ✦</option>
+          <option value="2048">2048 ✦</option>
+          <option value="2049">2049 ✦</option>
           <option value="2050">2050 ✦</option>
         </select>
       </div>
       <div class="field-group">
         <label id="t-sector">Sector
-          <span class="tooltip-icon"
+          <span class="tooltip-trigger"
             data-tooltip-en="Your industry sector. Affects how ESG compliance risks are weighted and framed."
             data-tooltip-pt="Seu setor de atividade. Afeta como os riscos de conformidade ESG são ponderados."
-            data-tooltip="Your industry sector. Affects how ESG compliance risks are weighted and framed.">i</span>
+            data-tooltip="Your industry sector. Affects how ESG compliance risks are weighted and framed.">?</span>
         </label>
         <select id="inp-sector">
           <option value="General" selected>General</option>
@@ -1361,15 +1385,15 @@
       </div>
       <div class="field-group">
         <label id="t-scenario">Scenario
-          <span class="tooltip-icon"
+          <span class="tooltip-trigger"
             data-tooltip-en="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)"
             data-tooltip-pt="Cenário de emissões IPCC para projeções futuras:&#10;SSP1-2.6: Otimista (forte ação climática, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas atuais, ~2–3°C)&#10;SSP5-8.5: Pessimista (altas emissões, ~4–5°C)"
-            data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">i</span>
+            data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">?</span>
         </label>
         <select id="inp-scenario">
-          <option value="SSP2-4.5" selected>SSP2-4.5</option>
-          <option value="SSP1-2.6">SSP1-2.6</option>
-          <option value="SSP5-8.5">SSP5-8.5</option>
+          <option value="SSP1-2.6">🟢 SSP1-2.6 · Optimistic</option>
+          <option value="SSP2-4.5" selected>🟡 SSP2-4.5 · Moderate</option>
+          <option value="SSP5-8.5">🔴 SSP5-8.5 · High emissions</option>
         </select>
       </div>
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
@@ -1832,7 +1856,7 @@ function setLang(l) {
     const el = document.getElementById('t-' + k);
     if (el) el.textContent = v;
   }
-  document.querySelectorAll('.tooltip-icon').forEach(el => {
+  document.querySelectorAll('.tooltip-trigger').forEach(el => {
     const tt = el.getAttribute('data-tooltip-' + l);
     if (tt) el.setAttribute('data-tooltip', tt);
   });
@@ -2115,7 +2139,9 @@ function renderResults(data) {
   const cf     = data.climate_findings  || {};
 
   /* score */
-  document.getElementById('score-num').textContent = score;
+  const scoreEl = document.getElementById('score-num');
+  scoreEl.textContent  = score;
+  scoreEl.style.color  = meterColor(score);
   const badgeEl = document.getElementById('risk-badge');
   badgeEl.textContent = badge;
   badgeEl.className = `risk-badge ${level}`;
