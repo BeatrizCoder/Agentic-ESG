@@ -452,29 +452,25 @@
       text-align: center;
     }
 
-    /* Pipeline step animations — total 56s = 4 × 14s intervals */
-    #status-bar.visible .pipe-step-1 .step-dot { animation: pipe-dot-1 56s linear 1 forwards; }
-    #status-bar.visible .pipe-step-2 .step-dot { animation: pipe-dot-2 56s linear 1 forwards; }
-    #status-bar.visible .pipe-step-3 .step-dot { animation: pipe-dot-3 56s linear 1 forwards; }
-    #status-bar.visible .pipe-step-4 .step-dot { animation: pipe-dot-4 56s linear 1 forwards; }
-
-    @keyframes pipe-dot-1 {
-      0%, 24.9% { background:var(--bg3); border-color:var(--green); color:var(--green); }
-      25%, 100% { background:var(--green); border-color:var(--green); color:#fff; }
+    /* Pipeline step state — driven by JS highlightStep() */
+    .step-dot.active {
+      background: rgba(109,184,74,0.25);
+      border: 2px solid var(--green);
+      color: var(--green);
+      animation: pulse-dot 1.5s ease-in-out infinite;
     }
-    @keyframes pipe-dot-2 {
-      0%, 24.9% { background:var(--bg3); border-color:var(--border); color:var(--muted); }
-      25%, 49.9% { background:var(--bg3); border-color:var(--green); color:var(--green); }
-      50%, 100% { background:var(--green); border-color:var(--green); color:#fff; }
+    .step-dot.done {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
     }
-    @keyframes pipe-dot-3 {
-      0%, 49.9% { background:var(--bg3); border-color:var(--border); color:var(--muted); }
-      50%, 74.9% { background:var(--bg3); border-color:var(--green); color:var(--green); }
-      75%, 100% { background:var(--green); border-color:var(--green); color:#fff; }
+    .pipeline-step.done::after {
+      background: var(--green);
+      opacity: 0.6;
     }
-    @keyframes pipe-dot-4 {
-      0%, 74.9% { background:var(--bg3); border-color:var(--border); color:var(--muted); }
-      75%, 100% { background:var(--bg3); border-color:var(--green); color:var(--green); }
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(109,184,74,0.4); }
+      50%       { box-shadow: 0 0 0 6px rgba(109,184,74,0); }
     }
 
     /* ── Results ─────────────────────────────────────────────────────────── */
@@ -2061,6 +2057,17 @@ function renderRecs(recs) {
 /* ── Main analysis ───────────────────────────────────────────────────────── */
 let _currentId = null;
 
+function highlightStep(idx) {
+  document.querySelectorAll('.step-dot').forEach((dot, i) => {
+    dot.classList.remove('active', 'done');
+    if (i < idx)      dot.classList.add('done');
+    else if (i === idx) dot.classList.add('active');
+  });
+  document.querySelectorAll('.pipeline-step').forEach((step, i) => {
+    step.classList.toggle('done', i < idx);
+  });
+}
+
 async function runAnalysis() {
   const lat      = parseFloat(document.getElementById('inp-lat').value);
   const lon      = parseFloat(document.getElementById('inp-lon').value);
@@ -2084,9 +2091,11 @@ async function runAnalysis() {
   const statusText = document.getElementById('status-text');
   statusBar.classList.add('visible');
   statusText.textContent = steps[0];
+  highlightStep(0);
   const stepTimer = setInterval(() => {
     stepIdx = Math.min(stepIdx + 1, steps.length - 1);
     statusText.textContent = steps[stepIdx];
+    highlightStep(stepIdx);
   }, 14000);
 
   try {
@@ -2122,6 +2131,8 @@ async function runAnalysis() {
     setTimeout(() => statusBar.classList.remove('visible'), 5000);
   } finally {
     clearInterval(stepTimer);
+    document.querySelectorAll('.step-dot').forEach(d => d.classList.remove('active', 'done'));
+    document.querySelectorAll('.pipeline-step').forEach(s => s.classList.remove('done'));
     statusBar.classList.remove('visible');
     btn.disabled = false;
     btn.textContent = _lang === 'pt' ? 'Analisar →' : 'Analyze →';
