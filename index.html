@@ -14,6 +14,7 @@
     /* ── Dark theme (default — no data-theme attribute) ──────────────────── */
     /* JS sets data-theme="light" for light; removes attribute for dark       */
     :root {
+      color-scheme: dark;
       --bg:       #0d1208;
       --bg2:      #131a0d;
       --bg3:      #1a2410;
@@ -36,6 +37,7 @@
 
     /* ── Light theme (data-theme="light") ─────────────────────────────────── */
     [data-theme="light"] {
+      color-scheme: light;
       --bg:       #f7f5f0;
       --bg2:      #ffffff;
       --bg3:      #f0ede6;
@@ -169,10 +171,10 @@
     .lang-toggle button:last-child { border-right: none; }
     .lang-toggle button.active {
       background: var(--green);
-      color: #ffffff;
+      color: #ffffff !important;
     }
     .lang-toggle button:not(.active) {
-      color: var(--muted);
+      color: var(--text2);
     }
 
     .theme-toggle {
