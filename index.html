@@ -1585,6 +1585,7 @@
       <!-- Export -->
       <div class="export-row" id="export-row">
         <button class="export-btn" onclick="exportPdf()" id="t-export-pdf">Export PDF ↓</button>
+        <button class="export-btn" onclick="exportExcel()">Export Excel ↓</button>
       </div>
 
     </div><!-- .results-grid -->
@@ -2261,6 +2262,16 @@ async function exportPdf() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
+}
+
+function exportExcel() {
+  if (!_currentId) return;
+  const a = document.createElement('a');
+  a.href     = `${API_BASE}/api/analyses/${_currentId}/export/excel`;
+  a.download = `cs_report_${_currentId}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 /* ── Investment status badge ─────────────────────────────────────────────── */

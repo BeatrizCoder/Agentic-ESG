@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from io import BytesIO
 
+from reportlab.graphics.shapes import Drawing, Rect
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
@@ -16,51 +17,64 @@ from reportlab.platypus import (
 logger = logging.getLogger(__name__)
 
 # ── Brand palette ─────────────────────────────────────────────────────────────
-NAVY     = colors.HexColor("#0d1117")
-TEAL     = colors.HexColor("#2e7d9a")
-TEAL_LT  = colors.HexColor("#4aa8c8")
-OFFWHT   = colors.HexColor("#e8ede8")
+GREEN    = colors.HexColor("#3a6b35")
+GREEN_LT = colors.HexColor("#4d8c45")
+OFFWHT   = colors.HexColor("#f7f5f0")
 MUTED    = colors.HexColor("#6a8898")
 WHITE    = colors.white
-BORDER   = colors.HexColor("#1a2636")
+BODY_TXT = colors.HexColor("#1a2a1a")
+ROW_ALT  = colors.HexColor("#f7f5f0")
 
 RISK_COLORS = {
-    "low":      (colors.HexColor("#0d2218"), colors.HexColor("#3aaa78")),
-    "medium":   (colors.HexColor("#221c08"), colors.HexColor("#c4ae3a")),
-    "high":     (colors.HexColor("#221208"), colors.HexColor("#c46a2a")),
-    "critical": (colors.HexColor("#220808"), colors.HexColor("#c42a2a")),
+    "low":      (colors.HexColor("#edf7f0"), colors.HexColor("#3aaa78")),
+    "medium":   (colors.HexColor("#fdf8e8"), colors.HexColor("#c4ae3a")),
+    "high":     (colors.HexColor("#fdf2e9"), colors.HexColor("#c46a2a")),
+    "critical": (colors.HexColor("#fdecea"), colors.HexColor("#c42a2a")),
 }
-# Plain hex strings for use inside Paragraph markup (reportlab <font color='#rrggbb'>)
 RISK_HEX_FG = {
     "low": "#3aaa78", "medium": "#c4ae3a", "high": "#c46a2a", "critical": "#c42a2a",
 }
 FW_HEX = {
     "CSRD": "#4aa8c8", "ISSB_S2": "#d4b84a", "EU_TAXONOMY": "#3aaa78", "OPERATIONAL": "#6a8898",
 }
-FW_COLORS = {k: colors.HexColor(v) for k, v in FW_HEX.items()}
 COMP_HEX_FG = {
     "low": "#3aaa78", "medium": "#c4ae3a", "high": "#c46a2a", "critical": "#c42a2a",
     "partial": "#c4ae3a", "misaligned": "#c42a2a", "aligned": "#3aaa78", "not_assessed": "#6a8898",
 }
 
 
+def _inv_status(score: int) -> tuple[str, str]:
+    """Return (label, hex_color) for investment status."""
+    if score <= 40:
+        return "Investment Approved",      "#3aaa78"
+    if score <= 70:
+        return "Investment Conditioned",   "#c4ae3a"
+    if score <= 85:
+        return "Investment Restricted",    "#c46a2a"
+    return "Investment Suspended",         "#c42a2a"
+
+
 def _styles() -> dict:
     return {
-        "h1": ParagraphStyle("h1", fontSize=22, fontName="Helvetica-Bold",
+        "h1": ParagraphStyle("h1", fontSize=20, fontName="Helvetica-Bold",
                               textColor=WHITE, spaceAfter=2),
-        "h2": ParagraphStyle("h2", fontSize=11, fontName="Helvetica-Bold",
-                              textColor=TEAL_LT, spaceAfter=6, spaceBefore=14),
+        "h1tag": ParagraphStyle("h1tag", fontSize=8, fontName="Helvetica",
+                                textColor=colors.HexColor("#a8d4a0"), alignment=TA_RIGHT),
+        "h2": ParagraphStyle("h2", fontSize=10, fontName="Helvetica-Bold",
+                              textColor=GREEN, spaceAfter=5, spaceBefore=12,
+                              borderPad=(0, 0, 2, 0)),
         "sub": ParagraphStyle("sub", fontSize=9, fontName="Helvetica",
                                textColor=MUTED, spaceAfter=2),
         "body": ParagraphStyle("body", fontSize=9, fontName="Helvetica",
-                                textColor=colors.HexColor("#1a2a2a"),
-                                leading=14, spaceAfter=4),
+                                textColor=BODY_TXT, leading=14, spaceAfter=4),
         "mono": ParagraphStyle("mono", fontSize=8, fontName="Courier",
-                                textColor=colors.HexColor("#2a3a4a")),
+                                textColor=colors.HexColor("#2a3a2a")),
         "cell": ParagraphStyle("cell", fontSize=8, fontName="Helvetica",
-                                textColor=colors.HexColor("#1a2a2a"), leading=11),
+                                textColor=BODY_TXT, leading=11),
         "cell_bold": ParagraphStyle("cell_bold", fontSize=8, fontName="Helvetica-Bold",
-                                     textColor=colors.HexColor("#1a2a2a")),
+                                     textColor=BODY_TXT),
+        "chart_lbl": ParagraphStyle("chart_lbl", fontSize=7, fontName="Helvetica",
+                                     textColor=MUTED, alignment=TA_CENTER),
         "footer": ParagraphStyle("footer", fontSize=7, fontName="Helvetica",
                                   textColor=MUTED, alignment=TA_RIGHT),
     }
@@ -69,12 +83,15 @@ def _styles() -> dict:
 def _header_footer(canvas, doc):
     canvas.saveState()
     w, _ = A4
-    canvas.setStrokeColor(colors.HexColor("#2e7d9a"))
-    canvas.setLineWidth(0.4)
+    canvas.setStrokeColor(GREEN)
+    canvas.setLineWidth(0.5)
     canvas.line(2 * cm, 1.6 * cm, w - 2 * cm, 1.6 * cm)
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(MUTED)
-    canvas.drawString(2 * cm, 1.2 * cm, "Climate Sentinel · ESG Intelligence — Confidential")
+    canvas.drawString(
+        2 * cm, 1.2 * cm,
+        "Generated by Climate Sentinel · NASA POWER · Claude AI (Anthropic) — Confidential",
+    )
     canvas.drawRightString(
         w - 2 * cm, 1.2 * cm,
         f"Page {doc.page} · {datetime.utcnow().strftime('%d %b %Y')}",
@@ -82,11 +99,38 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
+def _mini_bar_chart(values: list, width: float = 160, height: float = 36) -> Drawing:
+    """Reportlab Drawing with simple rectangular bars."""
+    d = Drawing(width, height)
+    if not values:
+        return d
+    n = len(values)
+    pad = 1.5
+    bar_w = max(2.0, (width - pad * (n + 1)) / n)
+    min_v = min(values)
+    max_v = max(values)
+    v_range = max_v - min_v or 1.0
+    is_declining = len(values) > 1 and values[-1] < values[0]
+    for i, v in enumerate(values):
+        bar_h = max(3.0, ((v - min_v) / v_range) * (height - 4) + 4)
+        x = pad + i * (bar_w + pad)
+        is_late = i >= n - 3
+        fill = colors.HexColor("#c46a2a") if (is_late and is_declining) else GREEN_LT
+        d.add(Rect(x, 0, bar_w, bar_h, fillColor=fill, strokeColor=None))
+    return d
+
+
+def _section_rule(canvas, x1, y, x2):
+    canvas.setStrokeColor(GREEN)
+    canvas.setLineWidth(0.3)
+    canvas.line(x1, y, x2, y)
+
+
 def generate_pdf(analysis: dict) -> BytesIO:
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
-        topMargin=2 * cm, bottomMargin=2.2 * cm,
+        topMargin=2 * cm, bottomMargin=2.4 * cm,
         leftMargin=2 * cm, rightMargin=2 * cm,
     )
 
@@ -96,37 +140,41 @@ def generate_pdf(analysis: dict) -> BytesIO:
 
     # ── Cover band ────────────────────────────────────────────────────────────
     risk_level = analysis.get("risk_level", "low")
-    _, risk_fg = RISK_COLORS.get(risk_level, RISK_COLORS["low"])
 
     cover = Table(
         [[
             Paragraph("ClimateSentinel", S["h1"]),
             Paragraph(
-                "<font color='" + RISK_HEX_FG.get(risk_level, "#6a8898") + "'>ESG Intelligence</font>",
-                ParagraphStyle("tag", fontSize=8, fontName="Helvetica",
-                               textColor=MUTED, alignment=TA_RIGHT),
+                "<font color='#a8d4a0'>ESG Intelligence</font>",
+                S["h1tag"],
             ),
         ]],
-        colWidths=[w_full * .7, w_full * .3],
+        colWidths=[w_full * .65, w_full * .35],
     )
     cover.setStyle(TableStyle([
-        ("BACKGROUND",  (0, 0), (-1, -1), NAVY),
-        ("TOPPADDING",  (0, 0), (-1, -1), 14),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
-        ("LEFTPADDING",  (0, 0), (0, -1), 14),
-        ("RIGHTPADDING", (-1, 0), (-1, -1), 14),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND",    (0, 0), (-1, -1), GREEN),
+        ("TOPPADDING",    (0, 0), (-1, -1), 16),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+        ("LEFTPADDING",   (0, 0), (0, -1),  16),
+        ("RIGHTPADDING",  (-1, 0), (-1, -1), 16),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
         ("ROUNDEDCORNERS", [6]),
     ]))
     story.append(cover)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 8))
+
+    # ── Tagline ───────────────────────────────────────────────────────────────
+    story.append(Paragraph(
+        "Physical Climate Risk · CSRD · ISSB S2 · EU Taxonomy",
+        ParagraphStyle("tag", fontSize=8, fontName="Helvetica",
+                       textColor=MUTED, spaceAfter=10),
+    ))
 
     # ── Meta row ──────────────────────────────────────────────────────────────
     region   = analysis.get("region_label", "—")
     lat, lon = analysis.get("latitude", 0), analysis.get("longitude", 0)
     aid      = analysis.get("analysis_id", "—")
     created  = analysis.get("created_at", "")[:10]
-    duration = analysis.get("pipeline_duration_sec", 0)
 
     meta = Table(
         [[
@@ -138,41 +186,65 @@ def generate_pdf(analysis: dict) -> BytesIO:
         colWidths=[w_full * .35, w_full * .2, w_full * .25, w_full * .2],
     )
     meta.setStyle(TableStyle([
-        ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#f4f6f4")),
-        ("BOX",          (0, 0), (-1, -1), 0.4, colors.HexColor("#d0dce0")),
-        ("TOPPADDING",   (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 7),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 8),
+        ("BACKGROUND",    (0, 0), (-1, -1), ROW_ALT),
+        ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#d4d0c8")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
     ]))
     story.append(meta)
     story.append(Spacer(1, 12))
 
-    # ── Risk score ────────────────────────────────────────────────────────────
+    # ── Risk score + badge + investment status ────────────────────────────────
     story.append(Paragraph("CLIMATE RISK SCORE", S["h2"]))
-    score      = analysis.get("risk_score", 0)
-    badge      = analysis.get("risk_badge_label", risk_level.upper() + " RISK")
-    risk_bg, risk_fg = RISK_COLORS.get(risk_level, RISK_COLORS["low"])
+    score              = analysis.get("risk_score", 0)
+    badge              = analysis.get("risk_badge_label", risk_level.upper() + " RISK")
+    risk_bg, risk_fg   = RISK_COLORS.get(risk_level, RISK_COLORS["low"])
+    inv_label, inv_hex = _inv_status(score)
+    conf_score         = analysis.get("confidence_score", 0)
 
     score_table = Table(
-        [[
-            Paragraph(f"<b>{score}</b>/100", ParagraphStyle(
-                "score", fontSize=28, fontName="Helvetica-Bold",
-                textColor=colors.HexColor("#1a2a2a"))),
-            Paragraph(badge, ParagraphStyle(
-                "badge", fontSize=10, fontName="Helvetica-Bold",
-                textColor=risk_fg, alignment=TA_CENTER)),
-        ]],
-        colWidths=[w_full * .25, w_full * .35],
+        [
+            [
+                Paragraph(
+                    f"<b>{score}</b><font size='12'>/100</font>",
+                    ParagraphStyle("score", fontSize=30, fontName="Helvetica-Bold",
+                                   textColor=colors.HexColor(RISK_HEX_FG.get(risk_level, "#3aaa78")),
+                                   alignment=TA_CENTER),
+                ),
+                Paragraph(
+                    f"<b>{badge}</b>",
+                    ParagraphStyle("badge", fontSize=11, fontName="Helvetica-Bold",
+                                   textColor=risk_fg, alignment=TA_CENTER),
+                ),
+                Paragraph(
+                    f"<font color='{inv_hex}'><b>{inv_label}</b></font>",
+                    ParagraphStyle("inv", fontSize=8, fontName="Helvetica",
+                                   textColor=colors.HexColor(inv_hex), alignment=TA_CENTER),
+                ),
+                Paragraph(
+                    f"Confidence<br/><b>{conf_score}%</b>",
+                    ParagraphStyle("conf", fontSize=8, fontName="Helvetica",
+                                   textColor=MUTED, alignment=TA_CENTER),
+                ),
+            ],
+        ],
+        colWidths=[w_full * .18, w_full * .26, w_full * .32, w_full * .24],
     )
     score_table.setStyle(TableStyle([
-        ("BACKGROUND",   (0, 0), (0, -1), colors.HexColor("#f4f6f4")),
-        ("BACKGROUND",   (1, 0), (1, -1), risk_bg),
-        ("BOX",          (0, 0), (0, -1), 0.4, colors.HexColor("#d0dce0")),
-        ("BOX",          (1, 0), (1, -1), 0.8, risk_fg),
-        ("TOPPADDING",   (0, 0), (-1, -1), 12),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 12),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 12),
-        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND",    (0, 0), (0, -1), colors.HexColor("#f0f7f0")),
+        ("BACKGROUND",    (1, 0), (1, -1), risk_bg),
+        ("BACKGROUND",    (2, 0), (2, -1), colors.HexColor("#fafaf7")),
+        ("BACKGROUND",    (3, 0), (3, -1), colors.HexColor("#f7f5f0")),
+        ("BOX",           (0, 0), (0, -1), 0.5, GREEN),
+        ("BOX",           (1, 0), (1, -1), 0.8, risk_fg),
+        ("BOX",           (2, 0), (2, -1), 0.5, colors.HexColor("#d4d0c8")),
+        ("BOX",           (3, 0), (3, -1), 0.5, colors.HexColor("#d4d0c8")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEAFTER",     (0, 0), (-2, -1), 0.3, colors.HexColor("#d4d0c8")),
     ]))
     story.append(score_table)
     story.append(Spacer(1, 12))
@@ -182,11 +254,11 @@ def generate_pdf(analysis: dict) -> BytesIO:
     if km:
         story.append(Paragraph("KEY METRICS", S["h2"]))
         metrics_data = [
-            ["Temperature Change", km.get("temp_change_label", "—")],
+            ["Temperature Change",  km.get("temp_change_label", "—")],
             ["Precipitation Change", km.get("precip_change_label", "—")],
-            ["Compliance Exposure", km.get("compliance_exposure_label", "—")],
-            ["Hottest Year", str(km.get("hottest_year", "—"))],
-            ["Driest Year",  str(km.get("driest_year", "—"))],
+            ["Compliance Exposure",  km.get("compliance_exposure_label", "—")],
+            ["Hottest Year",         str(km.get("hottest_year", "—"))],
+            ["Driest Year",          str(km.get("driest_year", "—"))],
         ]
         metrics_table = Table(
             [[Paragraph(k, S["cell_bold"]), Paragraph(v, S["mono"])]
@@ -194,16 +266,54 @@ def generate_pdf(analysis: dict) -> BytesIO:
             colWidths=[w_full * .4, w_full * .6],
         )
         metrics_table.setStyle(TableStyle([
-            ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#f9fbfc")),
-            ("ROWBACKGROUNDS", (0, 0), (-1, -1),
-             [colors.HexColor("#f4f6f4"), colors.white]),
-            ("BOX",          (0, 0), (-1, -1), 0.4, colors.HexColor("#d0dce0")),
-            ("INNERGRID",    (0, 0), (-1, -1), 0.2, colors.HexColor("#d0dce0")),
-            ("TOPPADDING",   (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [ROW_ALT, colors.white]),
+            ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#d4d0c8")),
+            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
         ]))
         story.append(metrics_table)
+        story.append(Spacer(1, 12))
+
+    # ── Mini bar charts ───────────────────────────────────────────────────────
+    annual_records = analysis.get("annual_records", [])
+    nasa_records = [r for r in annual_records if r.get("source") == "nasa"]
+    if nasa_records:
+        temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in nasa_records]
+        precips = [r.get("precip_total_mm") or 0 for r in nasa_records]
+        solars  = [r.get("solar_mean_kwh_m2") or 0 for r in nasa_records if r.get("solar_mean_kwh_m2")]
+
+        col_w = (w_full - 16) / 3
+        chart_height = 38
+
+        charts_row = []
+        labels_row = []
+        for vals, lbl in [
+            (temps,   f"Temp Mean (°C) — last: {temps[-1]:.1f}°C"   if temps   else "Temp Mean"),
+            (precips, f"Precip. (mm/yr) — last: {precips[-1]:.0f}mm" if precips else "Precipitation"),
+            (solars,  f"Solar (kWh/m²) — last: {solars[-1]:.2f}"    if solars  else "Solar"),
+        ]:
+            if vals and any(v for v in vals):
+                charts_row.append(_mini_bar_chart(vals, col_w - 4, chart_height))
+            else:
+                charts_row.append(Spacer(col_w - 4, chart_height))
+            labels_row.append(Paragraph(lbl, S["chart_lbl"]))
+
+        story.append(Paragraph("CLIMATE TRENDS (NASA POWER DATA)", S["h2"]))
+        chart_table = Table(
+            [charts_row, labels_row],
+            colWidths=[col_w] * 3,
+        )
+        chart_table.setStyle(TableStyle([
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
+            ("VALIGN",        (0, 0), (-1, 0),  "BOTTOM"),
+            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ]))
+        story.append(chart_table)
         story.append(Spacer(1, 12))
 
     # ── Executive summary ─────────────────────────────────────────────────────
@@ -218,12 +328,10 @@ def generate_pdf(analysis: dict) -> BytesIO:
     if comp:
         story.append(Paragraph("COMPLIANCE FRAMEWORK MAPPING", S["h2"]))
         comp_items = [
-            ("CSRD",        comp.get("csrd_exposure","—"),      comp.get("csrd_summary",""),      comp.get("csrd_articles",[])),
-            ("ISSB S2",     comp.get("issb_s2_exposure","—"),   comp.get("issb_s2_summary",""),   comp.get("issb_s2_scenarios",[])),
-            ("EU TAXONOMY", comp.get("eu_taxonomy_alignment","—"), comp.get("eu_taxonomy_summary",""), comp.get("eu_taxonomy_criteria",[])),
+            ("CSRD",        comp.get("csrd_exposure","—"),           comp.get("csrd_summary",""),         comp.get("csrd_articles",[])),
+            ("ISSB S2",     comp.get("issb_s2_exposure","—"),        comp.get("issb_s2_summary",""),      comp.get("issb_s2_scenarios",[])),
+            ("EU TAXONOMY", comp.get("eu_taxonomy_alignment","—"),   comp.get("eu_taxonomy_summary",""),  comp.get("eu_taxonomy_criteria",[])),
         ]
-        _clr = {"low":"#3aaa78","medium":"#c4ae3a","high":"#c46a2a","critical":"#c42a2a",
-                "partial":"#c4ae3a","misaligned":"#c42a2a","aligned":"#3aaa78","not_assessed":"#6a8898"}
         comp_rows = [
             [Paragraph("<b>Framework</b>", S["cell_bold"]),
              Paragraph("<b>Exposure</b>",  S["cell_bold"]),
@@ -240,10 +348,10 @@ def generate_pdf(analysis: dict) -> BytesIO:
             ])
         comp_table = Table(comp_rows, colWidths=[w_full*.13, w_full*.12, w_full*.42, w_full*.33])
         comp_table.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e8eef2")),
-            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.HexColor("#f4f8fa"), colors.white]),
-            ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#d0dce0")),
-            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d0dce0")),
+            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e8f0e4")),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [ROW_ALT, colors.white]),
+            ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#d4d0c8")),
+            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
             ("TOPPADDING",    (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LEFTPADDING",   (0, 0), (-1, -1), 6),
@@ -264,8 +372,8 @@ def generate_pdf(analysis: dict) -> BytesIO:
              Paragraph("<b>Timeline</b>",  S["cell_bold"])],
         ]
         for r in recs:
-            fw      = r.get("framework", "")
-            fw_hex  = FW_HEX.get(fw, "#6a8898")
+            fw     = r.get("framework", "")
+            fw_hex = FW_HEX.get(fw, "#6a8898")
             rec_rows.append([
                 Paragraph(f"<b>{r.get('rank','')}</b>", S["cell_bold"]),
                 Paragraph(f"<font color='{fw_hex}'><b>{fw}</b></font>", S["cell"]),
@@ -278,10 +386,10 @@ def generate_pdf(analysis: dict) -> BytesIO:
             colWidths=[w_full*.05, w_full*.14, w_full*.52, w_full*.17, w_full*.12],
         )
         rec_table.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e8eef2")),
-            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.HexColor("#f4f8fa"), colors.white]),
-            ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#d0dce0")),
-            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d0dce0")),
+            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e8f0e4")),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [ROW_ALT, colors.white]),
+            ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#d4d0c8")),
+            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
             ("TOPPADDING",    (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LEFTPADDING",   (0, 0), (-1, -1), 6),
@@ -292,8 +400,9 @@ def generate_pdf(analysis: dict) -> BytesIO:
     # ── Privacy note ──────────────────────────────────────────────────────────
     story.append(Spacer(1, 16))
     story.append(Paragraph(
-        f"Generated by Climate Sentinel · {datetime.utcnow().strftime('%d %b %Y %H:%M')} UTC · "
-        "Session data stored as temporary cookie only. No personal data collected or retained.",
+        f"Generated by Climate Sentinel · NASA POWER · Claude AI (Anthropic) · "
+        f"{datetime.utcnow().strftime('%d %b %Y %H:%M')} UTC · "
+        "Session data stored as temporary cookie only. No personal data retained.",
         S["footer"],
     ))
 

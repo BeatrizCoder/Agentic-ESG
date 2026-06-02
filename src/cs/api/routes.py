@@ -185,3 +185,32 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
             "Cache-Control": "no-cache",
         },
     )
+
+
+@router.get("/api/analyses/{analysis_id}/export/excel")
+@limiter.limit("5/minute")
+async def export_excel(request: Request, analysis_id: str) -> StreamingResponse:
+    """Generate and stream an Excel report for the given analysis."""
+    row = await _db_get(analysis_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Analysis '{analysis_id}' not found")
+
+    try:
+        from ..exports.excel_report import generate_excel
+        buffer = generate_excel(row)
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Excel export not available — install openpyxl")
+    except Exception as exc:
+        logger.exception("Excel generation failed for %s", analysis_id)
+        raise HTTPException(status_code=500, detail=f"Excel generation failed: {exc}")
+
+    filename = f"cs_report_{analysis_id}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
+    )
