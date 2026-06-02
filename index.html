@@ -1171,6 +1171,33 @@
     .modal-accept-btn.ready:hover { background: var(--green2); box-shadow: 0 4px 12px rgba(58,107,53,0.4); }
     .modal-accept-btn.accepted { cursor: default; opacity: 1; background: var(--green); color: #fff; border-color: var(--green); }
 
+    /* Glossary search */
+    .glossary-search-wrap {
+      padding: .75rem 1.5rem .5rem;
+      flex-shrink: 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .glossary-search {
+      width: 100%;
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: .8rem;
+      padding: .5rem .75rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .glossary-search:focus { border-color: var(--green); }
+    .glossary-no-results {
+      display: none;
+      text-align: center;
+      font-size: .8rem;
+      color: var(--muted);
+      padding: 1.5rem 0;
+    }
+
     /* Terms + Privacy modals — explicit scroll area height so detection works reliably */
     #terms-content, #privacy-content {
       height: 50vh;
@@ -1668,6 +1695,8 @@
     <button class="footer-link" onclick="openModal('modal-privacy')">Privacy Policy / Política de Privacidade</button>
     &nbsp;·&nbsp;
     <button class="footer-link" onclick="openModal('modal-terms')">Terms of Use / Termos de Uso</button>
+    &nbsp;·&nbsp;
+    <button class="footer-link" onclick="openModal('modal-glossary')">ESG Glossary / Glossário ESG</button>
   </div>
   <div class="footer-bottom" id="t-footer-text">
     🌿 Analysis history is stored for 24 hours using an anonymous session cookie. No personal data is collected.
@@ -2737,6 +2766,12 @@ function openModal(id) {
 
   if (gateText) gateText.classList.toggle('visible', gateActive);
 
+  // Reset glossary search when opening
+  if (id === 'modal-glossary') {
+    const inp = document.getElementById('glossary-search');
+    if (inp) { inp.value = ''; filterGlossary(''); }
+  }
+
   if (!btn) return;
 
   if (_termsAccepted()) {
@@ -2794,12 +2829,134 @@ document.addEventListener('keydown', e => {
     document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
   }
 });
+
+/* ── Glossary search ─────────────────────────────────────────────────────── */
+function filterGlossary(query) {
+  const q       = query.trim().toLowerCase();
+  const sections = document.querySelectorAll('#modal-glossary .modal-section');
+  const noResult = document.getElementById('glossary-no-results');
+  let visible = 0;
+
+  sections.forEach(sec => {
+    const haystack = (
+      (sec.dataset.term || '') + ' ' +
+      (sec.querySelector('.modal-section-title')?.textContent || '') + ' ' +
+      (sec.querySelector('.modal-en')?.textContent || '') + ' ' +
+      (sec.querySelector('.modal-pt')?.textContent || '')
+    ).toLowerCase();
+    const show = !q || haystack.includes(q);
+    sec.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  noResult.style.display = visible === 0 ? 'block' : 'none';
+}
 </script>
 
 <!-- Gate overlay: full-page block, shows during first-visit onboarding -->
 <div id="gate-overlay"></div>
 
 <!-- Privacy Policy Modal -->
+<!-- ── ESG Glossary modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-glossary" onclick="if(event.target===this)closeModal('modal-glossary')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-header-title">📚 ESG Glossary / Glossário ESG</div>
+        <div class="modal-header-sub">12 key terms · 12 termos-chave</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-glossary')" aria-label="Close">✕</button>
+    </div>
+    <div class="glossary-search-wrap">
+      <input id="glossary-search" class="glossary-search" type="text"
+        placeholder="Search terms… / Buscar termos…"
+        oninput="filterGlossary(this.value)"
+        autocomplete="off" />
+    </div>
+    <div class="modal-body">
+      <div class="glossary-no-results" id="glossary-no-results">No results / Sem resultados</div>
+
+      <div class="modal-section" data-term="csrd eu directive environmental social governance esrs diretiva ue governança">
+        <div class="modal-section-title">CSRD</div>
+        <p class="modal-en">EU directive requiring large companies to report on environmental, social and governance impacts. Mandatory for EU companies from 2024–2025 under ESRS standards.</p>
+        <p class="modal-pt">Diretiva da UE que exige que grandes empresas reportem impactos ambientais, sociais e de governança. Obrigatória para empresas europeias a partir de 2024–2025.</p>
+      </div>
+
+      <div class="modal-section" data-term="issb s2 ifrs climate disclosure physical transition risk scenario ifrs clima divulgação riscos">
+        <div class="modal-section-title">ISSB S2</div>
+        <p class="modal-en">Global standard by IFRS requiring companies to disclose climate-related risks and opportunities, including physical and transition risks with scenario analysis.</p>
+        <p class="modal-pt">Padrão global do IFRS exigindo divulgação de riscos e oportunidades relacionados ao clima, incluindo análise de cenários.</p>
+      </div>
+
+      <div class="modal-section" data-term="eu taxonomy classification sustainable green finance greenwashing taxonomia classificação sustentável financiamento verde">
+        <div class="modal-section-title">EU Taxonomy</div>
+        <p class="modal-en">EU classification system for sustainable economic activities. Companies must demonstrate alignment to access green finance and avoid greenwashing.</p>
+        <p class="modal-pt">Sistema de classificação da UE para atividades econômicas sustentáveis. Empresas precisam demonstrar alinhamento para acessar financiamento verde.</p>
+      </div>
+
+      <div class="modal-section" data-term="physical climate risk drought flood heat water stress sea level risco climático físico seca inundação calor hídrico">
+        <div class="modal-section-title">Physical Climate Risk</div>
+        <p class="modal-en">Direct risks from climate change affecting operations and assets: droughts, floods, extreme heat, water stress, sea level rise.</p>
+        <p class="modal-pt">Riscos diretos das mudanças climáticas que afetam operações e ativos: secas, inundações, calor extremo, estresse hídrico.</p>
+      </div>
+
+      <div class="modal-section" data-term="double materiality csrd financial impact materialidade dupla financeiro impacto">
+        <div class="modal-section-title">Double Materiality</div>
+        <p class="modal-en">CSRD concept requiring companies to assess both how climate affects them (financial materiality) AND how they affect the climate (impact materiality).</p>
+        <p class="modal-pt">Conceito do CSRD exigindo que empresas avaliem tanto como o clima as afeta quanto como elas afetam o clima.</p>
+      </div>
+
+      <div class="modal-section" data-term="ssp scenarios ipcc shared socioeconomic pathways emission 1.5 2 3 4 5 cenários emissões projeções">
+        <div class="modal-section-title">SSP Scenarios</div>
+        <p class="modal-en">IPCC Shared Socioeconomic Pathways — emission scenarios for climate projections: SSP1-2.6 (optimistic ~1.5°C), SSP2-4.5 (moderate ~2–3°C), SSP5-8.5 (high ~4–5°C).</p>
+        <p class="modal-pt">Cenários de emissões do IPCC para projeções climáticas futuras, do otimista ao pessimista.</p>
+      </div>
+
+      <div class="modal-section" data-term="esrs e1 european sustainability reporting standard climate change disclosure transition plano europeu reporte mudanças climáticas">
+        <div class="modal-section-title">ESRS E1</div>
+        <p class="modal-en">European Sustainability Reporting Standard for Climate Change — specifies exactly what companies must disclose about climate risks, targets and transition plans.</p>
+        <p class="modal-pt">Padrão Europeu de Reporte de Sustentabilidade para Mudanças Climáticas — especifica o que empresas devem divulgar sobre riscos climáticos e planos de transição.</p>
+      </div>
+
+      <div class="modal-section" data-term="nasa power api satellite temperature precipitation solar radiation dados satélite temperatura precipitação solar">
+        <div class="modal-section-title">NASA POWER API</div>
+        <p class="modal-en">NASA's Prediction Of Worldwide Energy Resources — provides real satellite-derived climate data (temperature, precipitation, solar radiation) for any location on Earth, free and open access.</p>
+        <p class="modal-pt">Sistema da NASA que fornece dados climáticos reais derivados de satélite para qualquer localização no planeta, gratuito e de acesso aberto.</p>
+      </div>
+
+      <div class="modal-section" data-term="ipcc intergovernmental panel climate change un ar6 scenarios painel intergovernamental mudanças climáticas onu">
+        <div class="modal-section-title">IPCC</div>
+        <p class="modal-en">Intergovernmental Panel on Climate Change — UN body that assesses climate science. Their AR6 report and SSP scenarios are the global reference for climate risk.</p>
+        <p class="modal-pt">Painel Intergovernamental sobre Mudanças Climáticas — organismo da ONU que avalia a ciência do clima.</p>
+      </div>
+
+      <div class="modal-section" data-term="llm judge language model evaluation quality accuracy validation avaliação qualidade precisão modelo linguagem">
+        <div class="modal-section-title">LLM-as-Judge</div>
+        <p class="modal-en">AI evaluation technique where one language model assesses the quality and accuracy of another model's output. Used in Climate Sentinel's Validation Layer.</p>
+        <p class="modal-pt">Técnica de avaliação por IA onde um modelo de linguagem avalia a qualidade e precisão do output de outro modelo.</p>
+      </div>
+
+      <div class="modal-section" data-term="hitl human in the loop expert validation regulatory decision humano cadeia decisão validação especializada">
+        <div class="modal-section-title">HITL (Human-in-the-Loop)</div>
+        <p class="modal-en">Design principle ensuring humans remain in the decision chain. Climate Sentinel flags analyses that require expert human validation before regulatory use.</p>
+        <p class="modal-pt">Princípio de design que garante que humanos permaneçam na cadeia de decisão. O Climate Sentinel sinaliza análises que requerem validação humana especializada.</p>
+      </div>
+
+      <div class="modal-section" data-term="carbon budget co2 paris agreement 1.5 2 degrees warming orçamento carbono acordo de paris aquecimento">
+        <div class="modal-section-title">Carbon Budget</div>
+        <p class="modal-en">Maximum amount of CO₂ that can be emitted globally while limiting warming to 1.5°C or 2°C as per Paris Agreement.</p>
+        <p class="modal-pt">Quantidade máxima de CO₂ que pode ser emitida globalmente para limitar o aquecimento conforme o Acordo de Paris.</p>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-btns">
+        <button class="modal-close-btn" onclick="closeModal('modal-glossary')">Close / Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-privacy" onclick="if(event.target===this)closeModal('modal-privacy')">
   <div class="modal-box">
     <div class="modal-header">
