@@ -1,5 +1,6 @@
 """CS FastAPI routes."""
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -28,17 +29,17 @@ async def health(request: Request) -> dict:
     }
 
 
+_PIPELINE_TIMEOUT_SEC = 180  # 5-agent pipeline; NASA + 4 LLM calls
+
+
 @router.post("/api/analyze", response_model=AnalysisResponse)
-@limiter.limit("5/minute")
+@limiter.limit("10/hour")
 async def analyze(
     request: Request,
     body: AnalyzeRequest,
     x_session_id: str | None = Header(None, alias="X-Session-ID")
 ) -> AnalysisResponse:
     """Run the full 4-agent CS pipeline and persist the result."""
-    if body.end_year <= body.start_year:
-        raise HTTPException(status_code=400, detail="end_year must be greater than start_year")
-
     logger.info(
         "POST /api/analyze: region=%r lat=%.4f lon=%.4f years=%d-%d session_id=%s",
         body.region_label or "(unnamed)",
@@ -49,15 +50,42 @@ async def analyze(
         x_session_id or "none",
     )
 
-    result = await run_analysis(
-        latitude=body.latitude,
-        longitude=body.longitude,
-        region_label=body.region_label,
-        start_year=body.start_year,
-        end_year=body.end_year,
-        sector=body.sector,
-        scenario=body.scenario,
-    )
+    try:
+        result = await asyncio.wait_for(
+            run_analysis(
+                latitude=body.latitude,
+                longitude=body.longitude,
+                region_label=body.region_label,
+                start_year=body.start_year,
+                end_year=body.end_year,
+                sector=body.sector,
+                scenario=body.scenario,
+            ),
+            timeout=_PIPELINE_TIMEOUT_SEC,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "Pipeline timeout after %ds: region=%r lat=%.4f lon=%.4f",
+            _PIPELINE_TIMEOUT_SEC,
+            body.region_label or "(unnamed)",
+            body.latitude,
+            body.longitude,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"Analysis timed out after {_PIPELINE_TIMEOUT_SEC}s. Please try again.",
+        )
+    except ValueError as exc:
+        logger.warning("Pipeline input error: %s", exc)
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        logger.exception(
+            "Pipeline failed: region=%r lat=%.4f lon=%.4f",
+            body.region_label or "(unnamed)",
+            body.latitude,
+            body.longitude,
+        )
+        raise HTTPException(status_code=500, detail="Analysis pipeline failed. Please try again.")
 
     try:
         await save_analysis(result, session_id=x_session_id)

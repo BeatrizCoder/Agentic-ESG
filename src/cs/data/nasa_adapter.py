@@ -105,7 +105,7 @@ async def fetch_climate_data(
     )
 
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             prepared = client.build_request("GET", NASA_POWER_BASE_URL, params=params)
             request_url = str(prepared.url)
             

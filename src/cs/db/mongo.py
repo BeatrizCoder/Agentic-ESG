@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 _MONGO_URL = os.getenv("MONGO_URL", "")
 
 if _MONGO_URL:
-    _client = AsyncIOMotorClient(_MONGO_URL)
+    _client = AsyncIOMotorClient(_MONGO_URL, maxPoolSize=10)
     db = _client["climate_sentinel"]
     analyses = db["analyses"]
     logger.info("MongoDB connected via MONGO_URL")

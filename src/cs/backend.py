@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.requests import Request
-from starlette.responses import FileResponse, Response
+from starlette.responses import FileResponse
 
 from .core.config import ALLOWED_ORIGINS, limiter
 from .api.routes import router
@@ -35,22 +35,6 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Session-ID"],
     expose_headers=["Content-Disposition"],
 )
-
-
-@app.middleware("http")
-async def _cors_preflight(request: Request, call_next):
-    origin = request.headers.get("origin")
-    response = await call_next(request)
-    response.headers["access-control-allow-origin"] = origin or "*"
-    response.headers["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS"
-    response.headers["access-control-allow-headers"] = "Content-Type, Authorization, X-Session-ID"
-    response.headers["access-control-expose-headers"] = "Content-Disposition"
-    if request.method == "OPTIONS":
-        headers = dict(response.headers)
-        headers.pop("content-length", None)
-        headers.pop("content-type", None)
-        return Response(status_code=204, headers=headers)
-    return response
 
 
 app.include_router(router)

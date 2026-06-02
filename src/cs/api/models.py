@@ -56,9 +56,7 @@ class AnalyzeRequest(BaseModel):
     @field_validator("latitude", "longitude")
     @classmethod
     def validate_coordinates(cls, v: float, info) -> float:
-        """Validate coordinate precision."""
-        if abs(v) > 180:
-            raise ValueError(f"{info.field_name} must be between -180 and 180")
+        """Validate coordinate precision (Field constraints are the primary guard)."""
         return round(v, 6)  # Limit to 6 decimal places (~0.1m precision)
 
     @model_validator(mode="after")
