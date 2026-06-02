@@ -82,6 +82,20 @@ After deployment, verify:
 
 ### MongoDB Connection Issues
 
+**Cross-Project MongoDB Connection:**
+
+If your MongoDB service is in a **different Railway project** than your backend:
+
+1. Go to your MongoDB service project
+2. Copy the `MONGO_PUBLIC_URL` value (format: `mongodb://mongo:password@yamanote.proxy.rlwy.net:32910`)
+3. In your backend service project → Variables:
+   - Set `MONGO_URL` = (paste the MONGO_PUBLIC_URL value)
+4. Railway will automatically redeploy
+
+**Note:** `mongodb.railway.internal` only works within the same project. For cross-project connections, always use the public proxy URL.
+
+**Same-Project MongoDB Connection:**
+
 If logs show `MONGO_URL not configured`:
 1. Verify MongoDB service is added to the project
 2. Check that MongoDB and backend are in the same project
