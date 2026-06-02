@@ -1056,8 +1056,8 @@
     .modal-accept-btn.ready:hover { background: var(--green2); box-shadow: 0 4px 12px rgba(58,107,53,0.4); }
     .modal-accept-btn.accepted { cursor: default; opacity: 1; background: var(--green); color: #fff; border-color: var(--green); }
 
-    /* Terms modal — explicit scroll area height so detection works reliably */
-    #terms-content {
+    /* Terms + Privacy modals — explicit scroll area height so detection works reliably */
+    #terms-content, #privacy-content {
       height: 50vh;
       min-height: 300px;
       overflow-y: scroll;
@@ -2483,7 +2483,7 @@ document.addEventListener('keydown', e => {
       </div>
       <button class="modal-close" onclick="closeModal('modal-privacy')" aria-label="Close">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" id="privacy-content">
 
       <div class="modal-section">
         <div class="modal-section-title">1. Data We Collect / Dados que Coletamos</div>
