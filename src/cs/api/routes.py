@@ -169,13 +169,16 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
         buffer = generate_pdf(row)
     except ImportError:
         raise HTTPException(status_code=503, detail="PDF export not available — install reportlab")
+    except Exception as exc:
+        logger.exception("PDF generation failed for %s", analysis_id)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
-    filename = f"crl_report_{analysis_id}.pdf"
+    filename = f"cs_report_{analysis_id}.pdf"
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "Access-Control-Expose-Headers": "Content-Disposition",
             "Cache-Control": "no-cache",
         },

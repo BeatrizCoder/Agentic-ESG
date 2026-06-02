@@ -1776,14 +1776,32 @@ function renderResults(data) {
 }
 
 /* ── PDF export ──────────────────────────────────────────────────────────── */
-function exportPdf() {
+async function exportPdf() {
+  console.log('exportPdf: currentId =', _currentId);
   if (!_currentId) return;
-  const a = document.createElement('a');
-  a.href     = `${API_BASE}/api/analyses/${_currentId}/export/pdf`;
-  a.download = `cs_report_${_currentId}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+
+  const btn = document.getElementById('t-export-pdf');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/pdf`);
+    if (!res.ok) throw new Error(`Server error ${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `cs_report_${_currentId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('PDF export failed:', err);
+    alert('PDF export failed: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
 }
 
 /* ── Investment status badge ─────────────────────────────────────────────── */
