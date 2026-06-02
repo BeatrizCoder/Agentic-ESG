@@ -1,4 +1,4 @@
-# Climate Sentinel — Agentic ESG Intelligence Platform
+# Climate Sentinel — Climate Risk Intelligence for ESG & Compliance
 
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
@@ -9,7 +9,9 @@
 
 ## Overview
 
-Climate Sentinel is an AI-powered platform that analyzes physical climate risks for any location on Earth and maps them to ESG compliance frameworks (CSRD, ISSB S2, EU Taxonomy). It combines 10+ years of real NASA satellite observations with IPCC climate projections to 2050, then uses a multi-agent AI pipeline to generate executive-ready risk assessments with actionable recommendations.
+Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Climate Sentinel delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.03 per location — powered by real NASA satellite data and IPCC projections to 2050.
+
+> **Maps physical climate risk to CSRD ESRS E1, ISSB S2, and EU Taxonomy — translating satellite data into compliance-ready business intelligence.**
 
 **Built for:** ESG analysts, sustainability officers, investment managers, and compliance teams who need fast, data-driven climate risk intelligence.
 
@@ -24,7 +26,7 @@ Organizations face mounting pressure to assess and disclose physical climate ris
 - **EU Taxonomy** — Investment screening requires climate risk evaluation for sustainable finance classification
 - **Traditional assessments** — Manual climate risk analysis costs $5,000-$50,000 and takes weeks
 
-Climate Sentinel delivers institutional-grade analysis in under 30 seconds for ~$0.03 per location.
+Climate Sentinel delivers executive-ready climate risk assessment in under 30 seconds for ~$0.03 per location.
 
 ---
 
@@ -67,10 +69,9 @@ Location Input (lat/lon)
 └───────────────────────────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────────────────────────┐
-│ Agent 5: Quality Judge (Claude Sonnet 4.6)               │
-│   • Cross-validates data accuracy                         │
-│   • Checks regulation mapping correctness                 │
-│   • Verifies risk score logic                             │
+│ Agent 5: Validation Layer (Claude Sonnet 4.6)            │
+│   • Validates output coherence                            │
+│   • Flags inconsistencies across agent outputs            │
 │   • Assigns confidence score (0-100)                      │
 └───────────────────────────────────────────────────────────┘
         ↓
@@ -99,7 +100,7 @@ Location Input (lat/lon)
 | **Climate Analyst** | Claude Haiku 4.5 | Detects trends and anomalies | Risk levels, key findings, data quality |
 | **ESG Strategist** | Claude Sonnet 4.6 | Maps risks to compliance frameworks | CSRD/ISSB/Taxonomy exposure + urgency |
 | **Report Writer** | Claude Sonnet 4.6 | Generates executive report | Risk score, summary, recommendations |
-| **Quality Judge** | Claude Sonnet 4.6 | Validates output accuracy | Confidence score, issues, strengths |
+| **Validation Layer** | Claude Sonnet 4.6 | Validates output coherence, flags inconsistencies | Confidence score (0-100) |
 
 ---
 
@@ -166,9 +167,23 @@ Location Input (lat/lon)
 - **Domain:** Custom domain via Railway
 
 ### Development Tools
-- **AI Pair Programming:** Claude Code (Anthropic) + IBM Bob
+- **Development Tools:** Built with Claude Code (Anthropic) for initial architecture and IBM Bob for deployment, documentation, and optimizations.
 - **Version Control:** Git + GitHub
 - **Environment:** WSL2 Ubuntu on Windows 11
+
+---
+
+## Auditability & Transparency
+
+Climate Sentinel is designed for auditability:
+
+- **Data provenance:** NASA endpoint URL + OpenMeteo model identifier logged per analysis
+- **Timestamp:** Exact analysis datetime recorded and stored
+- **Agent execution trace:** Per-agent token consumption visible in the Data Sources tab
+- **Confidence score:** Validation layer scores each output 0–100, flags inconsistencies
+- **Session isolation:** Anonymous 24h TTL session cookies, LGPD compliant
+
+All provenance data visible in the **Data Sources** tab of every analysis report.
 
 ---
 
@@ -182,7 +197,7 @@ Location Input (lat/lon)
 | Climate Analyst | Haiku 4.5 | ~800 | $0.002 |
 | ESG Strategist | Sonnet 4.6 | ~1,200 | $0.009 |
 | Report Writer | Sonnet 4.6 | ~1,500 | $0.012 |
-| Quality Judge | Sonnet 4.6 | ~1,000 | $0.008 |
+| Validation Layer | Sonnet 4.6 | ~1,000 | $0.008 |
 | **Total** | | **~4,500** | **~$0.031** |
 
 *Costs based on Anthropic pricing: Haiku $0.25/$1.25 per MTok (in/out), Sonnet $3/$15 per MTok (in/out)*
