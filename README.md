@@ -136,6 +136,9 @@ Location Input (lat/lon)
 - **Quantified Requirements** — Hectares, carbon sequestration potential, biodiversity impact
 - **Regional Adaptation** — Tailored to local ecosystem and climate conditions
 
+### Responsible AI
+- **Human-in-the-Loop Flag** — Validation Layer automatically recommends expert review when confidence indicators fall below threshold, ensuring AI outputs are not used uncritically in high-stakes compliance decisions.
+
 ### User Experience
 - **Session History** — MongoDB-backed analysis storage with cookie consent (LGPD compliant)
 - **Dark/Light Theme** — Automatic system preference detection + manual toggle

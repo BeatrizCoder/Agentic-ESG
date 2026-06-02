@@ -599,6 +599,35 @@
     .confidence-dot.medium { background: #c4ae3a; }
     .confidence-dot.low    { background: #c46a2a; }
 
+    .hitl-flag {
+      display: flex;
+      gap: .75rem;
+      background: rgba(184,134,11,0.08);
+      border: 1px solid rgba(184,134,11,0.25);
+      border-left: 3px solid var(--risk-med);
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      margin-top: .75rem;
+    }
+    .hitl-icon { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
+    .hitl-title {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--risk-med);
+      margin-bottom: .2rem;
+    }
+    .hitl-desc {
+      font-size: .72rem;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+    .hitl-reason {
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      color: var(--muted);
+      margin-top: .3rem;
+    }
+
     .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
     .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .5rem .65rem; }
     .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
@@ -1303,6 +1332,14 @@
           <span class="confidence-label">Analysis confidence</span>
           <span class="confidence-badge" id="confidence-badge">—</span>
         </div>
+        <div class="hitl-flag" id="hitl-flag" style="display:none">
+          <span class="hitl-icon">⚠️</span>
+          <div>
+            <div class="hitl-title">Human Review Recommended</div>
+            <div class="hitl-desc">This analysis contains indicators that warrant expert validation before use in regulatory filings or investment decisions.</div>
+            <div class="hitl-reason" id="hitl-reason">—</div>
+          </div>
+        </div>
         <div class="score-meta-grid">
           <div class="score-meta-item">
             <div class="score-meta-label" id="t-temp-delta">Temperature Change</div>
@@ -1914,6 +1951,9 @@ function renderResults(data) {
   /* confidence badge */
   renderConfidence(data.confidence_score, data.quality_evaluation);
 
+  /* HITL flag */
+  renderHitlFlag(data.hitl_required, data.hitl_reasons);
+
   /* offset targets */
   renderOffsetTargets(data.offset_targets);
 
@@ -2186,6 +2226,18 @@ function renderConfidence(score, qe) {
   badge.className   = `confidence-badge ${tier}`;
   dot.className     = `confidence-dot ${tier}`;
   row.style.display = 'flex';
+}
+
+/* ── HITL flag ───────────────────────────────────────────────────────────── */
+function renderHitlFlag(required, reasons) {
+  const flag   = document.getElementById('hitl-flag');
+  const reason = document.getElementById('hitl-reason');
+  if (required) {
+    flag.style.display = 'flex';
+    reason.textContent = (reasons && reasons.length) ? reasons.join(' · ') : '';
+  } else {
+    flag.style.display = 'none';
+  }
 }
 
 /* ── Tab switching ───────────────────────────────────────────────────────── */

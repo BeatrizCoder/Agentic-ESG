@@ -121,6 +121,8 @@ class AnalysisResponse(BaseModel):
     pipeline_duration_sec: float
     created_at: str
     error: str = ""
+    hitl_required: bool = False
+    hitl_reasons: list[str] = []
 
 
 class AnalysisSummary(BaseModel):

@@ -87,6 +87,8 @@ async def analyze(
         pipeline_duration_sec=result.pipeline_duration_sec,
         created_at=result.created_at,
         error=result.error,
+        hitl_required=result.hitl_required,
+        hitl_reasons=result.hitl_reasons,
     )
 
 

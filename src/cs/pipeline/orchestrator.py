@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import statistics
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -67,6 +68,67 @@ class AnalysisResult:
     offset_targets: list[dict[str, Any]] = field(default_factory=list)
     sector: str = "General"
     error: str = ""
+    hitl_required: bool = False
+    hitl_reasons: list[str] = field(default_factory=list)
+
+
+def _compute_hitl_flag(
+    confidence_score: int,
+    quality_evaluation: dict,
+    risk_score: int,
+    annual_records: list[dict],
+    climate_findings: dict,
+) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+
+    if confidence_score < 70:
+        reasons.append(f"Confidence score below threshold ({confidence_score}%)")
+
+    verdict = quality_evaluation.get("verdict", "")
+    if verdict in ("flagged", "needs_review"):
+        reasons.append(f"Validation Layer verdict: {verdict.replace('_', ' ')}")
+
+    if risk_score > 90 and confidence_score < 80:
+        reasons.append(f"Critical risk score ({risk_score}) with insufficient confidence ({confidence_score}%)")
+
+    nasa_recs = [r for r in annual_records if r.get("source") == "nasa"]
+    if nasa_recs:
+        missing = sum(
+            1 for r in nasa_recs
+            if not (r.get("temp_mean_celsius") or r.get("temp_mean_c"))
+        )
+        if missing > len(nasa_recs) * 0.3:
+            reasons.append(f"Data quality: {missing}/{len(nasa_recs)} NASA years missing temperature values")
+    if climate_findings.get("data_quality") == "poor" and not any("Data quality" in r for r in reasons):
+        reasons.append("Data quality rated poor by Climate Analyst")
+
+    temps = [
+        r.get("temp_mean_celsius") or r.get("temp_mean_c")
+        for r in nasa_recs
+        if r.get("temp_mean_celsius") or r.get("temp_mean_c")
+    ]
+    if len(temps) >= 3:
+        mean_t = statistics.mean(temps)
+        stdev_t = statistics.stdev(temps)
+        if stdev_t > 0:
+            for r in nasa_recs:
+                t = r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0
+                if t and abs(t - mean_t) > 3 * stdev_t:
+                    reasons.append(f"Extreme temperature anomaly in {r['year']} ({t:.1f}°C, >3σ from mean)")
+                    break
+
+    precips = [r.get("precip_total_mm") for r in nasa_recs if r.get("precip_total_mm")]
+    if len(precips) >= 3:
+        mean_p = statistics.mean(precips)
+        stdev_p = statistics.stdev(precips)
+        if stdev_p > 0:
+            for r in nasa_recs:
+                p = r.get("precip_total_mm") or 0
+                if p and abs(p - mean_p) > 3 * stdev_p:
+                    reasons.append(f"Extreme precipitation anomaly in {r['year']} ({p:.0f}mm, >3σ from mean)")
+                    break
+
+    return bool(reasons), reasons
 
 
 async def run_analysis(
@@ -261,6 +323,15 @@ async def run_analysis(
         tokens_judge.get("total_tokens"),
     )
 
+    hitl_required, hitl_reasons = _compute_hitl_flag(
+        confidence_score=confidence_score,
+        quality_evaluation=quality_evaluation,
+        risk_score=report.get("risk_score", 0),
+        annual_records=unified_records,
+        climate_findings=climate_findings,
+    )
+    logger.info("HITL flag: required=%s reasons=%s", hitl_required, hitl_reasons)
+
     total_llm_tokens = (
         tokens_analyst.get("total_tokens", 0)
         + tokens_strategist.get("total_tokens", 0)
@@ -335,6 +406,8 @@ async def run_analysis(
         quality_evaluation=quality_evaluation,
         offset_targets=report.get("offset_targets", []),
         sector=sector,
+        hitl_required=hitl_required,
+        hitl_reasons=hitl_reasons,
         openmeteo_data={
             "used":               needs_projection,
             "projection_url":     om_result.projection_url,
