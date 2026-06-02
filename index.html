@@ -1198,6 +1198,67 @@
       padding: 1.5rem 0;
     }
 
+    /* ── AI Transparency panel ───────────────────────────────────────────── */
+    .transparency-panel {
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .tp-title {
+      font-size: .65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--green); margin-bottom: .5rem;
+    }
+    .tp-subtitle {
+      font-size: .7rem; color: var(--muted);
+      font-style: italic; margin-bottom: .5rem;
+    }
+    .factor-row {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .4rem 0; border-top: 0.5px solid var(--border);
+      font-size: .78rem;
+    }
+    .factor-label { flex: 1; color: var(--text2); }
+    .factor-bar-bg {
+      width: 80px; height: 6px;
+      background: var(--bg2); border-radius: 3px; overflow: hidden; flex-shrink: 0;
+    }
+    .factor-bar-fill { height: 100%; border-radius: 3px; }
+    .factor-impact {
+      font-size: .65rem; font-family: 'DM Mono', monospace;
+      color: var(--muted); width: 90px; text-align: right; flex-shrink: 0;
+    }
+    .reasoning-step {
+      padding: .65rem 0; border-top: 0.5px solid var(--border);
+    }
+    .reasoning-agent {
+      font-weight: 600; color: var(--green); margin-bottom: .3rem;
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .reasoning-received {
+      color: var(--muted); font-size: .72rem; margin: .2rem 0;
+    }
+    .reasoning-finding {
+      color: var(--text); font-size: .78rem;
+      padding-left: .75rem; border-left: 2px solid var(--green);
+      margin: .3rem 0; line-height: 1.45;
+    }
+    .audit-row {
+      display: flex; align-items: flex-start; gap: .5rem;
+      padding: .4rem 0; border-top: 0.5px solid var(--border);
+      font-size: .78rem; color: var(--text2); line-height: 1.4;
+    }
+    .audit-icon { flex-shrink: 0; font-size: .9rem; margin-top: .05rem; }
+    .eu-ai-badge {
+      font-size: .55rem; background: rgba(109,184,74,0.12);
+      border: 0.5px solid rgba(109,184,74,0.3); color: var(--green);
+      border-radius: 4px; padding: .1rem .4rem; margin-left: .5rem;
+      letter-spacing: .06em; font-weight: 600; vertical-align: middle;
+      white-space: nowrap;
+    }
+
     /* Terms + Privacy modals — explicit scroll area height so detection works reliably */
     #terms-content, #privacy-content {
       height: 50vh;
@@ -1473,7 +1534,7 @@
     <!-- Tab bar -->
     <div class="tab-bar">
       <button class="tab-btn active" id="tab-btn-overview"   onclick="switchTab('overview')"    id="t-tab-overview">Overview</button>
-      <button class="tab-btn"        id="tab-btn-datasources" onclick="switchTab('datasources')" id="t-tab-datasources">Data Sources</button>
+      <button class="tab-btn"        id="tab-btn-datasources" onclick="switchTab('datasources')">Data &amp; Transparency</button>
     </div>
 
     <!-- Tab: Overview -->
@@ -1680,6 +1741,32 @@
           </thead>
           <tbody id="ds-agent-tbody"></tbody>
         </table>
+      </div>
+
+      <!-- AI Transparency -->
+      <div class="ds-section" id="ds-transparency-section" style="display:none">
+        <div class="ds-section-title">
+          AI Reasoning Transparency
+          <span class="eu-ai-badge">EU AI Act Art. 13 · Transparency</span>
+        </div>
+
+        <div class="transparency-panel">
+          <div class="tp-title">Risk Score Composition</div>
+          <div class="tp-subtitle">Factors weighted by impact on final score</div>
+          <div id="tp-factors"></div>
+        </div>
+
+        <div class="transparency-panel">
+          <div class="tp-title">Agent Reasoning Chain</div>
+          <div class="tp-subtitle">What each AI agent received and concluded</div>
+          <div id="tp-reasoning"></div>
+        </div>
+
+        <div class="transparency-panel">
+          <div class="tp-title">Validation Layer Audit</div>
+          <div class="tp-subtitle">Quality Judge evaluation · LLM-as-Judge technique</div>
+          <div id="tp-audit"></div>
+        </div>
       </div>
 
     </div><!-- #tab-datasources -->
@@ -2253,9 +2340,10 @@ function renderResults(data) {
   /* light mode score-card accent border */
   _updateScoreCardRiskClass();
 
-  /* data sources tab (includes double materiality) */
+  /* data sources tab (includes double materiality + transparency) */
   renderDataSources(data);
   renderDoubleMateriality(data.compliance_mapping);
+  renderTransparency(data.transparency);
 
   /* show panels — always land on Overview */
   switchTab('overview');
@@ -2376,6 +2464,73 @@ function renderDoubleMateriality(complianceMapping) {
   mkImpacts(dm.impact_risks,     'dm-impact-impacts');
 
   section.style.display = '';
+}
+
+/* ── AI Transparency ─────────────────────────────────────────────────────── */
+function renderTransparency(t) {
+  const section = document.getElementById('ds-transparency-section');
+  if (!t || !section) return;
+  section.style.display = '';
+
+  const IMP_COLOR = {
+    high:   'var(--risk-high)',
+    medium: 'var(--risk-med)',
+    low:    'var(--risk-low)',
+  };
+
+  /* Panel 1 — Score factors */
+  document.getElementById('tp-factors').innerHTML =
+    (t.score_factors || []).map(f => {
+      const pct   = Math.round((f.weight || 0) * 100);
+      const color = IMP_COLOR[f.impact] || 'var(--green)';
+      return `<div class="factor-row">
+        <span class="factor-label">${f.factor}</span>
+        <div class="factor-bar-bg"><div class="factor-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="factor-impact" style="color:${color}">${f.value || ''}</span>
+      </div>`;
+    }).join('') || '<div style="color:var(--muted);font-size:.75rem;padding:.5rem 0">No factor data available.</div>';
+
+  /* Panel 2 — Reasoning chain */
+  document.getElementById('tp-reasoning').innerHTML =
+    (t.reasoning_chain || []).map(step => {
+      const lines = [];
+      if (step.received)        lines.push(`<div class="reasoning-received">↳ Received: ${step.received}</div>`);
+      if (step.key_finding)     lines.push(`<div class="reasoning-finding">${step.key_finding}</div>`);
+      if (step.anomaly)         lines.push(`<div class="reasoning-finding">${step.anomaly}</div>`);
+      if (step.key_mapping)     lines.push(`<div class="reasoning-finding">${step.key_mapping}</div>`);
+      if (step.urgency)         lines.push(`<div class="reasoning-received">Compliance urgency: <b>${step.urgency}</b></div>`);
+      if (step.risk_score != null) lines.push(`<div class="reasoning-finding">Generated risk score: <b>${step.risk_score}/100</b></div>`);
+      if (step.score_rationale) lines.push(`<div class="reasoning-received">${step.score_rationale}</div>`);
+      return `<div class="reasoning-step">
+        <div class="reasoning-agent">Agent ${step.step || ''} — ${step.agent}
+          <span style="font-weight:400;color:var(--muted);font-size:.6rem;text-transform:none">(${step.model || ''})</span>
+        </div>
+        ${lines.join('')}
+      </div>`;
+    }).join('');
+
+  /* Panel 3 — Validation audit */
+  const audit        = t.validation_audit || {};
+  const VCLR         = { validated: 'var(--risk-low)', needs_review: 'var(--risk-med)', flagged: 'var(--risk-high)' };
+  const verdictColor = VCLR[audit.verdict] || 'var(--muted)';
+
+  let html = '';
+  (audit.checks_passed || []).forEach(c => {
+    html += `<div class="audit-row"><span class="audit-icon" style="color:var(--risk-low)">✓</span><span>${c}</span></div>`;
+  });
+  (audit.flags || []).forEach(f => {
+    html += `<div class="audit-row"><span class="audit-icon" style="color:var(--risk-med)">⚠</span><span>${f}</span></div>`;
+  });
+  if (audit.verdict) {
+    html += `<div class="audit-row"><span class="audit-icon">→</span>
+      <span>Verdict: <b style="color:${verdictColor}">${audit.verdict.replace(/_/g,' ').toUpperCase()}</b>
+      &nbsp;<span style="color:var(--muted);font-size:.7rem">(confidence: ${audit.confidence || 0}%)</span></span></div>`;
+  }
+  if (audit.recommendation) {
+    html += `<div class="audit-row"><span class="audit-icon">→</span><span>${audit.recommendation}</span></div>`;
+  }
+  document.getElementById('tp-audit').innerHTML = html ||
+    '<div style="color:var(--muted);font-size:.75rem;padding:.5rem 0">Audit data not available.</div>';
 }
 
 /* ── Projection chart ────────────────────────────────────────────────────── */

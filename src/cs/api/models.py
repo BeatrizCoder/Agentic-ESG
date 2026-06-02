@@ -121,6 +121,7 @@ class AnalysisResponse(BaseModel):
     error: str = ""
     hitl_required: bool = False
     hitl_reasons: list[str] = []
+    transparency: dict[str, Any] = {}
 
 
 class AnalysisSummary(BaseModel):

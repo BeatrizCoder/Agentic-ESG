@@ -117,6 +117,7 @@ async def analyze(
         error=result.error,
         hitl_required=result.hitl_required,
         hitl_reasons=result.hitl_reasons,
+        transparency=result.transparency,
     )
 
 

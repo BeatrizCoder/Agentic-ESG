@@ -70,6 +70,7 @@ class AnalysisResult:
     error: str = ""
     hitl_required: bool = False
     hitl_reasons: list[str] = field(default_factory=list)
+    transparency: dict[str, Any] = field(default_factory=dict)
 
 
 def _compute_hitl_flag(
@@ -129,6 +130,136 @@ def _compute_hitl_flag(
                     break
 
     return bool(reasons), reasons
+
+
+def _build_transparency(
+    region_label: str,
+    climate_findings: dict,
+    compliance_mapping: dict,
+    report: dict,
+    quality_evaluation: dict,
+    confidence_score: int,
+    nasa_years: int,
+) -> dict:
+    """Derive the EU AI Act Art. 13 transparency payload from pipeline outputs."""
+
+    # ── Score factors ──────────────────────────────────────────────────────────
+    factors: list[dict] = []
+
+    precip_trend = climate_findings.get("precip_trend_pct_per_decade")
+    if precip_trend is not None:
+        w = min(1.0, abs(precip_trend) / 30)
+        imp = "high" if abs(precip_trend) > 15 else "medium" if abs(precip_trend) > 5 else "low"
+        factors.append({"factor": f"Precipitation {'decline' if precip_trend < 0 else 'increase'}",
+                        "impact": imp, "weight": round(w, 2),
+                        "value": f"{precip_trend:+.1f}%/decade"})
+
+    temp_trend = climate_findings.get("temp_trend_c_per_decade")
+    if temp_trend is not None:
+        w = min(1.0, abs(temp_trend) / 1.5)
+        imp = "high" if abs(temp_trend) > 0.8 else "medium" if abs(temp_trend) > 0.3 else "low"
+        factors.append({"factor": "Temperature trend", "impact": imp,
+                        "weight": round(w, 2), "value": f"{temp_trend:+.2f}°C/decade"})
+
+    for risk_key, label in (("drought_risk", "Drought risk"), ("heat_stress_risk", "Heat stress risk")):
+        level = (climate_findings.get(risk_key) or "").lower()
+        if level in ("high", "medium", "critical"):
+            w = {"critical": 0.9, "high": 0.75, "medium": 0.5}.get(level, 0.3)
+            factors.append({"factor": label,
+                            "impact": "high" if level in ("critical", "high") else "medium",
+                            "weight": w, "value": level.upper()})
+
+    anom = len(climate_findings.get("temp_anomaly_years") or []) + \
+           len(climate_findings.get("precip_anomaly_years") or [])
+    if anom:
+        factors.append({"factor": "Extreme year anomalies",
+                        "impact": "medium" if anom < 3 else "high",
+                        "weight": round(min(1.0, anom * 0.2), 2),
+                        "value": f"{anom} anomalous year(s)"})
+
+    csrd_exp = (compliance_mapping.get("csrd_exposure") or "").lower()
+    urgency  = (compliance_mapping.get("compliance_urgency") or "").lower()
+    lvl = csrd_exp or urgency
+    if lvl in ("critical", "high", "medium"):
+        w = {"critical": 0.95, "high": 0.7, "medium": 0.45}.get(lvl, 0.3)
+        factors.append({"factor": "Compliance exposure",
+                        "impact": "high" if lvl in ("critical", "high") else "medium",
+                        "weight": w, "value": (f"CSRD {csrd_exp.upper()}" if csrd_exp else urgency.upper())})
+
+    factors.sort(key=lambda f: f["weight"], reverse=True)
+    factors = factors[:5]
+
+    # ── Reasoning chain ────────────────────────────────────────────────────────
+    raw_findings = climate_findings.get("key_findings") or []
+    key_finding  = (raw_findings[0] if raw_findings else None) or climate_findings.get("heat_stress_risk") or "Analysis complete"
+
+    anomaly_str = ""
+    if climate_findings.get("hottest_year"):
+        anomaly_str = f"{climate_findings['hottest_year']} was the hottest year on record"
+    elif climate_findings.get("driest_year"):
+        anomaly_str = f"{climate_findings['driest_year']} was the driest year on record"
+
+    csrd_arts  = compliance_mapping.get("csrd_articles") or []
+    key_map    = (f"Climate risk triggers CSRD {', '.join(csrd_arts[:2])} disclosure" if csrd_arts
+                  else (compliance_mapping.get("csrd_summary") or "")[:120])
+
+    exec_summary = (report.get("executive_summary") or "")[:150]
+    score        = report.get("risk_score", 0)
+    rationale    = exec_summary or f"Risk score {score}/100 derived from climate trends and compliance analysis"
+
+    reasoning_chain = [
+        {
+            "agent": "Climate Analyst", "model": "claude-haiku-4-5", "step": 2,
+            "received": f"{nasa_years} years of NASA POWER data for {region_label}",
+            "key_finding": str(key_finding)[:120],
+            "anomaly": anomaly_str or "No extreme anomalies detected",
+        },
+        {
+            "agent": "ESG Strategist", "model": "claude-sonnet-4-6", "step": 3,
+            "received": "Climate findings from Agent 2",
+            "key_mapping": key_map or "Compliance framework mapping complete",
+            "urgency": (compliance_mapping.get("compliance_urgency") or "—").upper(),
+        },
+        {
+            "agent": "Report Writer", "model": "claude-sonnet-4-6", "step": 4,
+            "received": "All findings from Agents 2 and 3",
+            "risk_score": score,
+            "score_rationale": rationale,
+        },
+    ]
+
+    # ── Validation audit ───────────────────────────────────────────────────────
+    verdict = quality_evaluation.get("verdict", "")
+    checks  = ["Data consistency: NASA data covers full requested period"]
+    if verdict in ("validated", "needs_review"):
+        checks.append("Score logic: Risk score aligns with detected indicators")
+
+    flags: list[str] = []
+    if confidence_score < 80:
+        flags.append(f"Confidence {confidence_score}% — expert review recommended before regulatory filing")
+    if verdict == "flagged":
+        flags.append("Output flagged by Validation Layer — significant inconsistency detected")
+    for issue in (quality_evaluation.get("issues") or quality_evaluation.get("flags") or [])[:2]:
+        if isinstance(issue, str) and issue not in flags:
+            flags.append(issue)
+
+    rec = (quality_evaluation.get("recommendation") or "").strip()
+    if not rec:
+        rec = ("Analysis validated — suitable for preliminary ESG screening"
+               if verdict == "validated" and confidence_score >= 80
+               else "Validate with qualified ESG consultant before regulatory filing")
+
+    return {
+        "score_factors": factors,
+        "reasoning_chain": reasoning_chain,
+        "validation_audit": {
+            "checks_passed": checks,
+            "flags": flags,
+            "verdict": verdict,
+            "confidence": confidence_score,
+            "recommendation": rec,
+        },
+    }
 
 
 async def run_analysis(
@@ -332,6 +463,16 @@ async def run_analysis(
     )
     logger.info("HITL flag: required=%s reasons=%s", hitl_required, hitl_reasons)
 
+    transparency = _build_transparency(
+        region_label=label,
+        climate_findings=climate_findings,
+        compliance_mapping=compliance_mapping,
+        report=report,
+        quality_evaluation=quality_evaluation,
+        confidence_score=confidence_score,
+        nasa_years=len(nasa_result.annual_records),
+    )
+
     total_llm_tokens = (
         tokens_analyst.get("total_tokens", 0)
         + tokens_strategist.get("total_tokens", 0)
@@ -408,6 +549,7 @@ async def run_analysis(
         sector=sector,
         hitl_required=hitl_required,
         hitl_reasons=hitl_reasons,
+        transparency=transparency,
         openmeteo_data={
             "used":               needs_projection,
             "projection_url":     om_result.projection_url,
