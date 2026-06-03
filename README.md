@@ -7,7 +7,7 @@
 
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
-🌐 **Live Demo:** [Coming Soon]
+🌐 **Live Demo:** [climate-sentinel-production.up.railway.app](https://climate-sentinel-production.up.railway.app/)
 📦 **GitHub:** https://github.com/BeatrizCoder/climate-sentinel
 
 ---
