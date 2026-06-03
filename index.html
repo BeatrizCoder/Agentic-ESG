@@ -3745,52 +3745,56 @@ async function runBatchAnalysis() {
 
   runBtn.disabled = true;
   progress.classList.add('visible');
-  progressTxt.textContent = 'Uploading CSV and starting pipeline…';
+  progressTxt.textContent = 'Uploading CSV…';
   resultsEl.classList.remove('visible');
   _batchResults = null;
 
-  // Count data rows client-side for progress display
-  let rowCount = 0;
-  try {
-    const text = await fileInput.files[0].text();
-    const lines = text.trim().split('\n').filter(l => l.trim());
-    rowCount = Math.max(0, lines.length - 1); // subtract header row
-  } catch (_) { /* ignore — progress just won't count */ }
-
   const formData = new FormData();
   formData.append('file', fileInput.files[0]);
-
   const headers = {};
   if (COOKIES_ACCEPTED && SESSION_ID) headers['X-Session-ID'] = SESSION_ID;
 
-  // Simulate per-row progress (backend processes ~2s/region)
-  let progressCounter = 0;
-  const progressInterval = rowCount > 0 ? setInterval(() => {
-    if (progressCounter < rowCount) {
-      progressCounter++;
-      progressTxt.textContent = `Analyzing ${progressCounter}/${rowCount} regions…`;
-    }
-  }, 2400) : null;
+  let pollInterval = null;
 
   try {
-    const resp = await fetch(`${API_BASE}/api/analyze/batch`, {
-      method: 'POST',
-      headers,
-      body: formData,
+    // Start the async job
+    const startResp = await fetch(`${API_BASE}/api/analyze/batch`, {
+      method: 'POST', headers, body: formData,
+    });
+    if (!startResp.ok) {
+      const err = await startResp.json().catch(() => ({ detail: startResp.statusText }));
+      throw new Error(err.detail || `HTTP ${startResp.status}`);
+    }
+    const { job_id, total } = await startResp.json();
+    progressTxt.textContent = `Starting analysis of ${total} region${total > 1 ? 's' : ''}…`;
+
+    // Poll every 5 seconds for status
+    await new Promise((resolve, reject) => {
+      pollInterval = setInterval(async () => {
+        try {
+          const statusResp = await fetch(`${API_BASE}/api/analyze/batch/${job_id}`);
+          if (!statusResp.ok) { clearInterval(pollInterval); reject(new Error('Polling failed')); return; }
+          const job = await statusResp.json();
+
+          progressTxt.textContent = `Analyzing ${job.completed}/${job.total} regions…`;
+
+          if (job.status === 'completed') {
+            clearInterval(pollInterval);
+            _batchResults = job;
+            _renderBatchResults(job);
+            resolve();
+          }
+        } catch (e) {
+          clearInterval(pollInterval);
+          reject(e);
+        }
+      }, 5000);
     });
 
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error(err.detail || `HTTP ${resp.status}`);
-    }
-
-    const data = await resp.json();
-    _batchResults = data;
-    _renderBatchResults(data);
   } catch (err) {
+    if (pollInterval) clearInterval(pollInterval);
     alert('Batch analysis failed: ' + err.message);
   } finally {
-    if (progressInterval) clearInterval(progressInterval);
     runBtn.disabled = false;
     progress.classList.remove('visible');
   }
@@ -4174,7 +4178,7 @@ async function viewBatchReport(analysisId) {
 
       <!-- Notices -->
       <p style="font-size:.72rem;color:var(--muted)">
-        ⚠ Max 5 regions · Max 1 MB · Each region takes ~2 min (5-agent pipeline)
+        ⚠ Max 10 regions · Max 1 MB · Each region takes ~2 min · Results appear as they complete
       </p>
       <p style="font-size:.72rem;color:var(--text2)">
         Required columns: <strong>region · latitude · longitude</strong>

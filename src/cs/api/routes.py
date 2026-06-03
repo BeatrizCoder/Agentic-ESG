@@ -4,9 +4,10 @@ import asyncio
 import csv
 import io
 import logging
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, File, HTTPException, Request, Header, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, Header, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..core.config import limiter
@@ -218,15 +219,26 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
     )
 
 
-_BATCH_MAX_ROWS = 5
-_BATCH_MAX_FILE_BYTES = 500_000  # 500 KB
+_BATCH_MAX_ROWS = 10
+_BATCH_MAX_FILE_BYTES = 1_000_000  # 1 MB
 _BATCH_REQUIRED_COLS = {"region", "latitude", "longitude"}
 _BATCH_TEMPLATE_CSV = (
     "region,latitude,longitude,sector,scenario\n"
     "São Paulo Brazil,-23.5505,-46.6333,General,SSP2-4.5\n"
     "Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5\n"
     "Berlin Germany,52.5200,13.4050,General,SSP1-2.6\n"
+    "Amsterdam Netherlands,52.3676,4.9041,General,SSP1-2.6\n"
+    "Lagos Nigeria,6.5244,3.3792,General,SSP5-8.5\n"
+    "Mumbai India,19.0760,72.8777,General,SSP2-4.5\n"
+    "Sydney Australia,-33.8688,151.2093,General,SSP1-2.6\n"
+    "Buenos Aires Argentina,-34.6037,-58.3816,General,SSP2-4.5\n"
+    "Helsinki Finland,60.1699,24.9384,General,SSP1-2.6\n"
+    "Dubai UAE,25.2048,55.2708,General,SSP5-8.5\n"
 )
+
+# In-memory job store for async batch processing.
+# Note: single-instance only — use Redis for multi-instance deployments.
+_batch_jobs: dict[str, dict] = {}
 
 
 def _inv_label(score: int) -> str:
@@ -248,17 +260,18 @@ async def batch_template() -> StreamingResponse:
     )
 
 
-@router.post("/api/analyze/batch", response_model=BatchAnalysisResponse)
+@router.post("/api/analyze/batch")
 @limiter.limit("3/hour")
-async def analyze_batch(
+async def start_batch(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     x_session_id: str | None = Header(None, alias="X-Session-ID"),
-) -> BatchAnalysisResponse:
-    """Process a CSV file of regions and run climate analysis on each row sequentially."""
+) -> dict:
+    """Start an async batch job. Returns job_id for polling."""
     content = await file.read()
     if len(content) > _BATCH_MAX_FILE_BYTES:
-        raise HTTPException(status_code=413, detail="File too large. Maximum 500 KB.")
+        raise HTTPException(status_code=413, detail="File too large. Maximum 1 MB.")
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -284,16 +297,33 @@ async def analyze_batch(
     if len(rows) > _BATCH_MAX_ROWS:
         raise HTTPException(
             status_code=400,
-            detail=f"Maximum {_BATCH_MAX_ROWS} rows allowed. CSV has {len(rows)} rows.",
+            detail=(
+                f"Maximum {_BATCH_MAX_ROWS} regions per batch. "
+                f"Your CSV has {len(rows)} rows. "
+                f"Please reduce to {_BATCH_MAX_ROWS} or fewer and try again. "
+                f"/ Máximo {_BATCH_MAX_ROWS} regiões por lote. Seu CSV tem {len(rows)} linhas."
+            ),
         )
 
-    results: list[BatchRowResult] = []
-    completed = 0
-    failed = 0
+    job_id = str(uuid.uuid4())
+    _batch_jobs[job_id] = {
+        "status": "running",
+        "total": len(rows),
+        "completed": 0,
+        "failed": 0,
+        "results": [],
+    }
 
+    background_tasks.add_task(_process_batch, job_id, rows, x_session_id)
+    logger.info("Batch job %s started: %d rows", job_id, len(rows))
+    return {"job_id": job_id, "total": len(rows)}
+
+
+async def _process_batch(job_id: str, rows: list, session_id: str | None) -> None:
+    job = _batch_jobs[job_id]
     for i, row in enumerate(rows):
-        region  = (row.get("region") or "").strip()
-        sector  = (row.get("sector") or "General").strip() or "General"
+        region   = (row.get("region") or "").strip()
+        sector   = (row.get("sector") or "General").strip() or "General"
         scenario = (row.get("scenario") or "SSP2-4.5").strip()
         if scenario not in ("SSP1-2.6", "SSP2-4.5", "SSP5-8.5"):
             scenario = "SSP2-4.5"
@@ -302,64 +332,70 @@ async def analyze_batch(
             lat = float(row.get("latitude") or 0)
             lon = float(row.get("longitude") or 0)
         except (ValueError, TypeError):
-            results.append(BatchRowResult(
-                region=region, sector=sector, scenario=scenario,
-                status="error", error="Invalid latitude or longitude value",
-            ))
-            failed += 1
+            job["results"].append({
+                "region": region, "latitude": 0.0, "longitude": 0.0,
+                "sector": sector, "scenario": scenario,
+                "risk_score": 0, "risk_level": "", "investment_status": "",
+                "confidence_score": 0, "analysis_id": "",
+                "status": "error", "error": "Invalid latitude or longitude value",
+            })
+            job["failed"] += 1
+            job["completed"] = i + 1
             continue
 
         if i > 0:
-            await asyncio.sleep(1)  # avoid NASA POWER rate limiting
+            await asyncio.sleep(2)  # avoid NASA POWER rate limiting
 
         try:
             result = await asyncio.wait_for(
                 run_analysis(
-                    latitude=lat,
-                    longitude=lon,
-                    region_label=region,
-                    start_year=2014,
-                    end_year=2023,
-                    sector=sector,
-                    scenario=scenario,
+                    latitude=lat, longitude=lon, region_label=region,
+                    start_year=2014, end_year=2023,
+                    sector=sector, scenario=scenario,
                 ),
                 timeout=120,
             )
             try:
-                await save_analysis(result, session_id=x_session_id)
+                await save_analysis(result, session_id=session_id)
             except Exception:
-                logger.warning("Batch: failed to persist %s", result.analysis_id)
+                logger.warning("Batch %s: failed to persist %s", job_id, result.analysis_id)
 
-            results.append(BatchRowResult(
-                region=region,
-                latitude=lat,
-                longitude=lon,
-                sector=sector,
-                scenario=scenario,
-                risk_score=result.risk_score,
-                risk_level=result.risk_level,
-                investment_status=_inv_label(result.risk_score),
-                confidence_score=result.confidence_score,
-                analysis_id=result.analysis_id,
-                status="completed",
-            ))
-            completed += 1
-            logger.info("Batch row %d/%d done: region=%r score=%d", i + 1, len(rows), region, result.risk_score)
+            job["results"].append({
+                "region": region, "latitude": lat, "longitude": lon,
+                "sector": sector, "scenario": scenario,
+                "risk_score": result.risk_score, "risk_level": result.risk_level,
+                "investment_status": _inv_label(result.risk_score),
+                "confidence_score": result.confidence_score,
+                "analysis_id": result.analysis_id,
+                "status": "completed", "error": "",
+            })
+            logger.info("Batch %s row %d/%d done: %r score=%d", job_id, i + 1, job["total"], region, result.risk_score)
 
         except Exception as exc:
-            logger.warning("Batch row %d/%d failed: region=%r error=%s", i + 1, len(rows), region, exc)
-            results.append(BatchRowResult(
-                region=region,
-                latitude=lat,
-                longitude=lon,
-                sector=sector,
-                scenario=scenario,
-                status="error",
-                error=str(exc)[:200],
-            ))
-            failed += 1
+            logger.warning("Batch %s row %d/%d failed: %r error=%s", job_id, i + 1, job["total"], region, exc)
+            job["results"].append({
+                "region": region, "latitude": lat, "longitude": lon,
+                "sector": sector, "scenario": scenario,
+                "risk_score": 0, "risk_level": "", "investment_status": "",
+                "confidence_score": 0, "analysis_id": "",
+                "status": "error", "error": str(exc)[:200],
+            })
+            job["failed"] += 1
 
-    return BatchAnalysisResponse(total=len(rows), completed=completed, failed=failed, results=results)
+        job["completed"] = i + 1
+
+    job["status"] = "completed"
+    logger.info("Batch job %s completed: %d/%d", job_id, job["completed"] - job["failed"], job["total"])
+
+
+@router.get("/api/analyze/batch/{job_id}")
+@limiter.limit("60/minute")
+async def get_batch_status(request: Request, job_id: str) -> dict:
+    """Poll status of an async batch job."""
+    job = _batch_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired")
+    return job
 
 
 @router.post("/api/batch/export/excel")
