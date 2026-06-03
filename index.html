@@ -972,10 +972,11 @@
     /* ── Summary ─────────────────────────────────────────────────────────── */
     .summary-card { grid-column: 1 / -1; }
     .summary-text { font-size: .85rem; line-height: 1.7; color: var(--text2); }
-    .region-header {
+    .summary-region {
       font-size: 1rem; font-weight: 600; color: var(--text);
       margin-bottom: .5rem; padding-bottom: .5rem;
       border-bottom: 0.5px solid var(--border);
+      letter-spacing: -.01em;
     }
 
     /* ── Compliance ──────────────────────────────────────────────────────── */
@@ -1874,6 +1875,7 @@
       <!-- Executive Summary -->
       <div class="card summary-card">
         <div class="card-label" id="t-summary-label">Executive Summary</div>
+        <div id="summary-region" class="summary-region" style="display:none"></div>
         <p class="summary-text" id="summary-text">—</p>
       </div>
 
@@ -2738,20 +2740,12 @@ function renderResults(data) {
     || document.getElementById('inp-location')?.value
     || document.getElementById('inp-label')?.value
     || '';
-  const summaryEl = document.getElementById('summary-text');
-  summaryEl.textContent = data.executive_summary || '—';
-
-  // Insert (or update) region name header above summary text
-  const summaryCard = document.querySelector('.summary-card');
-  if (summaryCard && regionLabel) {
-    let regionHeader = summaryCard.querySelector('.region-header');
-    if (!regionHeader) {
-      regionHeader = document.createElement('div');
-      regionHeader.className = 'region-header';
-      summaryCard.insertBefore(regionHeader, summaryEl);
-    }
-    regionHeader.textContent = regionLabel;
+  const summaryRegion = document.getElementById('summary-region');
+  if (summaryRegion) {
+    summaryRegion.textContent = regionLabel;
+    summaryRegion.style.display = regionLabel ? 'block' : 'none';
   }
+  document.getElementById('summary-text').textContent = data.executive_summary || '—';
 
   /* charts */
   // Reset optional chart cards so a fresh analysis always starts visible
@@ -3893,8 +3887,8 @@ async function viewBatchReport(analysisId) {
   <div class="modal-box">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title">📚 ESG Glossary / Glossário ESG</div>
-        <div class="modal-header-sub">20 key terms · 20 termos-chave</div>
+        <div class="modal-header-title">📚 Climate Sentinel Glossary</div>
+        <div class="modal-header-sub">Terms used in this platform · Termos utilizados nesta plataforma</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-glossary')" aria-label="Close">✕</button>
     </div>
