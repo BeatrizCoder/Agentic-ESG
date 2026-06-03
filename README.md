@@ -22,6 +22,12 @@ Organizations face mounting regulatory pressure to assess and disclose physical 
 
 ---
 
+## Architecture
+
+![Climate Sentinel Architecture](architecture.svg)
+
+---
+
 ## The Problem
 
 Organizations face mounting pressure to assess and disclose physical climate risks:

@@ -1,0 +1,121 @@
+<svg width="100%" viewBox="0 0 680 820" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Climate Sentinel — Architecture Diagram</title>
+<desc>System architecture showing data sources, AI agent pipeline, backend, frontend and deployment layers of Climate Sentinel</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<!-- TITLE -->
+<text x="340" y="30" text-anchor="middle" style="fill:rgb(20,20,19);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Climate Sentinel — System Architecture</text>
+
+<!-- ── LAYER 1: DATA SOURCES ── -->
+<rect x="40" y="50" width="600" height="100" rx="12" fill="none" stroke="rgba(31,30,29,0.15)" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="56" y="70" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Data sources</text>
+
+<rect x="60" y="82" width="168" height="52" rx="8" fill="rgb(230,241,251)" stroke="rgb(24,95,165)" stroke-width="0.5"/>
+<text x="144" y="104" text-anchor="middle" style="fill:rgb(12,68,124);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">NASA POWER API</text>
+<text x="144" y="122" text-anchor="middle" style="fill:rgb(24,95,165);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Temp · precip · solar · ET0</text>
+
+<rect x="248" y="82" width="168" height="52" rx="8" fill="rgb(230,241,251)" stroke="rgb(24,95,165)" stroke-width="0.5"/>
+<text x="332" y="104" text-anchor="middle" style="fill:rgb(12,68,124);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">OpenMeteo ERA5</text>
+<text x="332" y="122" text-anchor="middle" style="fill:rgb(24,95,165);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Real observed 2026+</text>
+
+<rect x="436" y="82" width="168" height="52" rx="8" fill="rgb(230,241,251)" stroke="rgb(24,95,165)" stroke-width="0.5"/>
+<text x="520" y="104" text-anchor="middle" style="fill:rgb(12,68,124);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">OpenMeteo IPCC</text>
+<text x="520" y="122" text-anchor="middle" style="fill:rgb(24,95,165);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Projections 2027–2050</text>
+
+<!-- arrows down to adapter -->
+<line x1="144" y1="134" x2="144" y2="180" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="332" y1="134" x2="332" y2="180" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="520" y1="134" x2="520" y2="180" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="144" y1="157" x2="520" y2="157" fill="none" stroke="rgba(31,30,29,0.15)" stroke-width="0.5"/>
+
+<!-- ── LAYER 2: DATA ADAPTER ── -->
+<rect x="60" y="180" width="560" height="48" rx="8" fill="rgb(225,245,238)" stroke="rgb(15,110,86)" stroke-width="0.5"/>
+<text x="340" y="199" text-anchor="middle" style="fill:rgb(8,80,65);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Data Collector · Agent 1</text>
+<text x="340" y="217" text-anchor="middle" style="fill:rgb(15,110,86);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Normalizes all sources → unified annual records JSON · Python + httpx · 0 LLM tokens</text>
+
+<!-- arrow down to pipeline -->
+<line x1="340" y1="228" x2="340" y2="268" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- ── LAYER 3: AI AGENT PIPELINE ── -->
+<rect x="40" y="268" width="600" height="240" rx="12" fill="none" stroke="rgba(31,30,29,0.15)" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="56" y="288" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">AI agent pipeline · CrewAI · Sequential</text>
+
+<rect x="60" y="298" width="168" height="56" rx="8" fill="rgb(238,237,254)" stroke="rgb(83,74,183)" stroke-width="0.5"/>
+<text x="144" y="320" text-anchor="middle" style="fill:rgb(60,52,137);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Climate Analyst</text>
+<text x="144" y="338" text-anchor="middle" style="fill:rgb(83,74,183);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Agent 2 · Haiku 4.5</text>
+<text x="144" y="366" text-anchor="middle" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Trends · anomalies · drought</text>
+
+<line x1="228" y1="326" x2="248" y2="326" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="248" y="298" width="168" height="56" rx="8" fill="rgb(238,237,254)" stroke="rgb(83,74,183)" stroke-width="0.5"/>
+<text x="332" y="320" text-anchor="middle" style="fill:rgb(60,52,137);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">ESG Strategist</text>
+<text x="332" y="338" text-anchor="middle" style="fill:rgb(83,74,183);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Agent 3 · Sonnet 4.6</text>
+<text x="332" y="366" text-anchor="middle" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">CSRD · ISSB S2 · EU Tax.</text>
+
+<line x1="416" y1="326" x2="436" y2="326" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="436" y="298" width="168" height="56" rx="8" fill="rgb(238,237,254)" stroke="rgb(83,74,183)" stroke-width="0.5"/>
+<text x="520" y="320" text-anchor="middle" style="fill:rgb(60,52,137);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Report Writer</text>
+<text x="520" y="338" text-anchor="middle" style="fill:rgb(83,74,183);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Agent 4 · Sonnet 4.6</text>
+<text x="520" y="366" text-anchor="middle" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Score · summary · recs</text>
+
+<!-- Validation layer -->
+<line x1="340" y1="380" x2="340" y2="408" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="160" y="408" width="360" height="48" rx="8" fill="rgb(250,236,231)" stroke="rgb(153,60,29)" stroke-width="0.5"/>
+<text x="340" y="428" text-anchor="middle" style="fill:rgb(113,43,19);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Validation Layer · Sonnet 4.6</text>
+<text x="340" y="446" text-anchor="middle" style="fill:rgb(153,60,29);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Confidence score · HITL flag · quality audit</text>
+
+<!-- arrow down to backend -->
+<line x1="340" y1="456" x2="340" y2="496" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- ── LAYER 4: BACKEND ── -->
+<rect x="40" y="496" width="600" height="100" rx="12" fill="none" stroke="rgba(31,30,29,0.15)" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="56" y="516" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Backend · Railway · Python 3.11</text>
+
+<rect x="60" y="526" width="168" height="52" rx="8" fill="rgb(225,245,238)" stroke="rgb(15,110,86)" stroke-width="0.5"/>
+<text x="144" y="548" text-anchor="middle" style="fill:rgb(8,80,65);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">FastAPI</text>
+<text x="144" y="566" text-anchor="middle" style="fill:rgb(15,110,86);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">REST API · rate limiting</text>
+
+<rect x="248" y="526" width="168" height="52" rx="8" fill="rgb(225,245,238)" stroke="rgb(15,110,86)" stroke-width="0.5"/>
+<text x="332" y="548" text-anchor="middle" style="fill:rgb(8,80,65);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">MongoDB</text>
+<text x="332" y="566" text-anchor="middle" style="fill:rgb(15,110,86);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Session history · TTL 24h</text>
+
+<rect x="436" y="526" width="168" height="52" rx="8" fill="rgb(225,245,238)" stroke="rgb(15,110,86)" stroke-width="0.5"/>
+<text x="520" y="548" text-anchor="middle" style="fill:rgb(8,80,65);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Export engine</text>
+<text x="520" y="566" text-anchor="middle" style="fill:rgb(15,110,86);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">PDF · Excel · batch CSV</text>
+
+<!-- arrow down to frontend -->
+<line x1="340" y1="596" x2="340" y2="636" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- ── LAYER 5: FRONTEND ── -->
+<rect x="40" y="636" width="600" height="100" rx="12" fill="none" stroke="rgba(31,30,29,0.15)" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="56" y="656" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Frontend · HTML · CSS · JS · served by Railway</text>
+
+<rect x="60" y="666" width="124" height="52" rx="8" fill="rgb(234,243,222)" stroke="rgb(59,109,17)" stroke-width="0.5"/>
+<text x="122" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Dashboard</text>
+<text x="122" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">5 languages</text>
+
+<rect x="200" y="666" width="124" height="52" rx="8" fill="rgb(234,243,222)" stroke="rgb(59,109,17)" stroke-width="0.5"/>
+<text x="262" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">AI Reasoning</text>
+<text x="262" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">How AI thinks tab</text>
+
+<rect x="340" y="666" width="124" height="52" rx="8" fill="rgb(234,243,222)" stroke="rgb(59,109,17)" stroke-width="0.5"/>
+<text x="402" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Transparency</text>
+<text x="402" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">EU AI Act Art. 13</text>
+
+<rect x="480" y="666" width="124" height="52" rx="8" fill="rgb(234,243,222)" stroke="rgb(59,109,17)" stroke-width="0.5"/>
+<text x="542" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Batch upload</text>
+<text x="542" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">CSV · 20 regions</text>
+
+<!-- ── LEGEND ── -->
+<line x1="40" y1="760" x2="640" y2="760" stroke="rgba(31,30,29,0.15)" stroke-width="0.5"/>
+<text x="56" y="782" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Stack</text>
+<text x="56" y="798" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Anthropic Claude API · CrewAI · NASA POWER · OpenMeteo · FastAPI · MongoDB · Railway</text>
+<text x="56" y="814" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Built with Claude Code (Anthropic) + IBM Bob · © 2026 Beatriz Costa Leal</text>
+
+</svg>
