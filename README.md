@@ -4,6 +4,9 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![LGPD Compliant](https://img.shields.io/badge/LGPD-compliant-brightgreen.svg)](SECURITY.md)
+[![EU AI Act](https://img.shields.io/badge/EU%20AI%20Act-Art.%2013-blue.svg)](SECURITY.md)
 
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
@@ -544,8 +547,12 @@ limitations under the License.
 - Anthropic Claude AI
 
 **Development:**
-- Built with Claude Code (Anthropic) and IBM Bob
+- Built with Claude Code (Anthropic) and IBM Bob (AI co-author)
 - Inspired by the "Become An Agentic Architect" course
+
+**Security:**
+- See [SECURITY.md](SECURITY.md) for security policy and best practices
+- Report vulnerabilities to: beatrizcostaleal1996@gmail.com
 
 ---
 
