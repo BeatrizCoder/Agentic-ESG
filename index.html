@@ -290,23 +290,28 @@
       color: var(--text2); margin: .5rem 0 .75rem; white-space: pre; overflow-x: auto;
     }
     .batch-dropzone {
-      border: 1.5px dashed var(--border); border-radius: 10px;
-      padding: 1.25rem 1rem; text-align: center; cursor: pointer;
-      margin-bottom: .75rem; transition: border-color .2s, background .2s;
-      position: relative;
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+      transition: all .3s ease; background: var(--bg3);
+      min-height: 140px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: .75rem;
+      position: relative; margin-bottom: .75rem;
     }
     .batch-dropzone:hover, .batch-dropzone.drag-over {
+      border-color: var(--green); background: var(--green-lt);
+    }
+    .batch-dropzone.has-file {
       border-color: var(--green); background: var(--green-lt);
     }
     .batch-dropzone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
     }
     .batch-dropzone-label {
-      font-size: .8rem; color: var(--text2); pointer-events: none;
+      font-size: .82rem; color: var(--text2); pointer-events: none; line-height: 1.5;
     }
     .batch-dropzone-filename {
-      font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--green);
-      margin-top: .3rem; display: none;
+      font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--green);
+      display: none; pointer-events: none;
     }
     .batch-upload-row { display: flex; gap: .65rem; align-items: center; margin-bottom: .6rem; }
     .batch-file-input {
@@ -3520,9 +3525,12 @@ function openBatchModal() {
   document.getElementById('modal-batch').classList.add('open');
   // Reset state each time modal opens
   document.getElementById('batch-run-btn').disabled = true;
-  document.getElementById('batch-filename').style.display = 'none';
-  document.getElementById('batch-filename').textContent = '';
+  const nameEl = document.getElementById('batch-filename');
+  nameEl.textContent  = '📄 No file selected';
+  nameEl.style.display = 'block';
   document.getElementById('batch-file-input').value = '';
+  const dz2 = document.getElementById('batch-dropzone');
+  if (dz2) dz2.classList.remove('has-file', 'drag-over');
   const dz = document.getElementById('batch-dropzone');
   if (dz) {
     dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
@@ -3536,16 +3544,20 @@ function openBatchModal() {
 }
 
 function _onBatchFileChange(input) {
-  const file = input.files && input.files[0];
+  const file   = input.files && input.files[0];
   const nameEl = document.getElementById('batch-filename');
   const runBtn = document.getElementById('batch-run-btn');
+  const dz     = document.getElementById('batch-dropzone');
   if (file) {
-    nameEl.textContent = '✓ ' + file.name;
+    nameEl.textContent  = '✓ ' + file.name;
     nameEl.style.display = 'block';
     runBtn.disabled = false;
+    if (dz) dz.classList.add('has-file');
   } else {
-    nameEl.style.display = 'none';
+    nameEl.textContent  = '📄 No file selected';
+    nameEl.style.display = 'block';
     runBtn.disabled = true;
+    if (dz) dz.classList.remove('has-file');
   }
 }
 
@@ -3943,7 +3955,7 @@ async function viewBatchReport(analysisId) {
 
 <!-- ── Batch Analysis Modal ──────────────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-batch" onclick="if(event.target===this)closeBatchModal()">
-  <div class="modal-box modal-box-wide">
+  <div class="modal-box" style="max-width:640px">
     <div class="modal-header">
       <div>
         <div class="modal-header-title">📊 Batch Analysis</div>
@@ -3952,36 +3964,39 @@ async function viewBatchReport(analysisId) {
       <button class="modal-close" onclick="closeBatchModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="modal-section">
-        <div class="modal-section-title">Upload CSV / Carregar CSV</div>
-        <div class="batch-instructions">region,latitude,longitude,sector,scenario
-São Paulo Brazil,-23.5505,-46.6333,General,SSP2-4.5
-Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5
-Berlin Germany,52.5200,13.4050,General,SSP1-2.6</div>
-        <p style="font-size:.75rem;color:var(--text2);margin:0 0 .65rem">
-          Required columns: <strong>region · latitude · longitude</strong>
-          &nbsp;·&nbsp; Optional: sector, scenario &nbsp;·&nbsp; Max 20 rows
-        </p>
-        <div class="batch-dropzone" id="batch-dropzone">
-          <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv"
-            onchange="_onBatchFileChange(this)" />
-          <div class="batch-dropzone-label">📂 Drag &amp; drop your CSV here or click to browse</div>
-          <div class="batch-dropzone-filename" id="batch-filename"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-          <p style="font-size:.7rem;color:var(--muted);margin:0">
-            ⚠ Each region runs the full 5-agent pipeline (~2 min). Large batches may take 30–40 min.
-          </p>
-          <button class="batch-template-btn" onclick="downloadBatchTemplate()">📥 Template CSV</button>
-        </div>
-        <button class="batch-run-btn" id="batch-run-btn" onclick="runBatchAnalysis()" disabled>
-          📊 Run Batch Analysis / Executar Análise
-        </button>
-        <div class="batch-progress" id="batch-progress">
-          <div class="batch-progress-spinner"></div>
-          <span id="batch-progress-text">Processing batch…</span>
-        </div>
+      <!-- Drop zone -->
+      <div class="batch-dropzone" id="batch-dropzone">
+        <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv"
+          onchange="_onBatchFileChange(this)" />
+        <div style="font-size:1.5rem;pointer-events:none">📂</div>
+        <div class="batch-dropzone-label">Drag &amp; drop your CSV here<br>or click to browse</div>
+        <div class="batch-dropzone-filename" id="batch-filename">📄 No file selected</div>
       </div>
+
+      <!-- Notices -->
+      <p style="font-size:.72rem;color:var(--muted);margin:.25rem 0 .5rem">
+        ⚠ Max 5 regions · Max 1 MB · Each region takes ~2 min (5-agent pipeline)
+      </p>
+      <p style="font-size:.72rem;color:var(--text2);margin:0 0 .75rem">
+        Required columns: <strong>region · latitude · longitude</strong>
+        &nbsp;·&nbsp; Optional: sector, scenario
+      </p>
+
+      <!-- Template link -->
+      <button class="batch-template-btn" onclick="downloadBatchTemplate()" style="margin-bottom:.85rem">
+        📥 Download CSV template
+      </button>
+
+      <!-- Run -->
+      <button class="batch-run-btn" id="batch-run-btn" onclick="runBatchAnalysis()" disabled>
+        📊 Run Batch Analysis / Executar Análise
+      </button>
+      <div class="batch-progress" id="batch-progress">
+        <div class="batch-progress-spinner"></div>
+        <span id="batch-progress-text">Processing batch…</span>
+      </div>
+
+      <!-- Results -->
       <div class="batch-results" id="batch-results">
         <div class="batch-results-header">
           <div class="batch-results-title" id="batch-results-title">Results</div>
@@ -3992,12 +4007,8 @@ Berlin Germany,52.5200,13.4050,General,SSP1-2.6</div>
         <table class="batch-table">
           <thead>
             <tr>
-              <th>Region</th>
-              <th>Score</th>
-              <th>Risk Level</th>
-              <th>Investment Status</th>
-              <th>Conf.</th>
-              <th></th>
+              <th>Region</th><th>Score</th><th>Risk Level</th>
+              <th>Investment Status</th><th>Conf.</th><th></th>
             </tr>
           </thead>
           <tbody id="batch-tbody"></tbody>

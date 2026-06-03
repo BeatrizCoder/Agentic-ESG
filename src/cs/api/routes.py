@@ -218,7 +218,8 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
     )
 
 
-_BATCH_MAX_ROWS = 20
+_BATCH_MAX_ROWS = 5
+_BATCH_MAX_FILE_BYTES = 500_000  # 500 KB
 _BATCH_REQUIRED_COLS = {"region", "latitude", "longitude"}
 _BATCH_TEMPLATE_CSV = (
     "region,latitude,longitude,sector,scenario\n"
@@ -256,6 +257,8 @@ async def analyze_batch(
 ) -> BatchAnalysisResponse:
     """Process a CSV file of regions and run climate analysis on each row sequentially."""
     content = await file.read()
+    if len(content) > _BATCH_MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum 500 KB.")
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -307,7 +310,7 @@ async def analyze_batch(
             continue
 
         if i > 0:
-            await asyncio.sleep(2)  # avoid NASA POWER rate limiting
+            await asyncio.sleep(1)  # avoid NASA POWER rate limiting
 
         try:
             result = await asyncio.wait_for(
