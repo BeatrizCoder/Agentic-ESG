@@ -214,7 +214,7 @@
     }
 
     /* ── Search ──────────────────────────────────────────────────────────── */
-    .search-section { margin-bottom: 2rem; max-width: 900px; margin-left: auto; margin-right: auto; }
+    .search-section { margin-bottom: 1rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
     .search-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; }
 
@@ -288,6 +288,25 @@
       background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
       padding: .65rem .9rem; font-family: 'DM Mono', monospace; font-size: .73rem;
       color: var(--text2); margin: .5rem 0 .75rem; white-space: pre; overflow-x: auto;
+    }
+    .batch-dropzone {
+      border: 1.5px dashed var(--border); border-radius: 10px;
+      padding: 1.25rem 1rem; text-align: center; cursor: pointer;
+      margin-bottom: .75rem; transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    .batch-dropzone:hover, .batch-dropzone.drag-over {
+      border-color: var(--green); background: var(--green-lt);
+    }
+    .batch-dropzone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .batch-dropzone-label {
+      font-size: .8rem; color: var(--text2); pointer-events: none;
+    }
+    .batch-dropzone-filename {
+      font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--green);
+      margin-top: .3rem; display: none;
     }
     .batch-upload-row { display: flex; gap: .65rem; align-items: center; margin-bottom: .6rem; }
     .batch-file-input {
@@ -849,7 +868,7 @@
     .map-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .map-coords { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
     .map-source-tag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: .15rem .5rem; }
-    #map { height: 300px; max-height: 300px; width: 100%; background: var(--bg3); }
+    #map { height: 320px; min-height: 320px; width: 100%; background: var(--bg3); }
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
@@ -896,7 +915,7 @@
     .chart-item-delta.down::before {
       border-top: 5px solid currentColor;
     }
-    canvas.mini-bar { width: 100%; height: 48px; display: block; }
+    canvas.mini-bar { width: 100%; height: 52px; display: block; }
     .chart-item-value.val-deficit  { color: #c46a2a; }
     .chart-item-value.val-risk-high { color: var(--risk-high); }
     .chart-item-value.val-risk-low  { color: var(--risk-low); }
@@ -2364,6 +2383,8 @@ function initMap(lat, lon) {
   if (!_map) {
     _map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 6);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(_map);
+    const mapEl = document.getElementById('map');
+    if (mapEl) new ResizeObserver(() => { if (_map) _map.invalidateSize(); }).observe(mapEl);
   } else {
     _map.setView([lat, lon], 6);
   }
@@ -2377,28 +2398,43 @@ function initMap(lat, lon) {
 }
 
 /* ── Mini bar chart ──────────────────────────────────────────────────────── */
-function drawBars(canvasId, values, rgbColor) {
+function drawBars(canvasId, values, type) {
   const canvas = document.getElementById(canvasId);
-  if (!canvas || !values.length) return;
+  if (!canvas || !values || !values.length) return;
   const dpr = window.devicePixelRatio || 1;
-  canvas.width  = canvas.offsetWidth  * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  if (!W || !H) return;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
-  const w = canvas.offsetWidth, h = canvas.offsetHeight;
-  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pad = 3;
-  const barW = w / values.length;
-  const isDeclining = values[values.length - 1] < values[0];
-  ctx.clearRect(0, 0, w, h);
+  ctx.clearRect(0, 0, W, H);
+
+  const min   = Math.min(...values);
+  const max   = Math.max(...values);
+  const range = max - min || 1;
+  const n     = values.length;
+  const gap   = 2;
+  const barW  = Math.max((W - (n - 1) * gap) / n, 4);
+
   values.forEach((v, i) => {
-    const barH = ((v - min) / range) * (h - 4) + 4;
-    const isLate = i >= values.length - 3;
-    ctx.fillStyle = (isLate && isDeclining)
-      ? 'rgba(196,106,42,0.8)'
-      : 'rgba(77,140,69,0.6)';
+    const pct  = (v - min) / range;
+    const barH = Math.max(pct * (H - 4) + 2, 3);
+    const x    = i * (barW + gap);
+    const y    = H - barH;
+    const isLate = i >= n - 3;
+    let color;
+    if (type === 'declining') {
+      color = isLate ? 'rgba(196,106,42,0.9)' : 'rgba(77,140,69,0.7)';
+    } else if (type === 'rising') {
+      color = isLate ? 'rgba(196,106,42,0.9)' : 'rgba(77,140,69,0.7)';
+    } else {
+      color = 'rgba(77,140,69,0.7)';
+    }
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.roundRect(i * barW + pad / 2, h - barH, barW - pad, barH, 2);
+    ctx.roundRect(x, y, barW, barH, 2);
     ctx.fill();
   });
 }
@@ -2570,7 +2606,7 @@ function renderResults(data) {
   /* map */
   document.getElementById('map-coords').textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
   initMap(data.latitude, data.longitude);
-  setTimeout(() => { if (_map) _map.invalidateSize(); }, 200);
+  setTimeout(() => { if (_map) _map.invalidateSize(); }, 300);
 
   /* summary */
   document.getElementById('summary-text').textContent = data.executive_summary || '—';
@@ -2620,11 +2656,11 @@ function renderResults(data) {
     if (!soils.some(v => v > 0))  { const c = document.getElementById('chart-soil-card');  if (c) c.style.display = 'none'; }
 
     setTimeout(() => {
-      drawBars('canvas-temp',   temps,   '196,106,42');
-      drawBars('canvas-precip', precips, '46,125,154');
-      if (solars.some(v => v > 0)) drawBars('canvas-solar', solars, '196,174,58');
-      if (et0s.some(v => v > 0))   drawBars('canvas-et0',  et0s,  '196,106,42');
-      if (soils.some(v => v > 0))  drawBars('canvas-soil', soils, '58,107,53');
+      drawBars('canvas-temp',   temps,   'rising');
+      drawBars('canvas-precip', precips, 'declining');
+      if (solars.some(v => v > 0)) drawBars('canvas-solar', solars, 'stable');
+      if (et0s.some(v => v > 0))   drawBars('canvas-et0',  et0s,  'rising');
+      if (soils.some(v => v > 0))  drawBars('canvas-soil', soils, 'stable');
     }, 50);
   }
 
@@ -2667,8 +2703,7 @@ function renderResults(data) {
 
 /* ── PDF export ──────────────────────────────────────────────────────────── */
 async function exportPdf() {
-  console.log('exportPdf: currentId =', _currentId);
-  if (!_currentId) return;
+  if (!_currentId) { alert('No analysis to export'); return; }
 
   const btn = document.getElementById('t-export-pdf');
   const origText = btn ? btn.textContent : '';
@@ -2694,14 +2729,26 @@ async function exportPdf() {
   }
 }
 
-function exportExcel() {
-  if (!_currentId) return;
-  const a = document.createElement('a');
-  a.href     = `${API_BASE}/api/analyses/${_currentId}/export/excel`;
-  a.download = `cs_report_${_currentId}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+async function exportExcel() {
+  if (!_currentId) { alert('No analysis to export'); return; }
+  const btn = document.querySelector('.export-btn[onclick="exportExcel()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  try {
+    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/excel`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `cs_report_${_currentId}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Excel export failed: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
 }
 
 /* ── Investment status badge ─────────────────────────────────────────────── */
@@ -3471,6 +3518,35 @@ let _batchResults = null;
 
 function openBatchModal() {
   document.getElementById('modal-batch').classList.add('open');
+  // Reset state each time modal opens
+  document.getElementById('batch-run-btn').disabled = true;
+  document.getElementById('batch-filename').style.display = 'none';
+  document.getElementById('batch-filename').textContent = '';
+  document.getElementById('batch-file-input').value = '';
+  const dz = document.getElementById('batch-dropzone');
+  if (dz) {
+    dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault(); dz.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) { document.getElementById('batch-file-input').files = e.dataTransfer.files; _onBatchFileChange({ files: e.dataTransfer.files }); }
+    });
+  }
+}
+
+function _onBatchFileChange(input) {
+  const file = input.files && input.files[0];
+  const nameEl = document.getElementById('batch-filename');
+  const runBtn = document.getElementById('batch-run-btn');
+  if (file) {
+    nameEl.textContent = '✓ ' + file.name;
+    nameEl.style.display = 'block';
+    runBtn.disabled = false;
+  } else {
+    nameEl.style.display = 'none';
+    runBtn.disabled = true;
+  }
 }
 
 function closeBatchModal() {
@@ -3886,15 +3962,20 @@ Berlin Germany,52.5200,13.4050,General,SSP1-2.6</div>
           Required columns: <strong>region · latitude · longitude</strong>
           &nbsp;·&nbsp; Optional: sector, scenario &nbsp;·&nbsp; Max 20 rows
         </p>
-        <div class="batch-upload-row">
-          <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv" />
-          <button class="batch-template-btn" onclick="downloadBatchTemplate()">⬇ Template CSV</button>
+        <div class="batch-dropzone" id="batch-dropzone">
+          <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv"
+            onchange="_onBatchFileChange(this)" />
+          <div class="batch-dropzone-label">📂 Drag &amp; drop your CSV here or click to browse</div>
+          <div class="batch-dropzone-filename" id="batch-filename"></div>
         </div>
-        <p style="font-size:.7rem;color:var(--muted);margin-bottom:.5rem">
-          ⚠ Each region runs the full 5-agent pipeline (~2 min). Large batches may take 30–40 min.
-        </p>
-        <button class="batch-run-btn" id="batch-run-btn" onclick="runBatchAnalysis()">
-          📊 Run Batch / Executar Análise
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <p style="font-size:.7rem;color:var(--muted);margin:0">
+            ⚠ Each region runs the full 5-agent pipeline (~2 min). Large batches may take 30–40 min.
+          </p>
+          <button class="batch-template-btn" onclick="downloadBatchTemplate()">📥 Template CSV</button>
+        </div>
+        <button class="batch-run-btn" id="batch-run-btn" onclick="runBatchAnalysis()" disabled>
+          📊 Run Batch Analysis / Executar Análise
         </button>
         <div class="batch-progress" id="batch-progress">
           <div class="batch-progress-spinner"></div>
