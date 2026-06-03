@@ -1284,6 +1284,14 @@
     .modal-body {
       flex: 1 1 0; min-height: 0; overflow-y: scroll; padding: 1.25rem 1.5rem;
     }
+    .batch-modal-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      overflow-y: auto;
+      max-height: calc(85vh - 80px);
+    }
     .modal-section {
       padding-bottom: 1rem; margin-bottom: 1rem;
       border-bottom: 0.5px solid var(--border);
@@ -4011,7 +4019,7 @@ async function viewBatchReport(analysisId) {
       </div>
       <button class="modal-close" onclick="closeBatchModal()">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body batch-modal-body">
       <!-- Drop zone -->
       <div class="batch-dropzone" id="batch-dropzone">
         <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv"
