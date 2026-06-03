@@ -62,7 +62,7 @@
 
     /* Smooth theme transitions */
     body, header, footer, .card, .score-meta-item, .rec-item,
-    .compliance-item, .preset-btn, .lang-select,
+    .compliance-item, .preset-btn, .lang-select-custom,
     .export-btn, .analyze-btn, #status-bar,
     .field-group input, .field-group select {
       transition: background .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease;
@@ -149,18 +149,28 @@
     }
     .topbar-right { display: flex; align-items: center; gap: 1rem; }
     
-    .lang-select {
-      background: var(--bg3);
-      border: 0.5px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: .78rem;
-      padding: .3rem .6rem;
-      cursor: pointer;
-      outline: none;
+    .lang-select-custom {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg3); border: 0.5px solid var(--border);
+      border-radius: 8px; padding: .3rem .75rem;
+      cursor: pointer; font-size: .78rem; color: var(--text);
+      position: relative; user-select: none;
+      transition: border-color .2s;
     }
-    .lang-select option { background: var(--bg2); }
+    .lang-select-custom:hover { border-color: var(--green); }
+    .lang-dropdown {
+      display: none; position: absolute; top: calc(100% + 4px); right: 0;
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 8px; box-shadow: 0 4px 16px var(--shadow);
+      z-index: 300; min-width: 100%; overflow: hidden;
+    }
+    .lang-dropdown.open { display: block; }
+    .lang-dropdown-item {
+      padding: .45rem .85rem; font-size: .78rem; color: var(--text2);
+      cursor: pointer; white-space: nowrap; transition: background .15s;
+    }
+    .lang-dropdown-item:hover { background: var(--bg3); color: var(--text); }
+    .lang-dropdown-item.active { color: var(--green); font-weight: 600; }
 
     .theme-toggle {
       background: transparent;
@@ -934,9 +944,9 @@
     .compliance-card  { grid-column: 1 / -1; }
 
     /* ── Projection chart ────────────────────────────────────────────────── */
-    .proj-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
-    .proj-toggle { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-    .proj-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .68rem; padding: .2rem .55rem; cursor: pointer; transition: background .15s, color .15s; }
+    .proj-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    .proj-toggle { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+    .proj-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .68rem; padding: .25rem .75rem; cursor: pointer; transition: background .15s, color .15s; white-space: nowrap; }
     .proj-toggle button.active { background: var(--green2); color: var(--text); }
     .proj-legend { display: flex; gap: 1.1rem; margin-bottom: .5rem; flex-wrap: wrap; }
     .proj-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); }
@@ -1480,13 +1490,17 @@
   </div>
   <div class="topbar-center">Powered by NASA POWER · Claude AI</div>
   <div class="topbar-right">
-    <select id="lang-select" onchange="setLang(this.value)" class="lang-select">
-      <option value="en">🇬🇧 EN</option>
-      <option value="pt">🇧🇷 PT</option>
-      <option value="es">🇪🇸 ES</option>
-      <option value="fr">🇫🇷 FR</option>
-      <option value="de">🇩🇪 DE</option>
-    </select>
+    <div class="lang-select-custom" id="lang-custom" onclick="_toggleLangDropdown(event)">
+      <span id="lang-flag">🇬🇧</span>
+      <span id="lang-code">EN</span>
+      <div class="lang-dropdown" id="lang-dropdown">
+        <div class="lang-dropdown-item active" data-lang="en" onclick="_pickLang(event,'en')">🇬🇧 EN</div>
+        <div class="lang-dropdown-item"        data-lang="pt" onclick="_pickLang(event,'pt')">🇧🇷 PT</div>
+        <div class="lang-dropdown-item"        data-lang="es" onclick="_pickLang(event,'es')">🇪🇸 ES</div>
+        <div class="lang-dropdown-item"        data-lang="fr" onclick="_pickLang(event,'fr')">🇫🇷 FR</div>
+        <div class="lang-dropdown-item"        data-lang="de" onclick="_pickLang(event,'de')">🇩🇪 DE</div>
+      </div>
+    </div>
     <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
       <svg id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
       <svg id="icon-moon" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
@@ -2216,6 +2230,29 @@ const I18N = {
   },
 };
 
+const _LANG_OPTIONS = {
+  en: { flag: '🇬🇧', code: 'EN' },
+  pt: { flag: '🇧🇷', code: 'PT' },
+  es: { flag: '🇪🇸', code: 'ES' },
+  fr: { flag: '🇫🇷', code: 'FR' },
+  de: { flag: '🇩🇪', code: 'DE' },
+};
+
+function _toggleLangDropdown(e) {
+  e.stopPropagation();
+  document.getElementById('lang-dropdown').classList.toggle('open');
+}
+
+function _pickLang(e, l) {
+  e.stopPropagation();
+  document.getElementById('lang-dropdown').classList.remove('open');
+  setLang(l);
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('lang-dropdown')?.classList.remove('open');
+});
+
 const ANALYZE_BTN_LABELS = { en: 'Analyze →', pt: 'Analisar →', es: 'Analizar →', fr: 'Analyser →', de: 'Analysieren →' };
 
 const INV_LABELS = {
@@ -2240,8 +2277,17 @@ function setLang(l) {
   _lang = l;
   localStorage.setItem('cs-lang', l);
 
-  const sel = document.getElementById('lang-select');
-  if (sel) sel.value = l;
+  // Update custom dropdown trigger
+  const opt = _LANG_OPTIONS[l];
+  if (opt) {
+    const flagEl = document.getElementById('lang-flag');
+    const codeEl = document.getElementById('lang-code');
+    if (flagEl) flagEl.textContent = opt.flag;
+    if (codeEl) codeEl.textContent = opt.code;
+  }
+  document.querySelectorAll('.lang-dropdown-item').forEach(item =>
+    item.classList.toggle('active', item.dataset.lang === l)
+  );
 
   const d = I18N[l];
   for (const [k, v] of Object.entries(d)) {
