@@ -57,7 +57,7 @@ _REPORT_SCHEMA = """{
   "risk_score": <int 0-100>,
   "risk_level": "low|medium|high|critical",
   "risk_badge_label": "LOW RISK|MEDIUM RISK|HIGH RISK|CRITICAL RISK",
-  "executive_summary": "<3-4 sentences>",
+  "executive_summary": "<Start with region name, e.g. 'Brasília, Brazil scores 72/100…'. 3-4 sentences total.>",
   "key_metrics": {
     "temp_change_label": "<e.g. +1.2°C vs baseline>",
     "precip_change_label": "<e.g. -18% vs baseline>",
@@ -212,7 +212,7 @@ COMPLIANCE MAPPING:
 {compliance_summary}
 
 Provide 4-6 recommendations ranked by priority.
-executive_summary must mention the risk_score number, lead with the main risk driver.
+executive_summary must start with the region name. Example: '{region_label} scores X/100…'. Then mention the risk_score number and lead with the main risk driver.
 
 OFFSET TARGETS RULES — each requirement MUST quote real numbers from CLIMATE FINDINGS:
 - Use exact values like temp_trend_c_per_decade, precip_trend_pct_per_decade, baseline_precip_mm, latest_precip_mm

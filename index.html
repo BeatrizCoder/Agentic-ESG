@@ -148,6 +148,13 @@
       letter-spacing: .02em;
     }
     .topbar-right { display: flex; align-items: center; gap: 1rem; }
+    .topbar-links { display: flex; align-items: center; gap: .25rem; }
+    .topbar-link {
+      background: transparent; border: none; color: var(--muted);
+      font-size: .72rem; cursor: pointer; font-family: inherit;
+      padding: .2rem .4rem; border-radius: 4px; transition: color .2s;
+    }
+    .topbar-link:hover { color: var(--green); }
     
     .lang-select-custom {
       display: flex; align-items: center; gap: 6px;
@@ -1363,6 +1370,13 @@
       transition: border-color .2s;
     }
     .glossary-search:focus { border-color: var(--green); }
+    #modal-glossary .modal-box {
+      width: min(680px, 92vw);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .glossary-body { overflow-y: auto; flex: 1; padding-right: .5rem; }
     .glossary-no-results {
       display: none;
       text-align: center;
@@ -1499,6 +1513,9 @@
     <span class="logo-badge">Agentic ESG</span>
   </div>
   <div class="topbar-center">Powered by NASA POWER · Claude AI</div>
+  <nav class="topbar-links">
+    <button class="topbar-link" onclick="openModal('modal-glossary')">📚 Glossary</button>
+  </nav>
   <div class="topbar-right">
     <div class="lang-select-custom" id="lang-custom" onclick="_toggleLangDropdown(event)">
       <span id="lang-flag">🇬🇧</span>
@@ -1985,8 +2002,6 @@
     <button class="footer-link" onclick="openModal('modal-privacy')">Privacy Policy / Política de Privacidade</button>
     &nbsp;·&nbsp;
     <button class="footer-link" onclick="openModal('modal-terms')">Terms of Use / Termos de Uso</button>
-    &nbsp;·&nbsp;
-    <button class="footer-link" onclick="openModal('modal-glossary')">ESG Glossary / Glossário ESG</button>
   </div>
   <div class="footer-bottom" id="t-footer-text">
     🌿 Analysis history is stored for 30 days using an anonymous session cookie. No personal data is collected.
@@ -2670,7 +2685,9 @@ function renderResults(data) {
   setTimeout(() => { if (_map) _map.invalidateSize(); }, 300);
 
   /* summary */
-  document.getElementById('summary-text').textContent = data.executive_summary || '—';
+  const regionName = data.region_label || document.getElementById('inp-label')?.value || 'This region';
+  const summaryEl = document.getElementById('summary-text');
+  summaryEl.textContent = data.executive_summary || '—';
 
   /* charts */
   // Reset optional chart cards so a fresh analysis always starts visible
@@ -3795,7 +3812,7 @@ async function viewBatchReport(analysisId) {
     <div class="modal-header">
       <div>
         <div class="modal-header-title">📚 ESG Glossary / Glossário ESG</div>
-        <div class="modal-header-sub">12 key terms · 12 termos-chave</div>
+        <div class="modal-header-sub">20 key terms · 20 termos-chave</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-glossary')" aria-label="Close">✕</button>
     </div>
@@ -3805,7 +3822,7 @@ async function viewBatchReport(analysisId) {
         oninput="filterGlossary(this.value)"
         autocomplete="off" />
     </div>
-    <div class="modal-body">
+    <div class="modal-body glossary-body">
       <div class="glossary-no-results" id="glossary-no-results">No results / Sem resultados</div>
 
       <div class="modal-section" data-term="csrd eu directive environmental social governance esrs diretiva ue governança">
@@ -3878,6 +3895,48 @@ async function viewBatchReport(analysisId) {
         <div class="modal-section-title">Carbon Budget</div>
         <p class="modal-en">Maximum amount of CO₂ that can be emitted globally while limiting warming to 1.5°C or 2°C as per Paris Agreement.</p>
         <p class="modal-pt">Quantidade máxima de CO₂ que pode ser emitida globalmente para limitar o aquecimento conforme o Acordo de Paris.</p>
+      </div>
+
+      <div class="modal-section" data-term="net zero greenhouse gas emissions removals 2050 paris zero líquido emissões remoções">
+        <div class="modal-section-title">Net Zero</div>
+        <p class="modal-en">A state where greenhouse gas emissions are balanced by removals. Many companies have net zero targets by 2050 aligned with the Paris Agreement.</p>
+        <p class="modal-pt">Estado em que as emissões de gases de efeito estufa são compensadas por remoções. Muitas empresas têm metas de net zero para 2050.</p>
+      </div>
+
+      <div class="modal-section" data-term="stranded assets fossil fuel devaluation energy transition climate change ativos encalhados combustíveis fósseis desvalorização transição energética">
+        <div class="modal-section-title">Stranded Assets</div>
+        <p class="modal-en">Assets that suffer unexpected devaluations due to climate change or energy transition — e.g. fossil fuel reserves that cannot be extracted profitably.</p>
+        <p class="modal-pt">Ativos que sofrem desvalorização inesperada devido às mudanças climáticas ou à transição energética — ex: reservas de combustíveis fósseis não extraíveis com lucro.</p>
+      </div>
+
+      <div class="modal-section" data-term="water stress demand supply freshwater withdrawals estresse hídrico demanda oferta água doce retiradas">
+        <div class="modal-section-title">Water Stress</div>
+        <p class="modal-en">Condition where water demand exceeds available supply. Measured by the ratio of water withdrawals to renewable freshwater resources.</p>
+        <p class="modal-pt">Condição em que a demanda de água supera a oferta disponível. Medido pela razão entre retiradas e recursos hídricos renováveis.</p>
+      </div>
+
+      <div class="modal-section" data-term="transition risk policy technology low carbon economy asset value risco de transição política tecnologia economia baixo carbono valor ativo">
+        <div class="modal-section-title">Transition Risk</div>
+        <p class="modal-en">Financial risks from the transition to a low-carbon economy — policy changes, technology shifts, and changing consumer preferences affecting asset values.</p>
+        <p class="modal-pt">Riscos financeiros da transição para uma economia de baixo carbono — mudanças de política, tecnologia e preferências que afetam valores de ativos.</p>
+      </div>
+
+      <div class="modal-section" data-term="scope 3 emissions indirect value chain suppliers business travel disposal escopo 3 emissões indiretas cadeia de valor fornecedores viagens descarte">
+        <div class="modal-section-title">Scope 3 Emissions</div>
+        <p class="modal-en">Indirect emissions in a company's value chain — from suppliers, business travel, product use and disposal. Often the largest share of corporate emissions.</p>
+        <p class="modal-pt">Emissões indiretas na cadeia de valor de uma empresa — fornecedores, viagens, uso e descarte de produtos. Frequentemente a maior parcela das emissões corporativas.</p>
+      </div>
+
+      <div class="modal-section" data-term="era5 reanalysis ecmwf historical climate dataset weather model 1940 reanálise dados climáticos históricos modelo meteorológico">
+        <div class="modal-section-title">ERA5 Reanalysis</div>
+        <p class="modal-en">ECMWF's global climate dataset combining historical observations with weather model outputs. Provides consistent climate data from 1940 to present.</p>
+        <p class="modal-pt">Dataset climático global do ECMWF combinando observações históricas com modelos meteorológicos. Fornece dados climáticos consistentes de 1940 ao presente.</p>
+      </div>
+
+      <div class="modal-section" data-term="evapotranspiration et0 soil evaporation plant transpiration water deficit drought indicator evapotranspiração solo evaporação transpiração déficit hídrico seca">
+        <div class="modal-section-title">Evapotranspiration (ET0)</div>
+        <p class="modal-en">Combined water loss through soil evaporation and plant transpiration. When ET0 exceeds precipitation, a region is in water deficit — a key drought indicator.</p>
+        <p class="modal-pt">Perda combinada de água por evaporação do solo e transpiração das plantas. Quando ET0 supera a precipitação, a região está em déficit hídrico.</p>
       </div>
 
     </div>
