@@ -756,7 +756,8 @@
     .results-grid {
       display: grid;
       grid-template-columns: 360px 1fr;
-      align-items: start;
+      grid-template-rows: auto auto;
+      align-items: stretch;
       gap: 1rem;
     }
 
@@ -879,15 +880,15 @@
     .score-meta-value { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--text); line-height: 1.5; margin-top: .25rem; }
 
     /* ── Map card ────────────────────────────────────────────────────────── */
-    .map-card { grid-column: 2; grid-row: 1 / 3; padding: 0; overflow: hidden; }
+    .map-card { grid-column: 2; grid-row: 1 / 3; padding: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 400px; }
     .map-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .map-coords { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
     .map-source-tag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: .15rem .5rem; }
-    #map { height: 320px; min-height: 320px; width: 100%; background: var(--bg3); }
+    #map { flex: 1; min-height: 280px; max-height: 500px; width: 100%; background: var(--bg3); }
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
-    .chart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1.25rem; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
     .chart-item { display: flex; flex-direction: column; gap: .25rem; }
     .chart-item-label {
       font-size: .6rem;
@@ -1470,9 +1471,10 @@
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 900px) {
-      .results-grid { grid-template-columns: 1fr; }
+      .results-grid { grid-template-columns: 1fr; align-items: start; }
       .score-card, .charts-card { grid-row: auto; }
-      .map-card  { grid-column: 1; grid-row: auto; }
+      .map-card  { grid-column: 1; grid-row: auto; min-height: 280px; }
+      #map { max-height: 320px; }
       .summary-card, .projections-card, .compliance-card, .recs-card, .offset-card, .export-row { grid-column: 1; }
       .offset-grid, .dm-panels { grid-template-columns: 1fr; }
       .compliance-grid { grid-template-columns: 1fr; }
