@@ -514,15 +514,26 @@ limitations under the License.
 
 ## Roadmap
 
+**What's Already Implemented:**
+- ✅ Batch location analysis (CSV upload — up to 5 regions)
+- ✅ Three IPCC scenarios (SSP1-2.6, SSP2-4.5, SSP5-8.5)
+- ✅ Multi-language support (EN, PT, ES, FR, DE)
+- ✅ Evapotranspiration and soil moisture analysis
+- ✅ Three-source climate timeline (NASA + ERA5 + IPCC)
+- ✅ Human-in-the-Loop (HITL) validation flag
+- ✅ AI Transparency layer (EU AI Act Art. 13)
+- ✅ ESG Glossary (bilingual EN/PT)
+- ✅ Terms of Use and Privacy Policy (scroll-to-accept)
+- ✅ PDF and Excel export
+- ✅ Session history with 30-day TTL (LGPD compliant)
+
 **Near-term:**
-- [x] Batch location analysis (CSV upload — max 20 regions)
-- [x] Additional IPCC scenarios (SSP1-2.6, SSP2-4.5, SSP5-8.5)
+- [ ] API key authentication for enterprise use
 - [ ] Historical comparison mode (1980-2000 vs 2000-2020)
-- [ ] API rate limiting and authentication
+- [ ] Batch analysis expanded to 20 regions
 
 **Medium-term:**
 - [ ] Vector database for regulation knowledge base (ChromaDB)
-- [x] Multi-language support (ES, FR, DE — 5 languages total)
 - [ ] Custom sector risk profiles (agriculture, real estate, energy)
 - [ ] Integration with GIS platforms (ArcGIS, QGIS)
 
@@ -548,6 +559,7 @@ limitations under the License.
 
 **Development:**
 - Built with Claude Code (Anthropic) and IBM Bob (AI co-author)
+- IBM Bob (watsonx Code Assistant) — used for deployment, documentation, and code review
 - Inspired by the "Become An Agentic Architect" course
 
 **Security:**
