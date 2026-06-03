@@ -45,8 +45,9 @@ Location Input (lat/lon)
 ┌───────────────────────────────────────────────────────────┐
 │ Agent 1: Data Collector (Python adapter — no LLM)        │
 │   • NASA POWER API: 10 years real satellite data         │
-│   • OpenMeteo IPCC: Climate projections 2026-2050        │
-│   • Parameters: temperature, precipitation, solar         │
+│   • ERA5 reanalysis: current-year real observations      │
+│   • OpenMeteo IPCC: Climate projections 2027-2050        │
+│   • 5 parameters: temp, precip, solar, ET0, soil moist. │
 └───────────────────────────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────────────────────────┐
@@ -87,13 +88,13 @@ Location Input (lat/lon)
 
 **NASA POWER API (2000-2025)**
 - Real satellite observations from NASA's POWER project
-- Daily resolution: temperature (T2M), precipitation (PRECTOTCORR), solar irradiance (ALLSKY_SFC_SW_DWN)
+- Daily resolution: temperature (T2M), precipitation (PRECTOTCORR), solar irradiance (ALLSKY_SFC_SW_DWN), FAO-56 evapotranspiration (ET0_FAO), soil moisture 0-10 cm (SOIL_MOISTURE_0_10CM)
 - Global coverage at 0.5° × 0.5° resolution
 - Aggregated to annual statistics for trend analysis
 
 **OpenMeteo IPCC Climate API (2026-2050)**
 - IPCC AR6 climate projections using EC_Earth3P_HR model
-- Daily resolution: temperature, precipitation
+- Daily resolution: temperature, precipitation, evapotranspiration (ET0)
 - Extends historical data with future scenarios
 - Enables long-term risk forecasting
 
@@ -101,7 +102,7 @@ Location Input (lat/lon)
 
 | Agent | Model | Role | Output |
 |-------|-------|------|--------|
-| **Data Collector** | Python + httpx | Fetches and normalizes climate data | Annual records (temp, precip, solar) |
+| **Data Collector** | Python + httpx | Fetches and normalizes climate data | Annual records (temp, precip, solar, ET0, soil moisture) |
 | **Climate Analyst** | Claude Haiku 4.5 | Detects trends and anomalies | Risk levels, key findings, data quality |
 | **ESG Strategist** | Claude Sonnet 4.6 | Maps risks to compliance frameworks | CSRD/ISSB/Taxonomy exposure + urgency |
 | **Report Writer** | Claude Sonnet 4.6 | Generates executive report | Risk score, summary, recommendations |
@@ -115,8 +116,11 @@ Location Input (lat/lon)
 - **Physical Climate Risk Score (0-100)** — Quantitative measure of location-specific climate exposure
 - **Investment Status Badge** — Approved / Conditioned / Restricted / Suspended (based on risk thresholds)
 - **Risk Level Classification** — Low / Moderate / High / Severe / Critical
-- **Trend Analysis** — Temperature and precipitation changes per decade
+- **5-parameter climate analysis** — temperature, precipitation, solar radiation, evapotranspiration (ET0), and soil moisture — covering heat stress, drought risk, and water security
+- **Trend Analysis** — Temperature, precipitation, and ET0 changes per decade
 - **Anomaly Detection** — Identifies extreme years (hottest, driest, wettest)
+- **Water Stress Detection** — ET0/precipitation ratio flags water deficit regions (ratio > 1.3 = HIGH stress)
+- **Soil Desiccation Signal** — Declining soil moisture trend flags long-term land degradation risk
 
 ### ESG Compliance Mapping
 - **CSRD ESRS E1** — Article-level mapping (E1-1 through E1-9) with exposure assessment

@@ -727,7 +727,7 @@
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
-    .chart-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    .chart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1.25rem; }
     .chart-item { display: flex; flex-direction: column; gap: .25rem; }
     .chart-item-label {
       font-size: .6rem;
@@ -771,6 +771,9 @@
       border-top: 5px solid currentColor;
     }
     canvas.mini-bar { width: 100%; height: 48px; display: block; }
+    .chart-item-value.val-deficit  { color: #c46a2a; }
+    .chart-item-value.val-risk-high { color: var(--risk-high); }
+    .chart-item-value.val-risk-low  { color: var(--risk-low); }
 
     /* ── Summary ─────────────────────────────────────────────────────────── */
     .summary-card { grid-column: 1 / -1; }
@@ -1626,6 +1629,18 @@
             <div class="chart-item-delta" id="chart-solar-delta"></div>
             <canvas class="mini-bar" id="canvas-solar"></canvas>
           </div>
+          <div class="chart-item">
+            <div class="chart-item-label" id="t-chart-et0">Evapotranspiration (mm/yr)</div>
+            <div class="chart-item-value" id="chart-et0-val">—</div>
+            <div class="chart-item-delta" id="chart-et0-delta"></div>
+            <canvas class="mini-bar" id="canvas-et0"></canvas>
+          </div>
+          <div class="chart-item">
+            <div class="chart-item-label" id="t-chart-soil">Soil Moisture (m³/m³)</div>
+            <div class="chart-item-value" id="chart-soil-val">—</div>
+            <div class="chart-item-delta" id="chart-soil-delta"></div>
+            <canvas class="mini-bar" id="canvas-soil"></canvas>
+          </div>
         </div>
       </div>
 
@@ -1689,7 +1704,7 @@
         <div class="ds-grid">
           <div class="ds-row"><span class="ds-key">Label</span><span class="ds-val" style="color:var(--green)">Historical · NASA POWER</span></div>
           <div class="ds-row"><span class="ds-key">Endpoint</span><span class="ds-val" id="ds-url">—</span></div>
-          <div class="ds-row"><span class="ds-key">Parameters</span><span class="ds-val">T2M · PRECTOTCORR · ALLSKY_SFC_SW_DWN</span></div>
+          <div class="ds-row"><span class="ds-key">Parameters</span><span class="ds-val">T2M · PRECTOTCORR · ALLSKY_SFC_SW_DWN · ET0_FAO · SOIL_MOISTURE_0_10CM</span></div>
           <div class="ds-row"><span class="ds-key">Period covered</span><span class="ds-val" id="ds-period">—</span></div>
           <div class="ds-row"><span class="ds-key">Annual records</span><span class="ds-val" id="ds-annual">—</span></div>
           <div class="ds-row"><span class="ds-key">Daily datapoints</span><span class="ds-val" id="ds-datapoints">—</span></div>
@@ -1936,6 +1951,8 @@ const I18N = {
     'chart-temp':      'Temp Mean (°C)',
     'chart-precip':    'Precipitation (mm/yr)',
     'chart-solar':     'Solar (kWh/m²/day)',
+    'chart-et0':       'Evapotranspiration (mm/yr)',
+    'chart-soil':      'Soil Moisture (m³/m³)',
     'summary-label':   'Executive Summary',
     'compliance-label':'Compliance Framework Mapping',
     'recs-label':      'Prioritised Recommendations',
@@ -1956,6 +1973,8 @@ const I18N = {
     'chart-temp':      'Temp. Média (°C)',
     'chart-precip':    'Precipitação (mm/ano)',
     'chart-solar':     'Solar (kWh/m²/dia)',
+    'chart-et0':       'Evapotranspiração (mm/ano)',
+    'chart-soil':      'Humidade do Solo (m³/m³)',
     'summary-label':   'Sumário Executivo',
     'compliance-label':'Mapeamento de Frameworks ESG',
     'recs-label':      'Recomendações Prioritárias',
@@ -2302,21 +2321,42 @@ function renderResults(data) {
   /* charts */
   if (annual.length) {
     const last    = annual[annual.length - 1];
-    const temps   = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
-    const precips = annual.map(r => r.precip_total_mm   ?? 0);
-    const solars  = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
+    const nasaRecs = annual.filter(r => (r.source || 'nasa') === 'nasa');
+    const temps    = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
+    const precips  = annual.map(r => r.precip_total_mm   ?? 0);
+    const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
+    const et0s     = annual.map(r => r.evapotranspiration_mm ?? 0);
+    const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
     document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
     document.getElementById('chart-solar-val').textContent  = (last.solar_mean_kwh_m2   ?? 0).toFixed(2);
 
-    setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,     '°C/decade', 'down', 'up');
-    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade, '%/decade',  'up',   'down');
+    // ET0 value + water-deficit color
+    const lastEt0   = last.evapotranspiration_mm ?? 0;
+    const lastPrecip = last.precip_total_mm ?? 0;
+    const et0El = document.getElementById('chart-et0-val');
+    et0El.textContent = lastEt0 > 0 ? lastEt0.toFixed(0) : '—';
+    et0El.className = 'chart-item-value' + (lastEt0 > 0 && lastPrecip > 0 && lastEt0 / lastPrecip > 1.3 ? ' val-deficit' : '');
+
+    // Soil moisture value + risk color
+    const lastSoil = last.soil_moisture_m3m3 ?? 0;
+    const soilEl = document.getElementById('chart-soil-val');
+    soilEl.textContent = lastSoil > 0 ? lastSoil.toFixed(3) : '—';
+    soilEl.className = 'chart-item-value'
+      + (lastSoil > 0 && lastSoil < 0.20 ? ' val-risk-high' : lastSoil > 0.30 ? ' val-risk-low' : '');
+
+    setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,              '°C/decade',       'down', 'up');
+    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade,          '%/decade',        'up',   'down');
+    setDelta('chart-et0-delta',    cf.et0_trend_mm_per_decade,              'mm/decade',       'down', 'up');
+    setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
 
     setTimeout(() => {
       drawBars('canvas-temp',   temps,   '196,106,42');
       drawBars('canvas-precip', precips, '46,125,154');
       drawBars('canvas-solar',  solars,  '196,174,58');
+      if (et0s.some(v => v > 0))  drawBars('canvas-et0',  et0s,  '196,106,42');
+      if (soils.some(v => v > 0)) drawBars('canvas-soil', soils, '58,107,53');
     }, 50);
   }
 

@@ -47,6 +47,7 @@ class ProjectionRecord:
     year: int
     temp_mean_c: float
     precip_total_mm: float
+    evapotranspiration_mm: float = 0.0
 
 
 @dataclass
@@ -54,6 +55,8 @@ class Era5Record:
     year: int
     temp_mean_c: float
     precip_total_mm: float
+    evapotranspiration_mm: float = 0.0
+    soil_moisture_m3m3: float = 0.0
 
 
 @dataclass
@@ -112,7 +115,8 @@ async def fetch_era5_recent(
         "longitude": longitude,
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date":   end_date.strftime("%Y-%m-%d"),
-        "daily":     "temperature_2m_mean,precipitation_sum,shortwave_radiation_sum",
+        "daily":     "temperature_2m_mean,precipitation_sum,shortwave_radiation_sum,"
+                     "et0_fao_evapotranspiration,soil_moisture_0_to_10cm",
         "timezone":  "auto",
     }
 
@@ -126,27 +130,42 @@ async def fetch_era5_recent(
 
         daily  = payload.get("daily", {})
         dates  = daily.get("time", [])
-        temps  = daily.get("temperature_2m_mean", [])
-        precip = daily.get("precipitation_sum",   [])
+        temps  = daily.get("temperature_2m_mean",        [])
+        precip = daily.get("precipitation_sum",          [])
+        et0    = daily.get("et0_fao_evapotranspiration", [])
+        soil   = daily.get("soil_moisture_0_to_10cm",    [])
 
         annual_temps:   dict[int, list[float]] = {}
         annual_precips: dict[int, list[float]] = {}
+        annual_et0:     dict[int, list[float]] = {}
+        annual_soil:    dict[int, list[float]] = {}
         for i, date_str in enumerate(dates):
             year = int(date_str[:4])
-            t = temps[i]
-            p = precip[i]
+            t = temps[i]  if i < len(temps)  else None
+            p = precip[i] if i < len(precip) else None
+            e = et0[i]    if i < len(et0)    else None
+            s = soil[i]   if i < len(soil)   else None
             if t is not None and float(t) != _FILL:
                 annual_temps.setdefault(year, []).append(float(t))
             if p is not None and float(p) != _FILL:
                 annual_precips.setdefault(year, []).append(float(p))
+            if e is not None and float(e) != _FILL:
+                annual_et0.setdefault(year, []).append(float(e))
+            if s is not None and float(s) != _FILL:
+                annual_soil.setdefault(year, []).append(float(s))
+
+        def _mean(lst: list[float]) -> float:
+            return sum(lst) / len(lst) if lst else 0.0
 
         records = [
             Era5Record(
                 year=year,
                 temp_mean_c=round(
-                    sum(annual_temps.get(year, [0])) / max(len(annual_temps.get(year, [1])), 1), 3
+                    _mean(annual_temps.get(year, [0])), 3
                 ),
                 precip_total_mm=round(sum(annual_precips.get(year, [0])), 1),
+                evapotranspiration_mm=round(sum(annual_et0.get(year, [0])), 1),
+                soil_moisture_m3m3=round(_mean(annual_soil.get(year, [0])), 4),
             )
             for year in sorted(set(annual_temps) | set(annual_precips))
         ]
@@ -298,7 +317,7 @@ async def _fetch_projections(
         "start_date": f"{start_year}-01-01",
         "end_date":   f"{end_year}-12-31",
         "models": model,
-        "daily": "temperature_2m_mean,precipitation_sum",
+        "daily": "temperature_2m_mean,precipitation_sum,et0_fao_evapotranspiration",
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         req = client.build_request("GET", _PROJECTION_URL, params=params)
@@ -309,26 +328,34 @@ async def _fetch_projections(
 
     daily = payload.get("daily", {})
     dates  = daily.get("time", [])
-    temps  = daily.get("temperature_2m_mean", [])
-    precip = daily.get("precipitation_sum",   [])
+    temps  = daily.get("temperature_2m_mean",        [])
+    precip = daily.get("precipitation_sum",          [])
+    et0    = daily.get("et0_fao_evapotranspiration", [])
 
     # Aggregate to annual means/totals
     annual_temps:   dict[int, list[float]] = {}
     annual_precips: dict[int, list[float]] = {}
+    annual_et0:     dict[int, list[float]] = {}
     for i, date_str in enumerate(dates):
         year = int(date_str[:4])
-        t = temps[i]
-        p = precip[i]
+        t = temps[i]  if i < len(temps)  else None
+        p = precip[i] if i < len(precip) else None
+        e = et0[i]    if i < len(et0)    else None
         if t is not None and float(t) != _FILL:
             annual_temps.setdefault(year, []).append(float(t))
         if p is not None and float(p) != _FILL:
             annual_precips.setdefault(year, []).append(float(p))
+        if e is not None and float(e) != _FILL:
+            annual_et0.setdefault(year, []).append(float(e))
 
     records = [
         ProjectionRecord(
             year=year,
-            temp_mean_c=round(sum(annual_temps.get(year, [0])) / max(len(annual_temps.get(year, [1])), 1), 3),
+            temp_mean_c=round(
+                sum(annual_temps.get(year, [0])) / max(len(annual_temps.get(year, [1])), 1), 3
+            ),
             precip_total_mm=round(sum(annual_precips.get(year, [0])), 1),
+            evapotranspiration_mm=round(sum(annual_et0.get(year, [0])), 1),
         )
         for year in sorted(set(annual_temps) | set(annual_precips))
     ]

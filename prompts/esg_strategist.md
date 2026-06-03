@@ -44,4 +44,7 @@ Rules:
 - Map flood_risk → ESRS E1 and EU Taxonomy climate change adaptation criteria
 - ISSB S2 physical risks: "chronic" = temperature/precipitation trends; "acute" = anomaly years
 - If drought_risk or heat_stress_risk is "high" or "critical", compliance_urgency must be at least "high"
+- If water_stress_risk is "high" or "critical" (ET0/precip ratio > 1.3) → add ESRS E3-4 (water consumption) to csrd_articles
+- If soil_moisture_mean_m3m3 < 0.20 or soil_moisture_trend is negative → add ESRS E4-6 (soil degradation / biodiversity) to csrd_articles
+- If both high ET0 and low soil moisture → add EU Taxonomy Do No Significant Harm (DNSH) water stress screening criteria to eu_taxonomy_criteria
 - lgpd_note is always the fixed string above — this analysis uses only aggregated climate data

@@ -337,59 +337,67 @@ async def run_analysis(
     # ── Build unified annual dataset (source field = "nasa" | "projection") ───
     unified_records: list[dict] = [
         {
-            "year":              r.year,
-            "latitude":          r.latitude,
-            "longitude":         r.longitude,
-            "temp_mean_celsius": r.temp_mean_celsius,
-            "temp_max_celsius":  r.temp_max_celsius,
-            "temp_min_celsius":  r.temp_min_celsius,
-            "precip_total_mm":   r.precip_total_mm,
-            "solar_mean_kwh_m2": r.solar_mean_kwh_m2,
-            "days_sampled":      r.days_sampled,
-            "source":            "nasa",
+            "year":                  r.year,
+            "latitude":              r.latitude,
+            "longitude":             r.longitude,
+            "temp_mean_celsius":     r.temp_mean_celsius,
+            "temp_max_celsius":      r.temp_max_celsius,
+            "temp_min_celsius":      r.temp_min_celsius,
+            "precip_total_mm":       r.precip_total_mm,
+            "solar_mean_kwh_m2":     r.solar_mean_kwh_m2,
+            "days_sampled":          r.days_sampled,
+            "evapotranspiration_mm": None,
+            "soil_moisture_m3m3":    None,
+            "source":                "nasa",
         }
         for r in nasa_result.annual_records
     ]
     if needs_era5 and era5_result.era5_records:
         unified_records += [
             {
-                "year":              r.year,
-                "latitude":          latitude,
-                "longitude":         longitude,
-                "temp_mean_celsius": r.temp_mean_c,
-                "temp_max_celsius":  None,
-                "temp_min_celsius":  None,
-                "precip_total_mm":   r.precip_total_mm,
-                "solar_mean_kwh_m2": None,
-                "days_sampled":      365,
-                "source":            "era5",
+                "year":                  r.year,
+                "latitude":              latitude,
+                "longitude":             longitude,
+                "temp_mean_celsius":     r.temp_mean_c,
+                "temp_max_celsius":      None,
+                "temp_min_celsius":      None,
+                "precip_total_mm":       r.precip_total_mm,
+                "solar_mean_kwh_m2":     None,
+                "days_sampled":          365,
+                "evapotranspiration_mm": r.evapotranspiration_mm or None,
+                "soil_moisture_m3m3":    r.soil_moisture_m3m3 or None,
+                "source":                "era5",
             }
             for r in era5_result.era5_records
         ]
     if needs_projection and om_result.projection_records:
         unified_records += [
             {
-                "year":              r.year,
-                "latitude":          latitude,
-                "longitude":         longitude,
-                "temp_mean_celsius": r.temp_mean_c,
-                "temp_max_celsius":  None,
-                "temp_min_celsius":  None,
-                "precip_total_mm":   r.precip_total_mm,
-                "solar_mean_kwh_m2": None,
-                "days_sampled":      365,
-                "source":            "projection",
+                "year":                  r.year,
+                "latitude":              latitude,
+                "longitude":             longitude,
+                "temp_mean_celsius":     r.temp_mean_c,
+                "temp_max_celsius":      None,
+                "temp_min_celsius":      None,
+                "precip_total_mm":       r.precip_total_mm,
+                "solar_mean_kwh_m2":     None,
+                "days_sampled":          365,
+                "evapotranspiration_mm": r.evapotranspiration_mm or None,
+                "soil_moisture_m3m3":    None,
+                "source":                "projection",
             }
             for r in om_result.projection_records
         ]
 
     serialised_records = json.dumps([
         {
-            "year":            r["year"],
-            "temp_mean_c":     r.get("temp_mean_celsius") or 0,
-            "precip_total_mm": r.get("precip_total_mm") or 0,
-            "solar_mean_kwh_m2": r.get("solar_mean_kwh_m2"),
-            "source":          r["source"],
+            "year":                  r["year"],
+            "temp_mean_c":           r.get("temp_mean_celsius") or 0,
+            "precip_total_mm":       r.get("precip_total_mm") or 0,
+            "solar_mean_kwh_m2":     r.get("solar_mean_kwh_m2"),
+            "evapotranspiration_mm": r.get("evapotranspiration_mm"),
+            "soil_moisture_m3m3":    r.get("soil_moisture_m3m3"),
+            "source":                r["source"],
         }
         for r in unified_records
     ])
