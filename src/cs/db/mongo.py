@@ -35,8 +35,7 @@ def _result_to_doc(result, session_id: str | None = None) -> dict:
     # Add session_id and expires_at if session_id is provided
     if session_id:
         doc["session_id"] = session_id
-        # Set expiration to 24 hours from now
-        doc["expires_at"] = datetime.utcnow() + timedelta(hours=24)
+        doc["expires_at"] = datetime.utcnow() + timedelta(days=30)
     
     return doc
 
@@ -121,5 +120,5 @@ async def create_indexes() -> None:
     await analyses.create_index([("created_at", -1)])
     await analyses.create_index("session_id")
     # TTL index: MongoDB will automatically delete documents when expires_at is reached
-    await analyses.create_index("expires_at", expireAfterSeconds=0)
+    await analyses.create_index("expires_at", expireAfterSeconds=2592000)
     logger.info("MongoDB indexes ensured (including TTL on expires_at)")

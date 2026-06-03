@@ -1981,7 +1981,7 @@
     <button class="footer-link" onclick="openModal('modal-glossary')">ESG Glossary / Glossário ESG</button>
   </div>
   <div class="footer-bottom" id="t-footer-text">
-    🌿 Analysis history is stored for 24 hours using an anonymous session cookie. No personal data is collected.
+    🌿 Analysis history is stored for 30 days using an anonymous session cookie. No personal data is collected.
     &nbsp;·&nbsp; Powered by NASA POWER API &amp; Claude AI (Anthropic)
   </div>
 
@@ -2031,7 +2031,7 @@ function generateSessionId() {
 function acceptCookies() {
   COOKIES_ACCEPTED = true;
   SESSION_ID = generateSessionId();
-  setCookie('cs_session_id', SESSION_ID, 86400); // 24 hours
+  setCookie('cs_session_id', SESSION_ID, 2592000); // 30 days
   setCookie('cs_consent', 'accepted', 86400);
   document.getElementById('cookie-banner').classList.remove('visible');
   loadHistory();
@@ -3893,13 +3893,13 @@ async function viewBatchReport(analysisId) {
 
       <div class="modal-section">
         <div class="modal-section-title">1. Data We Collect / Dados que Coletamos</div>
-        <p class="modal-en">We collect no personal data. Only an anonymous session ID (UUID) is stored as a browser cookie for 24 hours to enable analysis history.</p>
+        <p class="modal-en">We collect no personal data. Only an anonymous session ID (UUID) is stored as a browser cookie for 30 days to enable analysis history.</p>
         <p class="modal-pt">Não coletamos dados pessoais. Apenas um ID de sessão anônimo (UUID) é armazenado como cookie por 24 horas para habilitar o histórico de análises.</p>
       </div>
 
       <div class="modal-section">
         <div class="modal-section-title">2. Data Retention / Retenção de Dados</div>
-        <p class="modal-en">All session data is automatically deleted after 24 hours via MongoDB TTL index. No backups are kept. No data is sold or shared with third parties.</p>
+        <p class="modal-en">All session data is automatically deleted after 30 days via MongoDB TTL index. No backups are kept. No data is sold or shared with third parties.</p>
         <p class="modal-pt">Todos os dados de sessão são automaticamente excluídos após 24 horas via índice TTL do MongoDB. Nenhum backup é mantido. Nenhum dado é vendido ou compartilhado.</p>
       </div>
 
