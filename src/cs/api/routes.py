@@ -248,17 +248,6 @@ def _inv_label(score: int) -> str:
     return "Investment Suspended"
 
 
-@router.get("/api/batch/template")
-async def batch_template() -> StreamingResponse:
-    return StreamingResponse(
-        io.StringIO(_BATCH_TEMPLATE_CSV),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="climate_sentinel_batch_template.csv"',
-            "Cache-Control": "no-cache",
-        },
-    )
-
 
 @router.post("/api/analyze/batch")
 @limiter.limit("3/hour")
