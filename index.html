@@ -2736,7 +2736,7 @@ function renderResults(data) {
     const temps    = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
     const precips  = annual.map(r => r.precip_total_mm   ?? 0);
     const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
-    const et0s     = annual.map(r => r.evapotranspiration_mm ?? 0);
+    const et0s     = annual.map(r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0 ?? 0);
     const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
@@ -2745,12 +2745,29 @@ function renderResults(data) {
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
-    // ET0 value + water-deficit color
-    const lastEt0   = last.evapotranspiration_mm ?? 0;
+    // ET0 value + water-deficit color — scan backwards for last non-null value
+    const _et0From = r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0 ?? 0;
+    const lastEt0  = _et0From(last) || [...annual].reverse().reduce((v, r) => v || _et0From(r), 0);
     const lastPrecip = last.precip_total_mm ?? 0;
     const et0El = document.getElementById('chart-et0-val');
-    et0El.textContent = lastEt0 > 0 ? lastEt0.toFixed(0) : '—';
-    et0El.className = 'chart-item-value' + (lastEt0 > 0 && lastPrecip > 0 && lastEt0 / lastPrecip > 1.3 ? ' val-deficit' : '');
+    const et0Card = document.getElementById('chart-et0-card');
+
+    if (et0s.some(v => v > 0)) {
+      et0El.textContent = lastEt0 > 0 ? lastEt0.toFixed(0) : '—';
+      et0El.className = 'chart-item-value' + (lastEt0 > 0 && lastPrecip > 0 && lastEt0 / lastPrecip > 1.3 ? ' val-deficit' : '');
+    } else {
+      // Fall back to soil moisture in the ET0 card slot
+      const soilFallbacks = annual.map(r => r.soil_moisture_m3m3 ?? r.soil_moisture ?? 0);
+      if (soilFallbacks.some(v => v > 0) && et0Card) {
+        const labelEl = document.querySelector('#chart-et0-card .chart-item-label');
+        if (labelEl) labelEl.textContent = 'Soil Moisture (m³/m³)';
+        et0El.textContent = soilFallbacks[soilFallbacks.length - 1].toFixed(3);
+        setTimeout(() => drawBars('canvas-et0', soilFallbacks, 'stable'), 50);
+        et0Card.style.display = '';
+      } else if (et0Card) {
+        et0Card.style.display = 'none';
+      }
+    }
 
     // Soil moisture value + risk color
     const lastSoil = last.soil_moisture_m3m3 ?? 0;
@@ -2766,7 +2783,6 @@ function renderResults(data) {
 
     // Hide optional cards when no data for this analysis
     if (!solars.some(v => v > 0)) { const c = document.getElementById('chart-solar-card'); if (c) c.style.display = 'none'; }
-    if (!et0s.some(v => v > 0))   { const c = document.getElementById('chart-et0-card');   if (c) c.style.display = 'none'; }
     if (!soils.some(v => v > 0))  { const c = document.getElementById('chart-soil-card');  if (c) c.style.display = 'none'; }
 
     setTimeout(() => {
