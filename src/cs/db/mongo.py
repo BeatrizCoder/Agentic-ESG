@@ -116,9 +116,23 @@ async def create_indexes() -> None:
     """Ensure performance indexes exist. Call once at startup."""
     if analyses is None:
         return
-    await analyses.create_index("analysis_id", unique=True)
-    await analyses.create_index([("created_at", -1)])
-    await analyses.create_index("session_id")
-    # TTL index: MongoDB will automatically delete documents when expires_at is reached
-    await analyses.create_index("expires_at", expireAfterSeconds=2592000)
-    logger.info("MongoDB indexes ensured (including TTL on expires_at)")
+    try:
+        # Drop existing TTL index if it exists (value may have changed)
+        try:
+            await analyses.drop_index("expires_at_1")
+        except Exception:
+            pass  # Index doesn't exist, that's fine
+
+        await analyses.create_index(
+            "expires_at",
+            expireAfterSeconds=2592000,
+            name="expires_at_1",
+        )
+
+        await analyses.create_index("analysis_id", unique=True)
+        await analyses.create_index([("created_at", -1)])
+        await analyses.create_index("session_id")
+        logger.info("MongoDB indexes ensured (including TTL on expires_at)")
+    except Exception as e:
+        logger.warning(f"Index creation warning: {e}")
+        # Don't crash on index errors — app still works
