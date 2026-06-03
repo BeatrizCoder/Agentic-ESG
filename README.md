@@ -14,7 +14,7 @@
 
 ## Overview
 
-Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Climate Sentinel delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.03 per location — powered by real NASA satellite data and IPCC projections to 2050.
+Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Climate Sentinel delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.04 per location — powered by real NASA satellite data, ERA5 reanalysis, and IPCC projections to 2050.
 
 > **Maps physical climate risk to CSRD ESRS E1, ISSB S2, and EU Taxonomy — translating satellite data into compliance-ready business intelligence.**
 
@@ -31,7 +31,7 @@ Organizations face mounting pressure to assess and disclose physical climate ris
 - **EU Taxonomy** — Investment screening requires climate risk evaluation for sustainable finance classification
 - **Traditional assessments** — Manual climate risk analysis costs $5,000-$50,000 and takes weeks
 
-Climate Sentinel delivers executive-ready climate risk assessment in under 30 seconds for ~$0.03 per location.
+Climate Sentinel delivers executive-ready climate risk assessment in under 30 seconds for ~$0.04 per location.
 
 ---
 
@@ -86,17 +86,22 @@ Location Input (lat/lon)
 
 ### Data Sources
 
-**NASA POWER API (2000-2025)**
+**NASA POWER API (1981–2025)**
 - Real satellite observations from NASA's POWER project
-- Daily resolution: temperature (T2M), precipitation (PRECTOTCORR), solar irradiance (ALLSKY_SFC_SW_DWN), FAO-56 evapotranspiration (ET0_FAO), soil moisture 0-10 cm (SOIL_MOISTURE_0_10CM)
+- Daily resolution: temperature (T2M), precipitation (PRECTOTCORR), solar irradiance (ALLSKY_SFC_SW_DWN), FAO-56 evapotranspiration (ET0_FAO), soil moisture 0–10 cm (SOIL_MOISTURE_0_10CM)
 - Global coverage at 0.5° × 0.5° resolution
 - Aggregated to annual statistics for trend analysis
 
-**OpenMeteo IPCC Climate API (2026-2050)**
+**OpenMeteo ERA5 (2026–present)**
+- Real observed data from ECMWF ERA5 reanalysis for the current and recent years
+- Bridges the gap between NASA POWER history and IPCC projections
+- Same 5-parameter coverage as NASA POWER
+
+**OpenMeteo IPCC Climate API (2027–2050)**
 - IPCC AR6 climate projections using EC_Earth3P_HR model
+- Three emissions scenarios: SSP1-2.6 (optimistic), SSP2-4.5 (moderate), SSP5-8.5 (high)
 - Daily resolution: temperature, precipitation, evapotranspiration (ET0)
-- Extends historical data with future scenarios
-- Enables long-term risk forecasting
+- Enables long-term risk forecasting across scenario space
 
 ### Agent Details
 
@@ -114,13 +119,23 @@ Location Input (lat/lon)
 
 ### Risk Assessment
 - **Physical Climate Risk Score (0-100)** — Quantitative measure of location-specific climate exposure
-- **Investment Status Badge** — Approved / Conditioned / Restricted / Suspended (based on risk thresholds)
-- **Risk Level Classification** — Low / Moderate / High / Severe / Critical
-- **5-parameter climate analysis** — temperature, precipitation, solar radiation, evapotranspiration (ET0), and soil moisture — covering heat stress, drought risk, and water security
+- **Investment Status Badge** — Approved / Conditioned / Restricted / Suspended (based on risk thresholds), translated in all 5 languages
+- **Risk Level Classification** — Low / Medium / High / Critical
 - **Trend Analysis** — Temperature, precipitation, and ET0 changes per decade
 - **Anomaly Detection** — Identifies extreme years (hottest, driest, wettest)
-- **Water Stress Detection** — ET0/precipitation ratio flags water deficit regions (ratio > 1.3 = HIGH stress)
-- **Soil Desiccation Signal** — Declining soil moisture trend flags long-term land degradation risk
+
+### Enhanced Climate Data (5 Parameters)
+- **Temperature** — Mean annual (T2M) from NASA POWER satellite observations
+- **Precipitation** — Total annual (PRECTOTCORR), corrected for systematic bias
+- **Solar Radiation** — Surface shortwave downwelling (ALLSKY_SFC_SW_DWN, kWh/m²/day)
+- **Evapotranspiration (ET0)** — FAO-56 Penman-Monteith reference ET; ET0/precipitation ratio > 1.3 flagged as HIGH water deficit (CSRD ESRS E3-4)
+- **Soil Moisture** — 0–10 cm layer (m³/m³); declining trend flags long-term desiccation risk
+
+### Three-Source Climate Timeline
+- **NASA POWER** — Verified historical observations 1981–2025
+- **OpenMeteo ERA5** — Real observed data 2026–present (ECMWF reanalysis)
+- **OpenMeteo IPCC** — Climate projections 2027–2050 (SSP1-2.6, SSP2-4.5, SSP5-8.5)
+- Unified visualization showing all three sources with clear source labels
 
 ### ESG Compliance Mapping
 - **CSRD ESRS E1** — Article-level mapping (E1-1 through E1-9) with exposure assessment
@@ -129,26 +144,49 @@ Location Input (lat/lon)
 - **Double Materiality Assessment** — Impact and financial materiality per CSRD ESRS 1
 - **Compliance Urgency** — Low / Medium / High / Critical priority classification
 
-### Climate Projections
-- **Historical Baseline** — 10 years of NASA satellite observations (2014-2023)
-- **Future Scenarios** — IPCC projections to 2050 (EC_Earth3P_HR model)
-- **Unified Timeline** — Seamless integration of historical + projected data
-- **Trend Extrapolation** — Linear warming/precipitation trends with confidence intervals
+### Batch Analysis
+- **CSV Upload** — Analyze up to 20 regions in a single submission
+- **Template Download** — Pre-formatted CSV with example rows (region, lat, lon, sector, scenario)
+- **Sequential Processing** — 2-second delay between regions to respect NASA API rate limits
+- **Results Table** — Risk score, risk level, investment status, and confidence for every region
+- **Excel Export** — All batch results in a single formatted workbook, sorted by risk score
+
+### ESG Glossary
+- Bilingual EN/PT glossary of key ESG and climate terms
+- Searchable: CSRD, ISSB S2, EU Taxonomy, Double Materiality, HITL, SSP Scenarios, and more
+
+### AI Transparency Layer (EU AI Act Art. 13)
+- **Risk Score Composition** — Weighted factor breakdown showing what drove the score
+- **Agent Reasoning Chain** — What each agent received as input and what it concluded
+- **Validation Audit Trail** — Per-check results from the Validation Layer
+- **Interpretability vs Explainability** — Separated score factors from narrative reasoning
+
+### Human-in-the-Loop Flag
+- Automatic flag when Validation Layer confidence falls below 70%
+- Triggers on: critical risk + low confidence, extreme data anomalies, data quality issues
+- Recommends expert validation before use in regulatory filings or investment decisions
 
 ### Ecosystem Offsets
 - **Science-Based Targets** — Reforestation, wetland restoration, mangrove protection
 - **Quantified Requirements** — Hectares, carbon sequestration potential, biodiversity impact
 - **Regional Adaptation** — Tailored to local ecosystem and climate conditions
 
-### Responsible AI
-- **Human-in-the-Loop Flag** — Validation Layer automatically recommends expert review when confidence indicators fall below threshold, ensuring AI outputs are not used uncritically in high-stakes compliance decisions.
+### Multilingual Support
+- English (EN), Portuguese / PT-BR (PT), Spanish (ES), French (FR), German (DE)
+- All UI labels, risk badges, investment status, and the Analyze button translate dynamically
+- Language preference saved in localStorage and restored on next visit
+
+### Terms & Privacy
+- Bilingual EN/PT Terms of Use and Privacy Policy (scroll-to-accept)
+- Platform gated until both documents are accepted
+- LGPD compliant session storage (anonymous 24h TTL cookies)
+- © 2026 Beatriz Costa Leal
 
 ### User Experience
-- **Session History** — MongoDB-backed analysis storage with cookie consent (LGPD compliant)
+- **Session History** — MongoDB-backed analysis storage with cookie consent
 - **Dark/Light Theme** — Automatic system preference detection + manual toggle
-- **EN/PT Language Toggle** — Full bilingual support (English/Portuguese)
-- **PDF Export** — Professional report generation with charts and tables
-- **Interactive Map** — Click-to-analyze any location globally
+- **PDF & Excel Export** — Professional report generation with charts and tables
+- **Interactive Map** — Leaflet.js map with click-to-analyze any location globally
 
 ---
 
@@ -163,8 +201,9 @@ Location Input (lat/lon)
 - **Testing:** pytest with async support
 
 ### Data & APIs
-- **Climate Data:** NASA POWER API v2.5 (free, no auth required)
-- **Projections:** OpenMeteo IPCC Climate API (free, no auth required)
+- **Climate Data:** NASA POWER API v2.5 — temperature, precipitation, solar, ET0, soil moisture (free, no auth)
+- **Recent Observations:** OpenMeteo ERA5 reanalysis — real observed data 2026+ (free, no auth)
+- **Projections:** OpenMeteo IPCC Climate API — projections to 2050, 3 SSP scenarios (free, no auth)
 - **Database:** MongoDB via Railway (session storage)
 
 ### Frontend
@@ -202,16 +241,16 @@ All provenance data visible in the **Data Sources** tab of every analysis report
 
 ## Cost Per Analysis
 
-**~$0.03 per full analysis** (5 LLM agents)
+**~$0.04 per full analysis** (5 parameters + richer agent prompts)
 
 | Agent | Model | Avg Tokens | Avg Cost |
 |-------|-------|-----------|---------|
 | Data Collector | Python (no LLM) | 0 | $0.000 |
-| Climate Analyst | Haiku 4.5 | ~800 | $0.002 |
-| ESG Strategist | Sonnet 4.6 | ~1,200 | $0.009 |
-| Report Writer | Sonnet 4.6 | ~1,500 | $0.012 |
-| Validation Layer | Sonnet 4.6 | ~1,000 | $0.008 |
-| **Total** | | **~4,500** | **~$0.031** |
+| Climate Analyst | Haiku 4.5 | ~1,000 | $0.003 |
+| ESG Strategist | Sonnet 4.6 | ~1,400 | $0.011 |
+| Report Writer | Sonnet 4.6 | ~1,700 | $0.014 |
+| Validation Layer | Sonnet 4.6 | ~1,100 | $0.009 |
+| **Total** | | **~5,200** | **~$0.037** |
 
 *Costs based on Anthropic pricing: Haiku $0.25/$1.25 per MTok (in/out), Sonnet $3/$15 per MTok (in/out)*
 
@@ -261,7 +300,7 @@ Agents run **sequentially** (not in parallel) because each depends on the previo
 ### Projection Methodology
 - **Linear extrapolation:** Future trends are calculated using linear regression on historical data
 - **Not physics-based:** We use IPCC model outputs (EC_Earth3P_HR) but don't run climate simulations ourselves
-- **Single scenario:** Currently uses SSP2-4.5 (middle-of-the-road emissions scenario)
+- **Three scenarios available:** SSP1-2.6, SSP2-4.5, SSP5-8.5 — results vary significantly between scenarios
 - **No extreme events:** Projections show gradual trends, not sudden shocks (hurricanes, wildfires)
 
 ### Data Quality
@@ -273,8 +312,7 @@ Agents run **sequentially** (not in parallel) because each depends on the previo
 ### System Limitations
 - **No user authentication:** Current version uses session-based storage only (LGPD compliant)
 - **No real-time updates:** Climate data refreshed when NASA/OpenMeteo publish new datasets
-- **Single location analysis:** Batch processing not yet implemented
-- **English/Portuguese only:** Other languages require prompt translation
+- **Batch cap:** CSV batch analysis limited to 20 regions per submission; larger portfolios require multiple uploads
 
 ### Compliance Disclaimer
 Climate Sentinel provides **decision support**, not legal advice. Organizations should:
@@ -449,7 +487,7 @@ docker run -p 8001:8001 \
 
 Apache License 2.0
 
-Copyright 2026 Beatriz Costa
+Copyright 2026 Beatriz Costa Leal
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -468,14 +506,14 @@ limitations under the License.
 ## Roadmap
 
 **Near-term:**
-- [ ] Batch location analysis (CSV upload)
-- [ ] Additional IPCC scenarios (SSP1-2.6, SSP5-8.5)
+- [x] Batch location analysis (CSV upload — max 20 regions)
+- [x] Additional IPCC scenarios (SSP1-2.6, SSP2-4.5, SSP5-8.5)
 - [ ] Historical comparison mode (1980-2000 vs 2000-2020)
 - [ ] API rate limiting and authentication
 
 **Medium-term:**
 - [ ] Vector database for regulation knowledge base (ChromaDB)
-- [ ] Multi-language support (ES, FR, DE)
+- [x] Multi-language support (ES, FR, DE — 5 languages total)
 - [ ] Custom sector risk profiles (agriculture, real estate, energy)
 - [ ] Integration with GIS platforms (ArcGIS, QGIS)
 
