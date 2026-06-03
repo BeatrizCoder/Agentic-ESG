@@ -785,12 +785,13 @@
     .proj-toggle { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
     .proj-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .68rem; padding: .2rem .55rem; cursor: pointer; transition: background .15s, color .15s; }
     .proj-toggle button.active { background: var(--green2); color: var(--text); }
-    .proj-legend { display: flex; gap: 1.1rem; margin-bottom: .5rem; }
+    .proj-legend { display: flex; gap: 1.1rem; margin-bottom: .5rem; flex-wrap: wrap; }
     .proj-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); }
     .proj-legend-line { width: 22px; height: 2px; }
-    .proj-legend-line.solid  { background: var(--green); }
+    .proj-legend-line.nasa   { background: #2e7d9a; }
     .proj-legend-line.dashed { background: repeating-linear-gradient(90deg, #c46a2a 0, #c46a2a 4px, transparent 4px, transparent 8px); }
-    #canvas-proj { width: 100%; height: 160px; display: block; }
+    .proj-legend-era5 { width: 12px; height: 12px; border-radius: 50%; background: #3a6b35; outline: 3px solid rgba(58,107,53,0.3); flex-shrink: 0; }
+    #canvas-proj { width: 100%; height: 200px; display: block; }
     .compliance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
     .compliance-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; }
     .compliance-framework { font-size: .6rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--green); margin-bottom: .35rem; }
@@ -1638,7 +1639,7 @@
       <div class="card projections-card" id="proj-card" style="display:none">
         <div class="proj-header">
           <div>
-            <div class="card-label" id="proj-card-label">Climate Projections 2024–2050 · OpenMeteo IPCC</div>
+            <div class="card-label" id="proj-card-label">Climate Timeline · Three-Source Unified Dataset</div>
           </div>
           <div class="proj-toggle">
             <button class="active" id="proj-btn-temp"   onclick="switchProjMetric('temp')">Temperature</button>
@@ -1646,8 +1647,9 @@
           </div>
         </div>
         <div class="proj-legend">
-          <div class="proj-legend-item"><div class="proj-legend-line solid"></div> Historical · NASA POWER</div>
-          <div class="proj-legend-item"><div class="proj-legend-line dashed"></div> Projected · OpenMeteo IPCC</div>
+          <div class="proj-legend-item"><div class="proj-legend-line nasa"></div> NASA POWER · Historical</div>
+          <div class="proj-legend-item"><div class="proj-legend-era5"></div> ERA5 · Real 2026</div>
+          <div class="proj-legend-item"><div class="proj-legend-line dashed"></div> OpenMeteo IPCC · Projected</div>
         </div>
         <canvas id="canvas-proj"></canvas>
       </div>
@@ -2535,6 +2537,7 @@ function renderTransparency(t) {
 
 /* ── Projection chart ────────────────────────────────────────────────────── */
 let _projHistorical = [];
+let _projEra5       = [];
 let _projFuture     = [];
 let _projMetric     = 'temp';
 
@@ -2546,24 +2549,16 @@ function switchProjMetric(metric) {
 }
 
 function renderProjections(annualRecords) {
-  // Split unified annual_records by source field
-  _projHistorical = annualRecords
-    .filter(r => (r.source || 'nasa') === 'nasa')
-    .map(r => ({
-      year: r.year,
-      temp: r.temp_mean_celsius ?? r.temp_mean_c ?? 0,
-      precip: r.precip_total_mm ?? 0,
-    }));
-  _projFuture = annualRecords
-    .filter(r => r.source === 'projection')
-    .map(r => ({
-      year: r.year,
-      temp: r.temp_mean_celsius ?? r.temp_mean_c ?? 0,
-      precip: r.precip_total_mm ?? 0,
-    }));
+  const toPoint = r => ({
+    year:   r.year,
+    temp:   r.temp_mean_celsius ?? r.temp_mean_c ?? 0,
+    precip: r.precip_total_mm ?? 0,
+  });
+  _projHistorical = annualRecords.filter(r => (r.source || 'nasa') === 'nasa').map(toPoint);
+  _projEra5       = annualRecords.filter(r => r.source === 'era5').map(toPoint);
+  _projFuture     = annualRecords.filter(r => r.source === 'projection').map(toPoint);
 
-  // Show chart even for NASA-only analyses (solid line only)
-  if (_projHistorical.length < 2) return;
+  if (_projHistorical.length < 2 && !_projEra5.length) return;
   document.getElementById('proj-card').style.display = '';
   setTimeout(_drawProjectionChart, 60);
 }
@@ -2578,94 +2573,144 @@ function _drawProjectionChart() {
   ctx.scale(dpr, dpr);
 
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  const PAD = { top: 8, right: 12, bottom: 26, left: 44 };
+  const PAD = { top: 20, right: 16, bottom: 28, left: 46 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top  - PAD.bottom;
 
-  const isTemp = _projMetric === 'temp';
-  const histVals = _projHistorical.map(r => isTemp ? r.temp   : r.precip);
-  const projVals = _projFuture.map(r    => isTemp ? r.temp   : r.precip);
-  const allVals  = [...histVals, ...projVals].filter(v => v > 0);
+  const isTemp  = _projMetric === 'temp';
+  const val     = r => isTemp ? r.temp : r.precip;
+  const hasEra5 = _projEra5.length > 0;
+  const hasProj = _projFuture.length > 0;
+
+  const allPts  = [..._projHistorical, ..._projEra5, ..._projFuture];
+  const allVals = allPts.map(val).filter(v => v > 0);
   if (!allVals.length) return;
 
-  const minV = Math.min(...allVals) * (isTemp ? 0.98 : 0.6);
-  const maxV = Math.max(...allVals) * (isTemp ? 1.02 : 1.1);
-  const allYears = [..._projHistorical, ..._projFuture].map(r => r.year);
+  const minV = Math.min(...allVals) * (isTemp ? 0.97 : 0.6);
+  const maxV = Math.max(...allVals) * (isTemp ? 1.03 : 1.1);
+  const allYears = allPts.map(r => r.year);
   const minY = Math.min(...allYears), maxY = Math.max(...allYears);
   const rangeY = maxY - minY || 1, rangeV = maxV - minV || 1;
 
   const xOf = year  => PAD.left + (year - minY) / rangeY * chartW;
   const yOf = value => PAD.top  + (1 - (value - minV) / rangeV) * chartH;
 
-  // Background grid
-  ctx.strokeStyle = getComputedStyle(document.documentElement)
-    .getPropertyValue('--border').trim() || 'rgba(99,140,160,0.12)';
+  // ── Background grid ───────────────────────────────────────────────────────
+  ctx.strokeStyle = 'rgba(60,80,40,0.07)';
   ctx.lineWidth = 0.5;
   for (let i = 0; i <= 4; i++) {
     const y = PAD.top + (i / 4) * chartH;
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
   }
 
-  // Historical line — solid teal
-  if (_projHistorical.length > 1) {
-    ctx.beginPath();
-    ctx.strokeStyle = '#4aa8c8';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    _projHistorical.forEach((r, i) => {
-      const val = isTemp ? r.temp : r.precip;
-      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val)) : ctx.lineTo(xOf(r.year), yOf(val));
-    });
-    ctx.stroke();
-    // Dots
-    ctx.fillStyle = '#4aa8c8';
-    _projHistorical.forEach(r => {
-      const val = isTemp ? r.temp : r.precip;
-      ctx.beginPath(); ctx.arc(xOf(r.year), yOf(val), 3, 0, Math.PI * 2); ctx.fill();
-    });
+  // ── Background zones ──────────────────────────────────────────────────────
+  const nasaZoneEnd = (hasEra5 || hasProj) ? xOf(2026) : W - PAD.right;
+  ctx.fillStyle = 'rgba(46,125,154,0.05)';
+  ctx.fillRect(PAD.left, PAD.top, nasaZoneEnd - PAD.left, chartH);
+
+  if (hasEra5) {
+    const era5End = hasProj ? xOf(2027) : W - PAD.right;
+    ctx.fillStyle = 'rgba(58,107,53,0.07)';
+    ctx.fillRect(xOf(2026), PAD.top, era5End - xOf(2026), chartH);
+  }
+  if (hasProj) {
+    const projStart = hasEra5 ? xOf(2027) : xOf(2026);
+    ctx.fillStyle = 'rgba(196,106,42,0.04)';
+    ctx.fillRect(projStart, PAD.top, W - PAD.right - projStart, chartH);
   }
 
-  // Projection line — dashed orange
-  if (_projFuture.length > 1) {
-    ctx.beginPath();
-    ctx.strokeStyle = '#c46a2a';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]);
-    _projFuture.forEach((r, i) => {
-      const val = isTemp ? r.temp : r.precip;
-      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val)) : ctx.lineTo(xOf(r.year), yOf(val));
-    });
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // X-axis labels — every 5 years
-  ctx.fillStyle = '#6a8898';
-  ctx.font = `${10 * (1 / dpr + (dpr - 1) * 0.5)}px "DM Mono", monospace`;
-  ctx.textAlign = 'center';
-  for (let y = Math.ceil(minY / 5) * 5; y <= maxY; y += 5) {
-    ctx.fillText(y, xOf(y), H - 6);
-  }
-
-  // Y-axis labels
-  ctx.textAlign = 'right';
-  for (let i = 0; i <= 4; i++) {
-    const val = minV + (1 - i / 4) * rangeV;
-    const label = isTemp ? val.toFixed(1) + '°' : Math.round(val) + 'mm';
-    ctx.fillText(label, PAD.left - 4, PAD.top + (i / 4) * chartH + 4);
-  }
-
-  // Transition marker
-  if (_projHistorical.length && _projFuture.length) {
-    const x = xOf(2024);
-    ctx.strokeStyle = 'rgba(99,140,160,0.3)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
+  // ── Divider lines ─────────────────────────────────────────────────────────
+  function drawDivider(year, color, label) {
+    if (year <= minY || year > maxY) return;
+    const x = xOf(year);
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(99,140,160,0.5)';
-    ctx.textAlign = 'center';
-    ctx.fillText('2024', x, PAD.top + 10);
+    ctx.fillStyle = color;
+    ctx.font = '9px "DM Mono", monospace'; ctx.textAlign = 'center';
+    ctx.fillText(label, x, PAD.top - 5);
+  }
+  if (hasEra5) drawDivider(2026, 'rgba(46,125,154,0.5)', '2026');
+  if (hasProj) drawDivider(hasEra5 ? 2027 : 2026, 'rgba(196,106,42,0.5)', hasEra5 ? '2027' : '2026');
+
+  // ── Bridge connectors ─────────────────────────────────────────────────────
+  ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+  if (_projHistorical.length && hasEra5) {
+    const a = _projHistorical[_projHistorical.length - 1], b = _projEra5[0];
+    ctx.strokeStyle = 'rgba(46,125,154,0.25)';
+    ctx.beginPath(); ctx.moveTo(xOf(a.year), yOf(val(a))); ctx.lineTo(xOf(b.year), yOf(val(b))); ctx.stroke();
+  } else if (_projHistorical.length && hasProj) {
+    const a = _projHistorical[_projHistorical.length - 1], b = _projFuture[0];
+    ctx.strokeStyle = 'rgba(196,106,42,0.25)';
+    ctx.beginPath(); ctx.moveTo(xOf(a.year), yOf(val(a))); ctx.lineTo(xOf(b.year), yOf(val(b))); ctx.stroke();
+  }
+  if (hasEra5 && hasProj) {
+    const a = _projEra5[_projEra5.length - 1], b = _projFuture[0];
+    ctx.strokeStyle = 'rgba(196,106,42,0.25)';
+    ctx.beginPath(); ctx.moveTo(xOf(a.year), yOf(val(a))); ctx.lineTo(xOf(b.year), yOf(val(b))); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ── NASA line — solid blue, dots ──────────────────────────────────────────
+  if (_projHistorical.length > 1) {
+    ctx.beginPath(); ctx.strokeStyle = '#2e7d9a'; ctx.lineWidth = 2;
+    _projHistorical.forEach((r, i) => {
+      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val(r))) : ctx.lineTo(xOf(r.year), yOf(val(r)));
+    });
+    ctx.stroke();
+    ctx.fillStyle = '#2e7d9a';
+    _projHistorical.forEach(r => {
+      ctx.beginPath(); ctx.arc(xOf(r.year), yOf(val(r)), 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  // ── ERA5 dot — filled circle + ring ──────────────────────────────────────
+  if (hasEra5) {
+    const e = _projEra5[0];
+    const ex = xOf(e.year), ey = yOf(val(e));
+    ctx.fillStyle = '#3a6b35';
+    ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#3a6b35'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(ex, ey, 9, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // ── Projection line — dashed orange ──────────────────────────────────────
+  if (_projFuture.length > 1) {
+    ctx.beginPath(); ctx.strokeStyle = '#c46a2a'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    _projFuture.forEach((r, i) => {
+      i === 0 ? ctx.moveTo(xOf(r.year), yOf(val(r))) : ctx.lineTo(xOf(r.year), yOf(val(r)));
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // ── Zone labels ───────────────────────────────────────────────────────────
+  ctx.font = '9px "DM Mono", monospace'; ctx.textAlign = 'center';
+  if (_projHistorical.length) {
+    const mid = _projHistorical[Math.floor(_projHistorical.length / 2)].year;
+    ctx.fillStyle = 'rgba(46,125,154,0.7)';
+    ctx.fillText('NASA POWER', xOf(mid), PAD.top + 12);
+  }
+  if (hasEra5) {
+    ctx.fillStyle = 'rgba(58,107,53,0.8)';
+    ctx.fillText('ERA5', xOf(2026), PAD.top + 12);
+  }
+  if (hasProj) {
+    const mid = _projFuture[Math.floor(_projFuture.length / 2)].year;
+    ctx.fillStyle = 'rgba(196,106,42,0.7)';
+    ctx.fillText('IPCC Projected', xOf(mid), PAD.top + 12);
+  }
+
+  // ── X-axis labels ─────────────────────────────────────────────────────────
+  ctx.fillStyle = '#9aab8a'; ctx.font = '10px "DM Mono", monospace'; ctx.textAlign = 'center';
+  [minY, 2020, 2026, 2030, 2040, maxY]
+    .filter((y, i, a) => y >= minY && y <= maxY && a.indexOf(y) === i)
+    .forEach(y => ctx.fillText(y, xOf(y), H - 6));
+
+  // ── Y-axis labels ─────────────────────────────────────────────────────────
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const v = minV + (1 - i / 4) * rangeV;
+    ctx.fillText(isTemp ? v.toFixed(1) + '°' : Math.round(v) + 'mm', PAD.left - 4, PAD.top + (i / 4) * chartH + 4);
   }
 }
 

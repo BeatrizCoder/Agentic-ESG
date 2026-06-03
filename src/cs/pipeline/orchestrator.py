@@ -11,7 +11,8 @@ from typing import Any
 
 from ..data.nasa_adapter import AnnualClimateRecord, NasaClimateResult, fetch_climate_data
 from ..data.openmeteo_adapter import (
-    OpenMeteoResult, fetch_projection_range, _PROJECTION_MODEL,
+    Era5Result, OpenMeteoResult,
+    fetch_era5_recent, fetch_projection_range, _PROJECTION_MODEL,
 )
 
 logger = logging.getLogger(__name__)
@@ -285,39 +286,53 @@ async def run_analysis(
     logger.info("Pipeline start: analysis_id=%s region=%r scenario=%s", analysis_id, label, scenario)
 
     # ── Step 1: Data Collector ─────────────────────────────────────────────────
-    # 2000–2025 → NASA POWER (real observations)
-    # 2026–2050 → OpenMeteo IPCC (projection with selected scenario)
+    # ≤2025 → NASA POWER (real observations)
+    # 2026  → ERA5 reanalysis (real observations, ~5-day processing latency)
+    # 2027+ → OpenMeteo IPCC projections (selected scenario)
     nasa_end_year    = min(end_year, 2025)
-    needs_projection = end_year > 2025
-    om_start_year    = 2026
+    needs_era5       = end_year >= 2026
+    needs_projection = end_year > 2026
+    om_start_year    = 2027
 
+    # Build parallel task list — always NASA, optionally ERA5 and/or IPCC
+    _coros: list = [
+        fetch_climate_data(
+            latitude=latitude, longitude=longitude, region_label=label,
+            start_year=start_year, end_year=nasa_end_year,
+        )
+    ]
+    _era5_idx = _om_idx = None
+    if needs_era5:
+        _era5_idx = len(_coros)
+        _coros.append(fetch_era5_recent(latitude, longitude, 2026, min(end_year, 2026)))
     if needs_projection:
-        logger.info(
-            "Step 1/5 — Data Collector: NASA (%d–%d) + OpenMeteo IPCC %s (%d–%d) in parallel",
-            start_year, nasa_end_year, scenario, om_start_year, end_year,
-        )
-        _nasa_task = fetch_climate_data(
-            latitude=latitude, longitude=longitude, region_label=label,
-            start_year=start_year, end_year=nasa_end_year,
-        )
-        _om_task = fetch_projection_range(latitude, longitude, om_start_year, end_year, scenario)
-        nasa_result, om_raw = await asyncio.gather(_nasa_task, _om_task, return_exceptions=True)
-    else:
-        logger.info("Step 1/5 — Data Collector: NASA POWER (%d–%d) only", start_year, nasa_end_year)
-        nasa_result = await fetch_climate_data(
-            latitude=latitude, longitude=longitude, region_label=label,
-            start_year=start_year, end_year=nasa_end_year,
-        )
-        om_raw = None
+        _om_idx = len(_coros)
+        _coros.append(fetch_projection_range(latitude, longitude, om_start_year, end_year, scenario))
+
+    logger.info(
+        "Step 1/5 — Data Collector: NASA (%d–%d)%s%s in parallel",
+        start_year, nasa_end_year,
+        " + ERA5 (2026)" if needs_era5 else "",
+        f" + OpenMeteo IPCC {scenario} ({om_start_year}–{end_year})" if needs_projection else "",
+    )
+    _gathered = await asyncio.gather(*_coros, return_exceptions=True)
+    nasa_result = _gathered[0]
+    era5_raw = _gathered[_era5_idx] if _era5_idx is not None else None
+    om_raw   = _gathered[_om_idx]   if _om_idx   is not None else None
 
     if isinstance(nasa_result, Exception):
         raise nasa_result
+
+    if isinstance(era5_raw, Exception):
+        logger.warning("ERA5 fetch failed (non-fatal): %s", era5_raw)
+        era5_raw = Era5Result(latitude=latitude, longitude=longitude, error=str(era5_raw))
 
     if isinstance(om_raw, Exception):
         logger.warning("OpenMeteo IPCC fetch failed (non-fatal): %s", om_raw)
         om_raw = OpenMeteoResult(latitude=latitude, longitude=longitude, error=str(om_raw))
 
-    om_result: OpenMeteoResult = om_raw or OpenMeteoResult(latitude=latitude, longitude=longitude)
+    era5_result: Era5Result      = era5_raw or Era5Result(latitude=latitude, longitude=longitude)
+    om_result:   OpenMeteoResult = om_raw   or OpenMeteoResult(latitude=latitude, longitude=longitude)
 
     # ── Build unified annual dataset (source field = "nasa" | "projection") ───
     unified_records: list[dict] = [
@@ -335,6 +350,22 @@ async def run_analysis(
         }
         for r in nasa_result.annual_records
     ]
+    if needs_era5 and era5_result.era5_records:
+        unified_records += [
+            {
+                "year":              r.year,
+                "latitude":          latitude,
+                "longitude":         longitude,
+                "temp_mean_celsius": r.temp_mean_c,
+                "temp_max_celsius":  None,
+                "temp_min_celsius":  None,
+                "precip_total_mm":   r.precip_total_mm,
+                "solar_mean_kwh_m2": None,
+                "days_sampled":      365,
+                "source":            "era5",
+            }
+            for r in era5_result.era5_records
+        ]
     if needs_projection and om_result.projection_records:
         unified_records += [
             {
@@ -364,8 +395,9 @@ async def run_analysis(
     ])
 
     logger.info(
-        "Step 1/5 complete: nasa=%d years  projection=%d years  total=%d",
+        "Step 1/5 complete: nasa=%d years  era5=%d years  projection=%d years  total=%d",
         len(nasa_result.annual_records),
+        len(era5_result.era5_records),
         len(om_result.projection_records),
         len(unified_records),
     )
@@ -487,6 +519,10 @@ async def run_analysis(
         "nasa_end_year":             nasa_end_year,
         "nasa_records_count":        len(nasa_result.annual_records),
         "total_daily_datapoints":    nasa_result.total_daily_datapoints,
+        "era5_used":                 needs_era5,
+        "era5_url":                  era5_result.era5_url or None,
+        "era5_records_count":        len(era5_result.era5_records),
+        "era5_error":                era5_result.error or None,
         "openmeteo_used":            needs_projection,
         "openmeteo_projection_url":  om_result.projection_url or None,
         "openmeteo_model":           _PROJECTION_MODEL if needs_projection else None,
@@ -551,6 +587,10 @@ async def run_analysis(
         hitl_reasons=hitl_reasons,
         transparency=transparency,
         openmeteo_data={
+            "era5_used":          needs_era5,
+            "era5_url":           era5_result.era5_url or None,
+            "era5_records":       [asdict(r) for r in era5_result.era5_records],
+            "era5_error":         era5_result.error or None,
             "used":               needs_projection,
             "projection_url":     om_result.projection_url,
             "model":              _PROJECTION_MODEL,

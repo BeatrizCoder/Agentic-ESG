@@ -1,4 +1,4 @@
-"""Adapter for Open-Meteo — current forecast (16 days) and IPCC climate projections to 2050."""
+"""Adapter for Open-Meteo — ERA5 reanalysis, IPCC climate projections, and current forecast."""
 
 import asyncio
 import logging
@@ -14,6 +14,7 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
+_ERA5_URL        = "https://archive-api.open-meteo.com/v1/archive"
 _FORECAST_URL    = "https://api.open-meteo.com/v1/forecast"
 _PROJECTION_URL  = "https://climate-api.open-meteo.com/v1/climate"
 _PROJECTION_MODEL = "EC_Earth3P_HR"  # Default: SSP2-4.5
@@ -49,6 +50,24 @@ class ProjectionRecord:
 
 
 @dataclass
+class Era5Record:
+    year: int
+    temp_mean_c: float
+    precip_total_mm: float
+
+
+@dataclass
+class Era5Result:
+    latitude: float
+    longitude: float
+    era5_records: list[Era5Record] = field(default_factory=list)
+    era5_url: str = ""
+    start_year: int = 0
+    end_year: int = 0
+    error: str = ""
+
+
+@dataclass
 class OpenMeteoResult:
     latitude: float
     longitude: float
@@ -58,6 +77,94 @@ class OpenMeteoResult:
     projection_url: str = ""
     model: str = _PROJECTION_MODEL
     error: str = ""
+
+
+async def fetch_era5_recent(
+    latitude: float,
+    longitude: float,
+    start_year: int = 2026,
+    end_year: int = 2026,
+) -> Era5Result:
+    """Fetch real ERA5 reanalysis data from OpenMeteo archive API.
+
+    ERA5 has ~5-day processing latency. Returns observed data labelled
+    source='era5', bridging the gap between the NASA POWER historical
+    record (≤ 2025) and IPCC projections (future years).
+    """
+    import datetime
+    today    = datetime.date.today()
+    end_date = min(
+        datetime.date(end_year, 12, 31),
+        today - datetime.timedelta(days=5),
+    )
+    start_date = datetime.date(start_year, 1, 1)
+
+    if end_date < start_date:
+        logger.info(
+            "ERA5: no data available yet for %d–%d (today=%s, latency=5d)",
+            start_year, end_year, today,
+        )
+        return Era5Result(latitude=latitude, longitude=longitude,
+                          start_year=start_year, end_year=end_year)
+
+    params = {
+        "latitude":  latitude,
+        "longitude": longitude,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date":   end_date.strftime("%Y-%m-%d"),
+        "daily":     "temperature_2m_mean,precipitation_sum,shortwave_radiation_sum",
+        "timezone":  "auto",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            req  = client.build_request("GET", _ERA5_URL, params=params)
+            url  = str(req.url)
+            resp = await client.send(req)
+            resp.raise_for_status()
+            payload = resp.json()
+
+        daily  = payload.get("daily", {})
+        dates  = daily.get("time", [])
+        temps  = daily.get("temperature_2m_mean", [])
+        precip = daily.get("precipitation_sum",   [])
+
+        annual_temps:   dict[int, list[float]] = {}
+        annual_precips: dict[int, list[float]] = {}
+        for i, date_str in enumerate(dates):
+            year = int(date_str[:4])
+            t = temps[i]
+            p = precip[i]
+            if t is not None and float(t) != _FILL:
+                annual_temps.setdefault(year, []).append(float(t))
+            if p is not None and float(p) != _FILL:
+                annual_precips.setdefault(year, []).append(float(p))
+
+        records = [
+            Era5Record(
+                year=year,
+                temp_mean_c=round(
+                    sum(annual_temps.get(year, [0])) / max(len(annual_temps.get(year, [1])), 1), 3
+                ),
+                precip_total_mm=round(sum(annual_precips.get(year, [0])), 1),
+            )
+            for year in sorted(set(annual_temps) | set(annual_precips))
+        ]
+
+        logger.info(
+            "ERA5 fetch: lat=%.4f lon=%.4f period=%s–%s records=%d",
+            latitude, longitude, start_date, end_date, len(records),
+        )
+        return Era5Result(
+            latitude=latitude, longitude=longitude,
+            era5_records=records, era5_url=url,
+            start_year=start_year, end_year=end_year,
+        )
+
+    except Exception as exc:
+        logger.warning("ERA5 fetch failed (non-fatal): %s", exc)
+        return Era5Result(latitude=latitude, longitude=longitude,
+                          start_year=start_year, end_year=end_year, error=str(exc))
 
 
 async def fetch_openmeteo_data(latitude: float, longitude: float) -> OpenMeteoResult:
