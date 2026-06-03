@@ -1,17 +1,25 @@
 # Climate Sentinel — Climate Risk Intelligence for ESG & Compliance
 
-[![Tests](https://github.com/BeatrizCoder/climate-sentinel/actions/workflows/tests.yml/badge.svg)](https://github.com/BeatrizCoder/climate-sentinel/actions/workflows/tests.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)](https://fastapi.tiangolo.com)
+[![CrewAI](https://img.shields.io/badge/CrewAI-Multi--Agent-purple)](https://crewai.com)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue)](LICENSE)
+[![Railway](https://img.shields.io/badge/Deploy-Railway-black?logo=railway)](https://railway.app)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![LGPD Compliant](https://img.shields.io/badge/LGPD-compliant-brightgreen.svg)](SECURITY.md)
 [![EU AI Act](https://img.shields.io/badge/EU%20AI%20Act-Art.%2013-blue.svg)](SECURITY.md)
 
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
-🌐 **Live Demo:** [climate-sentinel-production.up.railway.app](https://climate-sentinel-production.up.railway.app/)
 📦 **GitHub:** https://github.com/BeatrizCoder/climate-sentinel
+
+---
+
+## 🌐 Live Demo
+
+**[climate-sentinel-production.up.railway.app](https://climate-sentinel-production.up.railway.app)**
+
+> Try it: type any city name and get a full ESG climate risk analysis powered by real NASA data.
 
 ---
 
@@ -213,7 +221,7 @@ Location Input (lat/lon)
 - **Climate Data:** NASA POWER API v2.5 — temperature, precipitation, solar, ET0, soil moisture (free, no auth)
 - **Recent Observations:** OpenMeteo ERA5 reanalysis — real observed data 2026+ (free, no auth)
 - **Projections:** OpenMeteo IPCC Climate API — projections to 2050, 3 SSP scenarios (free, no auth)
-- **Database:** MongoDB via Railway (session storage)
+- **Database:** MongoDB — hosted as a service on Railway (persistent volume, not ephemeral storage)
 
 ### Frontend
 - **Stack:** Vanilla HTML/CSS/JavaScript (no framework)
@@ -223,12 +231,12 @@ Location Input (lat/lon)
 
 ### Deployment
 - **Backend:** Railway (Docker container)
-- **Database:** MongoDB on Railway
+- **Database:** MongoDB — hosted as a service on Railway (persistent volume, not ephemeral storage)
 - **Frontend:** Served via FastAPI static files
 - **Domain:** Custom domain via Railway
 
 ### Development Tools
-- **Development Tools:** Built with Claude Code (Anthropic) for initial architecture and IBM Bob for deployment, documentation, and optimizations.
+- **Development Tools:** Built with Claude Code (Anthropic) for architecture and development. IBM Bob (watsonx Code Assistant) — AI assistant used for deployment configuration, documentation, and code review. Code architecture and business logic designed by Beatriz Costa Leal.
 - **Version Control:** Git + GitHub
 - **Environment:** WSL2 Ubuntu on Windows 11
 
@@ -558,8 +566,8 @@ limitations under the License.
 - Anthropic Claude AI
 
 **Development:**
-- Built with Claude Code (Anthropic) and IBM Bob (AI co-author)
-- IBM Bob (watsonx Code Assistant) — used for deployment, documentation, and code review
+- Built with Claude Code (Anthropic) — architecture, features, and business logic
+- IBM Bob (watsonx Code Assistant) — AI assistant used for deployment configuration, documentation, and code review. Code architecture and business logic designed by Beatriz Costa Leal.
 - Inspired by the "Become An Agentic Architect" course
 
 **Security:**
