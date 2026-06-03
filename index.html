@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
@@ -1551,16 +1552,16 @@
   <div class="topbar-right">
     <div class="lang-dropdown" id="lang-custom">
       <button class="lang-selected" onclick="toggleLangDropdown()">
-        <span id="lang-flag">🇬🇧</span>
+        <span id="lang-flag"><span class="fi fi-gb"></span></span>
         <span id="lang-code">EN</span>
         <span class="lang-arrow">▾</span>
       </button>
       <div class="lang-options" id="lang-options">
-        <button onclick="selectLang('en')">🇬🇧 EN</button>
-        <button onclick="selectLang('pt')">🇧🇷 PT</button>
-        <button onclick="selectLang('es')">🇪🇸 ES</button>
-        <button onclick="selectLang('fr')">🇫🇷 FR</button>
-        <button onclick="selectLang('de')">🇩🇪 DE</button>
+        <button onclick="selectLang('en')"><span class="fi fi-gb"></span> EN</button>
+        <button onclick="selectLang('pt')"><span class="fi fi-br"></span> PT</button>
+        <button onclick="selectLang('es')"><span class="fi fi-es"></span> ES</button>
+        <button onclick="selectLang('fr')"><span class="fi fi-fr"></span> FR</button>
+        <button onclick="selectLang('de')"><span class="fi fi-de"></span> DE</button>
       </div>
     </div>
     <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
@@ -2300,22 +2301,28 @@ const I18N = {
   },
 };
 
-const _LANG_OPTIONS = {
-  en: { flag: '🇬🇧', code: 'EN' },
-  pt: { flag: '🇧🇷', code: 'PT' },
-  es: { flag: '🇪🇸', code: 'ES' },
-  fr: { flag: '🇫🇷', code: 'FR' },
-  de: { flag: '🇩🇪', code: 'DE' },
+const _FLAG_HTML = {
+  en: '<span class="fi fi-gb"></span>',
+  pt: '<span class="fi fi-br"></span>',
+  es: '<span class="fi fi-es"></span>',
+  fr: '<span class="fi fi-fr"></span>',
+  de: '<span class="fi fi-de"></span>',
 };
-
-const LANG_FLAGS = { en: '🇬🇧', pt: '🇧🇷', es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪' };
+const _LANG_OPTIONS = {
+  en: { flag: _FLAG_HTML.en, code: 'EN' },
+  pt: { flag: _FLAG_HTML.pt, code: 'PT' },
+  es: { flag: _FLAG_HTML.es, code: 'ES' },
+  fr: { flag: _FLAG_HTML.fr, code: 'FR' },
+  de: { flag: _FLAG_HTML.de, code: 'DE' },
+};
+const LANG_FLAGS = _FLAG_HTML;
 
 function toggleLangDropdown() {
   document.getElementById('lang-options').classList.toggle('open');
 }
 
 function selectLang(lang) {
-  document.getElementById('lang-flag').textContent = LANG_FLAGS[lang];
+  document.getElementById('lang-flag').innerHTML = LANG_FLAGS[lang];
   document.getElementById('lang-code').textContent = lang.toUpperCase();
   document.getElementById('lang-options').classList.remove('open');
   document.querySelectorAll('.lang-options button').forEach(b => b.classList.remove('active'));
@@ -2358,7 +2365,7 @@ function setLang(l) {
   if (opt) {
     const flagEl = document.getElementById('lang-flag');
     const codeEl = document.getElementById('lang-code');
-    if (flagEl) flagEl.textContent = opt.flag;
+    if (flagEl) flagEl.innerHTML = opt.flag;
     if (codeEl) codeEl.textContent = opt.code;
   }
   document.querySelectorAll('.lang-options button').forEach(btn =>
@@ -3483,7 +3490,7 @@ function _updateScoreCardRiskClass() {
 
 (function () {
   const savedLang = localStorage.getItem('cs-lang') || 'en';
-  document.getElementById('lang-flag').textContent = LANG_FLAGS[savedLang] || '🇬🇧';
+  document.getElementById('lang-flag').innerHTML = LANG_FLAGS[savedLang] || _FLAG_HTML.en;
   document.getElementById('lang-code').textContent = savedLang.toUpperCase();
   if (savedLang !== 'en') setLang(savedLang);
 })();
