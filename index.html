@@ -576,6 +576,56 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
+    /* ── How the AI Thinks — reasoning timeline ──────────────────────────── */
+    .reasoning-intro {
+      font-size: .8rem; color: var(--text2); text-align: center;
+      margin-bottom: 1.5rem; line-height: 1.6;
+    }
+    .reasoning-timeline {
+      display: flex; flex-direction: column; gap: 0;
+      max-width: 640px; margin: 0 auto;
+    }
+    .reasoning-card {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.25rem; position: relative;
+    }
+    .reasoning-connector {
+      width: 2px; height: 24px; background: var(--border);
+      margin: 0 auto; position: relative;
+    }
+    .reasoning-connector::after {
+      content: ''; position: absolute; bottom: -4px; left: 50%;
+      width: 8px; height: 8px;
+      border-right: 2px solid var(--border); border-bottom: 2px solid var(--border);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .reasoning-agent-header {
+      display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem;
+    }
+    .reasoning-icon { font-size: 1.2rem; }
+    .reasoning-agent-name { font-size: .85rem; font-weight: 600; color: var(--text); }
+    .reasoning-model {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      color: var(--muted); margin-left: auto;
+    }
+    .reasoning-status {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .78rem; font-weight: 600; margin-bottom: .4rem;
+    }
+    .reasoning-status.ok   { color: var(--green); }
+    .reasoning-status.warn { color: var(--risk-med); }
+    .reasoning-finding {
+      font-size: .78rem; color: var(--text2); line-height: 1.6;
+      padding-left: .75rem; border-left: 2px solid var(--green);
+      margin-top: .3rem; font-style: italic;
+    }
+    .reasoning-meta {
+      display: flex; gap: 1rem; margin-top: .5rem; flex-wrap: wrap;
+    }
+    .reasoning-meta-item {
+      font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted);
+    }
+
     /* ── Data Sources panel ──────────────────────────────────────────────── */
     .ds-section { margin-bottom: 1.25rem; }
     .ds-section-title {
@@ -1616,6 +1666,7 @@
     <div class="tab-bar">
       <button class="tab-btn active" id="tab-btn-overview"    onclick="switchTab('overview')">Overview</button>
       <button class="tab-btn"        id="tab-btn-datasources" onclick="switchTab('datasources')">Data &amp; Transparency</button>
+      <button class="tab-btn"        id="tab-btn-reasoning"   onclick="switchTab('reasoning')">How the AI Thinks</button>
     </div>
 
     <!-- Tab: Overview -->
@@ -1864,6 +1915,16 @@
       </div>
 
     </div><!-- #tab-datasources -->
+
+    <!-- Tab: How the AI Thinks -->
+    <div class="tab-panel" id="tab-reasoning">
+      <div class="reasoning-intro">
+        <p>Each analysis runs through 4 specialized AI agents + a Validation Layer. Here's what each one found.</p>
+      </div>
+      <div class="reasoning-timeline" id="reasoning-timeline">
+        <!-- Rendered dynamically by renderReasoningTab() -->
+      </div>
+    </div><!-- #tab-reasoning -->
 
   </div><!-- #results -->
 
@@ -2581,6 +2642,9 @@ function renderResults(data) {
   renderDoubleMateriality(data.compliance_mapping);
   renderTransparency(data.transparency);
 
+  /* reasoning tab */
+  renderReasoningTab(data);
+
   /* show panels — always land on Overview */
   switchTab('overview');
   document.getElementById('results').classList.add('visible');
@@ -2975,6 +3039,103 @@ function renderHitlFlag(required, reasons) {
   } else {
     flag.style.display = 'none';
   }
+}
+
+/* ── How the AI Thinks tab ───────────────────────────────────────────────── */
+function renderReasoningTab(data) {
+  const timeline = document.getElementById('reasoning-timeline');
+  if (!timeline) return;
+
+  const md    = data.pipeline_metadata || {};
+  const agents = md.agents || [];
+  const cf    = data.climate_findings  || {};
+  const comp  = data.compliance_mapping || {};
+  const qe    = data.quality_evaluation || {};
+
+  const keyFindings = cf.key_findings || [];
+  const climateFinding = keyFindings[0] || cf.heat_stress_risk || cf.drought_risk || '—';
+
+  const compFinding = comp.overall_summary
+    || (comp.csrd_summary ? `CSRD: ${comp.csrd_summary}` : null)
+    || '—';
+
+  const confidence = data.confidence_score || 0;
+  const verdict    = qe.verdict || (confidence >= 70 ? 'validated' : 'needs_review');
+  const valOk      = confidence >= 70;
+  const valSummary = qe.summary
+    || (valOk
+      ? 'Output validated. Analysis consistent with input data.'
+      : 'Human expert review recommended before regulatory use.');
+
+  const execSlice  = data.executive_summary
+    ? (data.executive_summary.length > 160
+        ? data.executive_summary.slice(0, 157) + '…'
+        : data.executive_summary)
+    : '—';
+
+  const tok = i => (agents[i] || {}).total_tokens;
+  const fmtTok = i => tok(i) != null ? `${tok(i).toLocaleString()} tokens` : null;
+
+  const nasaYears  = md.nasa_records_count || '—';
+  const totalDp    = md.total_daily_datapoints;
+  const omUsed     = md.openmeteo_used || md.era5_used;
+  const dataFinding = `${nasaYears} years of NASA POWER data · ${omUsed ? 'ERA5 + IPCC projections loaded' : 'Historical data only'}`;
+  const dataMeta   = [
+    totalDp != null ? `${totalDp.toLocaleString()} datapoints` : null,
+    '5 parameters',
+    '0 LLM tokens',
+  ].filter(Boolean);
+
+  const agentDefs = [
+    {
+      icon: '🛰️', name: 'Data Collector', model: 'Python · httpx',
+      status: 'ok', statusText: 'Data collected successfully',
+      finding: dataFinding, meta: dataMeta,
+    },
+    {
+      icon: '🌡️', name: 'Climate Analyst', model: 'claude-haiku-4-5',
+      status: 'ok', statusText: 'Climate trends analyzed',
+      finding: climateFinding, meta: [fmtTok(1)].filter(Boolean),
+    },
+    {
+      icon: '⚖️', name: 'ESG Strategist', model: 'claude-sonnet-4-6',
+      status: 'ok',
+      statusText: `${comp.overall_urgency || 'Medium'} compliance urgency`,
+      finding: compFinding, meta: [fmtTok(2)].filter(Boolean),
+    },
+    {
+      icon: '📋', name: 'Report Writer', model: 'claude-sonnet-4-6',
+      status: 'ok',
+      statusText: `Risk score: ${data.risk_score || 0}/100 · ${(data.recommendations || []).length} recommendations`,
+      finding: execSlice, meta: [fmtTok(3)].filter(Boolean),
+    },
+    {
+      icon: valOk ? '✅' : '⚠️', name: 'Validation Layer', model: 'claude-sonnet-4-6',
+      status: valOk ? 'ok' : 'warn',
+      statusText: `Confidence: ${confidence}% · ${verdict.replace('_', ' ')}`,
+      finding: valSummary, meta: [fmtTok(4)].filter(Boolean),
+    },
+  ];
+
+  timeline.innerHTML = agentDefs.map((a, i) => {
+    const connector = i < agentDefs.length - 1
+      ? `<div class="reasoning-connector"></div>` : '';
+    const metaHtml = a.meta.length
+      ? `<div class="reasoning-meta">${a.meta.map(m => `<span class="reasoning-meta-item">${m}</span>`).join('')}</div>`
+      : '';
+    return `
+      <div class="reasoning-card">
+        <div class="reasoning-agent-header">
+          <span class="reasoning-icon">${a.icon}</span>
+          <span class="reasoning-agent-name">Agent ${i + 1} · ${a.name}</span>
+          <span class="reasoning-model">${a.model}</span>
+        </div>
+        <div class="reasoning-status ${a.status}">${a.status === 'ok' ? '✓' : '⚠'} ${a.statusText}</div>
+        <div class="reasoning-finding">${a.finding}</div>
+        ${metaHtml}
+      </div>
+      ${connector}`;
+  }).join('');
 }
 
 /* ── Tab switching ───────────────────────────────────────────────────────── */
