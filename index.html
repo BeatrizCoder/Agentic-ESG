@@ -2689,8 +2689,9 @@ function renderResults(data) {
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
     document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
-    const lastSolar = last.solar_mean_kwh_m2 ?? 0;
-    document.getElementById('chart-solar-val').textContent  = lastSolar > 0 ? lastSolar.toFixed(2) : '—';
+    const _solarFrom = r => r.solar_mean_kwh_m2 ?? r.solar_kwh_m2 ?? r.solar ?? 0;
+    const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
+    document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
     // ET0 value + water-deficit color
     const lastEt0   = last.evapotranspiration_mm ?? 0;
