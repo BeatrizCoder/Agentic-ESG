@@ -134,3 +134,25 @@ class AnalysisSummary(BaseModel):
     risk_badge_label: str
     created_at: str
     pipeline_duration_sec: float
+
+
+class BatchRowResult(BaseModel):
+    region: str = ""
+    latitude: float = 0.0
+    longitude: float = 0.0
+    sector: str = "General"
+    scenario: str = "SSP2-4.5"
+    risk_score: int = 0
+    risk_level: str = ""
+    investment_status: str = ""
+    confidence_score: int = 0
+    analysis_id: str = ""
+    error: str = ""
+    status: str = "completed"  # "completed" | "error"
+
+
+class BatchAnalysisResponse(BaseModel):
+    total: int
+    completed: int
+    failed: int
+    results: list[BatchRowResult]

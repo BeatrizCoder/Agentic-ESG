@@ -227,7 +227,70 @@ def _sheet_recs(wb: Workbook, analysis: dict) -> None:
     _autofit(ws, min_w=10, max_w=70)
 
 
-# ── Public entry point ────────────────────────────────────────────────────────
+# ── Public entry points ───────────────────────────────────────────────────────
+
+def generate_batch_excel(batch_data: dict) -> BytesIO:
+    """Generate a single-sheet Excel summary for batch analysis results."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Summary"
+    ws.sheet_view.showGridLines = True
+
+    ws["A1"] = "Climate Sentinel · Batch ESG Analysis"
+    ws["A1"].font = _BOLD_GRN
+    ws.merge_cells("A1:F1")
+    ws.row_dimensions[1].height = 22
+
+    completed = batch_data.get("completed", 0)
+    total     = batch_data.get("total", 0)
+    ws["A2"] = (
+        f"Generated {datetime.utcnow().strftime('%d %b %Y %H:%M')} UTC  ·  "
+        f"{completed}/{total} regions completed"
+    )
+    ws["A2"].font = Font(name="Calibri", italic=True, color="888888", size=8)
+    ws.merge_cells("A2:F2")
+
+    _set_header(ws, 4, ["Region", "Risk Score", "Risk Level", "Investment Status", "Confidence", "Scenario"])
+
+    results = sorted(
+        batch_data.get("results", []),
+        key=lambda r: r.get("risk_score", 0),
+        reverse=True,
+    )
+
+    _ERR_FILL = PatternFill("solid", fgColor="FDEDEC")
+    for i, r in enumerate(results, 5):
+        is_err = r.get("status") == "error"
+        row_data = [
+            r.get("region", ""),
+            "Error" if is_err else r.get("risk_score", 0),
+            "—"     if is_err else r.get("risk_level", "").upper(),
+            (r.get("error") or "")[:60] if is_err else r.get("investment_status", "—"),
+            "—"     if is_err else f"{r.get('confidence_score', 0)}%",
+            r.get("scenario", "—"),
+        ]
+        fill = _ERR_FILL if is_err else (_ALT_FILL if i % 2 == 0 else None)
+        for col, val in enumerate(row_data, 1):
+            c = ws.cell(row=i, column=col, value=val)
+            c.font      = _BOLD if col == 1 else _NORMAL
+            c.border    = _border()
+            c.alignment = _CENTER if col > 1 else _WRAP_TOP
+            if fill:
+                c.fill = fill
+
+    ws.column_dimensions["A"].width = 30
+    ws.column_dimensions["B"].width = 12
+    ws.column_dimensions["C"].width = 14
+    ws.column_dimensions["D"].width = 26
+    ws.column_dimensions["E"].width = 14
+    ws.column_dimensions["F"].width = 14
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    logger.info("Batch Excel generated: %d rows", len(results))
+    return buf
+
 
 def generate_excel(analysis: dict) -> BytesIO:
     wb = Workbook()

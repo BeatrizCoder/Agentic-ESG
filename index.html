@@ -230,7 +230,7 @@
     /* ── Search ──────────────────────────────────────────────────────────── */
     .search-section { margin-bottom: 2rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
-    .search-row { display: grid; grid-template-columns: 2fr auto auto 1fr 1fr auto auto; gap: .75rem; align-items: end; }
+    .search-row { display: grid; grid-template-columns: 2fr auto auto 1fr 1fr auto auto auto; gap: .75rem; align-items: end; }
 
     .field-group { display: flex; flex-direction: column; gap: .3rem; }
     .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -276,6 +276,92 @@
       box-shadow: 0 6px 16px rgba(58,107,53,0.4);
     }
     .analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .batch-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text2);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Sora', sans-serif;
+      font-size: .85rem;
+      font-weight: 500;
+      padding: .65rem 1rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .3s ease;
+      align-self: flex-end;
+    }
+    .batch-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* ── Batch modal ──────────────────────────────────────────────────────── */
+    .modal-box-wide { max-width: 780px !important; }
+    .batch-instructions {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      padding: .65rem .9rem; font-family: 'DM Mono', monospace; font-size: .73rem;
+      color: var(--text2); margin: .5rem 0 .75rem; white-space: pre; overflow-x: auto;
+    }
+    .batch-upload-row { display: flex; gap: .65rem; align-items: center; margin-bottom: .6rem; }
+    .batch-file-input {
+      flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      padding: .45rem .7rem; font-size: .78rem; color: var(--text);
+      font-family: 'DM Mono', monospace;
+    }
+    .batch-template-btn {
+      background: transparent; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text2); font-size: .75rem; padding: .45rem .85rem; cursor: pointer;
+      white-space: nowrap; transition: all .2s; font-family: inherit;
+    }
+    .batch-template-btn:hover { border-color: var(--green); color: var(--green); }
+    .batch-run-btn {
+      background: var(--green); border: none; border-radius: 10px; color: #fff;
+      font-family: inherit; font-size: .85rem; font-weight: 600; padding: .7rem 1.5rem;
+      cursor: pointer; width: 100%; transition: all .25s; margin-top: .5rem;
+    }
+    .batch-run-btn:hover:not(:disabled) { background: var(--green2); }
+    .batch-run-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .batch-progress {
+      display: none; align-items: center; gap: .75rem; padding: .65rem .9rem;
+      background: var(--bg3); border-radius: 8px; margin-top: .75rem;
+      font-size: .8rem; color: var(--text2);
+    }
+    .batch-progress.visible { display: flex; }
+    .batch-progress-spinner {
+      width: 15px; height: 15px; border: 2px solid var(--border);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: batch-spin .8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes batch-spin { to { transform: rotate(360deg); } }
+    .batch-results { display: none; margin-top: 1.25rem; }
+    .batch-results.visible { display: block; }
+    .batch-results-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem;
+    }
+    .batch-results-title {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--muted);
+    }
+    .batch-export-btn {
+      background: transparent; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text2); font-size: .73rem; padding: .35rem .8rem; cursor: pointer;
+      transition: all .2s; font-family: inherit;
+    }
+    .batch-export-btn:hover { border-color: var(--green); color: var(--green); }
+    .batch-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .batch-table th {
+      text-align: left; padding: .45rem .6rem;
+      font-size: .62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    .batch-table td {
+      padding: .45rem .6rem; border-bottom: 0.5px solid var(--border); vertical-align: middle;
+    }
+    .batch-table tr:last-child td { border-bottom: none; }
+    .batch-view-btn {
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--green); font-size: .7rem; padding: .22rem .55rem; cursor: pointer;
+      transition: all .2s; white-space: nowrap; font-family: inherit;
+    }
+    .batch-view-btn:hover { background: var(--green-lt); border-color: var(--green); }
 
     .presets { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
     .preset-btn {
@@ -1312,6 +1398,7 @@
     @media (max-width: 900px) {
       .search-row { grid-template-columns: 1fr 1fr; }
       .analyze-btn { grid-column: 1 / 3; }
+      .batch-btn   { grid-column: 1 / 3; }
       .refresh-btn { grid-column: 1; }
       .results-grid { grid-template-columns: 1fr; }
       .score-card, .charts-card { grid-row: auto; }
@@ -1488,6 +1575,7 @@
       </div>
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
+      <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
     </div>
     <div class="presets">
       <button class="preset-btn" onclick="setPreset(-15.7801,-47.9292,'Brasília, Brazil')">Brasília</button>
@@ -3091,6 +3179,180 @@ function filterGlossary(query) {
 
   noResult.style.display = visible === 0 ? 'block' : 'none';
 }
+
+/* ── Batch Analysis ───────────────────────────────────────────────────────── */
+
+let _batchResults = null;
+
+function openBatchModal() {
+  document.getElementById('modal-batch').classList.add('open');
+}
+
+function closeBatchModal() {
+  document.getElementById('modal-batch').classList.remove('open');
+}
+
+function downloadBatchTemplate() {
+  const a = document.createElement('a');
+  a.href = `${API_BASE}/api/batch/template`;
+  a.download = 'climate_sentinel_batch_template.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function runBatchAnalysis() {
+  const fileInput = document.getElementById('batch-file-input');
+  if (!fileInput.files.length) {
+    alert('Please select a CSV file first. / Por favor selecione um ficheiro CSV.');
+    return;
+  }
+
+  const runBtn      = document.getElementById('batch-run-btn');
+  const progress    = document.getElementById('batch-progress');
+  const progressTxt = document.getElementById('batch-progress-text');
+  const resultsEl   = document.getElementById('batch-results');
+
+  runBtn.disabled = true;
+  progress.classList.add('visible');
+  progressTxt.textContent = 'Uploading CSV and starting pipeline…';
+  resultsEl.classList.remove('visible');
+  _batchResults = null;
+
+  // Count data rows client-side for progress display
+  let rowCount = 0;
+  try {
+    const text = await fileInput.files[0].text();
+    const lines = text.trim().split('\n').filter(l => l.trim());
+    rowCount = Math.max(0, lines.length - 1); // subtract header row
+  } catch (_) { /* ignore — progress just won't count */ }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  const headers = {};
+  if (COOKIES_ACCEPTED && SESSION_ID) headers['X-Session-ID'] = SESSION_ID;
+
+  // Simulate per-row progress (backend processes ~2s/region)
+  let progressCounter = 0;
+  const progressInterval = rowCount > 0 ? setInterval(() => {
+    if (progressCounter < rowCount) {
+      progressCounter++;
+      progressTxt.textContent = `Analyzing ${progressCounter}/${rowCount} regions…`;
+    }
+  }, 2400) : null;
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/analyze/batch`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    _batchResults = data;
+    _renderBatchResults(data);
+  } catch (err) {
+    alert('Batch analysis failed: ' + err.message);
+  } finally {
+    if (progressInterval) clearInterval(progressInterval);
+    runBtn.disabled = false;
+    progress.classList.remove('visible');
+  }
+}
+
+function _scoreColor(score) {
+  if (score <= 40) return 'var(--risk-low)';
+  if (score <= 70) return 'var(--risk-med)';
+  if (score <= 85) return 'var(--risk-high)';
+  return 'var(--risk-crit)';
+}
+
+function _renderBatchResults(data) {
+  const resultsEl  = document.getElementById('batch-results');
+  const tbody      = document.getElementById('batch-tbody');
+  const titleEl    = document.getElementById('batch-results-title');
+  const exportBtn  = document.getElementById('batch-export-btn');
+
+  const suffix = data.failed ? ` · ${data.failed} error${data.failed > 1 ? 's' : ''}` : '';
+  titleEl.textContent = `Results · ${data.completed}/${data.total} completed${suffix}`;
+
+  tbody.innerHTML = '';
+  (data.results || []).forEach(r => {
+    const isErr = r.status === 'error';
+    const tr = document.createElement('tr');
+
+    const scoreHtml = isErr
+      ? `<span style="color:var(--risk-high);font-size:.72rem">Error</span>`
+      : `<strong style="color:${_scoreColor(r.risk_score)}">${r.risk_score}</strong>`;
+
+    const levelHtml = isErr
+      ? `<span style="color:var(--muted);font-size:.7rem">${(r.error || '').substring(0, 45)}</span>`
+      : `<span class="risk-badge ${r.risk_level}" style="font-size:.62rem;padding:.12rem .4rem">${r.risk_level.toUpperCase()}</span>`;
+
+    const viewHtml = (!isErr && r.analysis_id)
+      ? `<button class="batch-view-btn" onclick="viewBatchReport('${r.analysis_id}')">View Full Report</button>`
+      : '';
+
+    tr.innerHTML = `
+      <td style="font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.region}">${r.region || '—'}</td>
+      <td style="text-align:center">${scoreHtml}</td>
+      <td>${levelHtml}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${isErr ? '—' : (r.investment_status || '—')}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-size:.75rem">${isErr ? '—' : r.confidence_score + '%'}</td>
+      <td>${viewHtml}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  exportBtn.style.display = data.completed > 0 ? '' : 'none';
+  resultsEl.classList.add('visible');
+}
+
+async function exportBatchExcel() {
+  if (!_batchResults) return;
+  const exportBtn = document.getElementById('batch-export-btn');
+  exportBtn.textContent = '⏳ Generating…';
+  exportBtn.disabled = true;
+  try {
+    const resp = await fetch(`${API_BASE}/api/batch/export/excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_batchResults),
+    });
+    if (!resp.ok) throw new Error('Export failed');
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'climate_sentinel_batch.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Excel export failed: ' + err.message);
+  } finally {
+    exportBtn.textContent = '⬇ Export All as Excel';
+    exportBtn.disabled = false;
+  }
+}
+
+async function viewBatchReport(analysisId) {
+  closeBatchModal();
+  try {
+    const resp = await fetch(`${API_BASE}/api/analyses/${analysisId}`);
+    if (!resp.ok) throw new Error('Analysis not found');
+    const data = await resp.json();
+    _currentId = data.analysis_id;
+    renderResults(data);
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    alert('Failed to load report: ' + err.message);
+  }
+}
 </script>
 
 <!-- Gate overlay: full-page block, shows during first-visit onboarding -->
@@ -3315,6 +3577,67 @@ function filterGlossary(query) {
   <div class="gate-modal-text" id="gate-text-terms">
     Please accept our Terms and Privacy Policy to continue.
     <em>Por favor aceite os Termos e Política de Privacidade para continuar.</em>
+  </div>
+</div>
+
+<!-- ── Batch Analysis Modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-batch" onclick="if(event.target===this)closeBatchModal()">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <div>
+        <div class="modal-header-title">📊 Batch Analysis</div>
+        <div class="modal-header-sub">Análise em Lote · Multi-region ESG assessment from CSV</div>
+      </div>
+      <button class="modal-close" onclick="closeBatchModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-title">Upload CSV / Carregar CSV</div>
+        <div class="batch-instructions">region,latitude,longitude,sector,scenario
+São Paulo Brazil,-23.5505,-46.6333,General,SSP2-4.5
+Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5
+Berlin Germany,52.5200,13.4050,General,SSP1-2.6</div>
+        <p style="font-size:.75rem;color:var(--text2);margin:0 0 .65rem">
+          Required columns: <strong>region · latitude · longitude</strong>
+          &nbsp;·&nbsp; Optional: sector, scenario &nbsp;·&nbsp; Max 20 rows
+        </p>
+        <div class="batch-upload-row">
+          <input type="file" id="batch-file-input" class="batch-file-input" accept=".csv" />
+          <button class="batch-template-btn" onclick="downloadBatchTemplate()">⬇ Template CSV</button>
+        </div>
+        <p style="font-size:.7rem;color:var(--muted);margin-bottom:.5rem">
+          ⚠ Each region runs the full 5-agent pipeline (~2 min). Large batches may take 30–40 min.
+        </p>
+        <button class="batch-run-btn" id="batch-run-btn" onclick="runBatchAnalysis()">
+          📊 Run Batch / Executar Análise
+        </button>
+        <div class="batch-progress" id="batch-progress">
+          <div class="batch-progress-spinner"></div>
+          <span id="batch-progress-text">Processing batch…</span>
+        </div>
+      </div>
+      <div class="batch-results" id="batch-results">
+        <div class="batch-results-header">
+          <div class="batch-results-title" id="batch-results-title">Results</div>
+          <button class="batch-export-btn" id="batch-export-btn" style="display:none" onclick="exportBatchExcel()">
+            ⬇ Export All as Excel
+          </button>
+        </div>
+        <table class="batch-table">
+          <thead>
+            <tr>
+              <th>Region</th>
+              <th>Score</th>
+              <th>Risk Level</th>
+              <th>Investment Status</th>
+              <th>Conf.</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="batch-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 

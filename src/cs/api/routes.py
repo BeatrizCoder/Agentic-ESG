@@ -1,10 +1,12 @@
 """CS FastAPI routes."""
 
 import asyncio
+import csv
+import io
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Header
+from fastapi import APIRouter, File, HTTPException, Request, Header, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..core.config import limiter
@@ -12,7 +14,7 @@ from ..db.mongo import delete_analysis as _db_delete
 from ..db.mongo import get_analysis as _db_get
 from ..db.mongo import get_recent_analyses, get_session_history, save_analysis
 from ..pipeline.orchestrator import run_analysis
-from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest
+from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +212,174 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
+_BATCH_MAX_ROWS = 20
+_BATCH_REQUIRED_COLS = {"region", "latitude", "longitude"}
+_BATCH_TEMPLATE_CSV = (
+    "region,latitude,longitude,sector,scenario\n"
+    "São Paulo Brazil,-23.5505,-46.6333,General,SSP2-4.5\n"
+    "Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5\n"
+    "Berlin Germany,52.5200,13.4050,General,SSP1-2.6\n"
+)
+
+
+def _inv_label(score: int) -> str:
+    if score <= 40: return "Investment Approved"
+    if score <= 70: return "Investment Conditioned"
+    if score <= 85: return "Investment Restricted"
+    return "Investment Suspended"
+
+
+@router.get("/api/batch/template")
+async def batch_template() -> StreamingResponse:
+    return StreamingResponse(
+        io.StringIO(_BATCH_TEMPLATE_CSV),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="climate_sentinel_batch_template.csv"',
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
+@router.post("/api/analyze/batch", response_model=BatchAnalysisResponse)
+@limiter.limit("3/hour")
+async def analyze_batch(
+    request: Request,
+    file: UploadFile = File(...),
+    x_session_id: str | None = Header(None, alias="X-Session-ID"),
+) -> BatchAnalysisResponse:
+    """Process a CSV file of regions and run climate analysis on each row sequentially."""
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded")
+
+    reader = csv.DictReader(io.StringIO(text))
+    try:
+        rows = list(reader)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid CSV format: {exc}")
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty")
+
+    fieldnames = set(rows[0].keys())
+    missing = _BATCH_REQUIRED_COLS - fieldnames
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required columns: {', '.join(sorted(missing))}. Required: region, latitude, longitude",
+        )
+
+    if len(rows) > _BATCH_MAX_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {_BATCH_MAX_ROWS} rows allowed. CSV has {len(rows)} rows.",
+        )
+
+    results: list[BatchRowResult] = []
+    completed = 0
+    failed = 0
+
+    for i, row in enumerate(rows):
+        region  = (row.get("region") or "").strip()
+        sector  = (row.get("sector") or "General").strip() or "General"
+        scenario = (row.get("scenario") or "SSP2-4.5").strip()
+        if scenario not in ("SSP1-2.6", "SSP2-4.5", "SSP5-8.5"):
+            scenario = "SSP2-4.5"
+
+        try:
+            lat = float(row.get("latitude") or 0)
+            lon = float(row.get("longitude") or 0)
+        except (ValueError, TypeError):
+            results.append(BatchRowResult(
+                region=region, sector=sector, scenario=scenario,
+                status="error", error="Invalid latitude or longitude value",
+            ))
+            failed += 1
+            continue
+
+        if i > 0:
+            await asyncio.sleep(2)  # avoid NASA POWER rate limiting
+
+        try:
+            result = await asyncio.wait_for(
+                run_analysis(
+                    latitude=lat,
+                    longitude=lon,
+                    region_label=region,
+                    start_year=2014,
+                    end_year=2023,
+                    sector=sector,
+                    scenario=scenario,
+                ),
+                timeout=120,
+            )
+            try:
+                await save_analysis(result, session_id=x_session_id)
+            except Exception:
+                logger.warning("Batch: failed to persist %s", result.analysis_id)
+
+            results.append(BatchRowResult(
+                region=region,
+                latitude=lat,
+                longitude=lon,
+                sector=sector,
+                scenario=scenario,
+                risk_score=result.risk_score,
+                risk_level=result.risk_level,
+                investment_status=_inv_label(result.risk_score),
+                confidence_score=result.confidence_score,
+                analysis_id=result.analysis_id,
+                status="completed",
+            ))
+            completed += 1
+            logger.info("Batch row %d/%d done: region=%r score=%d", i + 1, len(rows), region, result.risk_score)
+
+        except Exception as exc:
+            logger.warning("Batch row %d/%d failed: region=%r error=%s", i + 1, len(rows), region, exc)
+            results.append(BatchRowResult(
+                region=region,
+                latitude=lat,
+                longitude=lon,
+                sector=sector,
+                scenario=scenario,
+                status="error",
+                error=str(exc)[:200],
+            ))
+            failed += 1
+
+    return BatchAnalysisResponse(total=len(rows), completed=completed, failed=failed, results=results)
+
+
+@router.post("/api/batch/export/excel")
+@limiter.limit("10/minute")
+async def batch_export_excel(
+    request: Request,
+    body: BatchAnalysisResponse,
+) -> StreamingResponse:
+    """Generate an Excel summary for batch results."""
+    try:
+        from ..exports.excel_report import generate_batch_excel
+        buffer = generate_batch_excel(body.model_dump())
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Excel export not available — install openpyxl")
+    except Exception as exc:
+        logger.exception("Batch Excel generation failed")
+        raise HTTPException(status_code=500, detail=f"Excel generation failed: {exc}")
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="climate_sentinel_batch.xlsx"',
             "Access-Control-Expose-Headers": "Content-Disposition",
             "Cache-Control": "no-cache",
         },
