@@ -972,6 +972,11 @@
     /* ── Summary ─────────────────────────────────────────────────────────── */
     .summary-card { grid-column: 1 / -1; }
     .summary-text { font-size: .85rem; line-height: 1.7; color: var(--text2); }
+    .region-header {
+      font-size: 1rem; font-weight: 600; color: var(--text);
+      margin-bottom: .5rem; padding-bottom: .5rem;
+      border-bottom: 0.5px solid var(--border);
+    }
 
     /* ── Compliance ──────────────────────────────────────────────────────── */
     .projections-card { grid-column: 1 / -1; }
@@ -2154,11 +2159,20 @@ async function viewAnalysis(analysisId) {
   try {
     const response = await fetch(`${API_BASE}/api/analyses/${analysisId}`);
     if (!response.ok) throw new Error('Analysis not found');
-    
+
     const data = await response.json();
+
+    // Restore form fields so renderResults() picks up the correct region name
+    if (data.region_label) {
+      const locationInput = document.getElementById('inp-location');
+      const labelInput    = document.getElementById('inp-label');
+      if (locationInput) locationInput.value = data.region_label;
+      if (labelInput)    labelInput.value    = data.region_label;
+    }
+    if (data.latitude  != null) { const el = document.getElementById('inp-lat'); if (el) el.value = data.latitude;  }
+    if (data.longitude != null) { const el = document.getElementById('inp-lon'); if (el) el.value = data.longitude; }
+
     renderResults(data);
-    
-    // Scroll to results
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
     alert('Failed to load analysis: ' + err.message);
@@ -2720,9 +2734,24 @@ function renderResults(data) {
   setTimeout(() => { if (_map) _map.invalidateSize(); }, 300);
 
   /* summary */
-  const regionName = data.region_label || document.getElementById('inp-label')?.value || 'This region';
+  const regionLabel = data.region_label
+    || document.getElementById('inp-location')?.value
+    || document.getElementById('inp-label')?.value
+    || '';
   const summaryEl = document.getElementById('summary-text');
   summaryEl.textContent = data.executive_summary || '—';
+
+  // Insert (or update) region name header above summary text
+  const summaryCard = document.querySelector('.summary-card');
+  if (summaryCard && regionLabel) {
+    let regionHeader = summaryCard.querySelector('.region-header');
+    if (!regionHeader) {
+      regionHeader = document.createElement('div');
+      regionHeader.className = 'region-header';
+      summaryCard.insertBefore(regionHeader, summaryEl);
+    }
+    regionHeader.textContent = regionLabel;
+  }
 
   /* charts */
   // Reset optional chart cards so a fresh analysis always starts visible
