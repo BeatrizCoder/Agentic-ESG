@@ -216,9 +216,10 @@
     /* ── Search ──────────────────────────────────────────────────────────── */
     .search-section { margin-bottom: 2rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
-    .search-row { display: grid; grid-template-columns: 2fr auto auto 1fr 1fr auto auto auto; gap: .75rem; align-items: end; }
+    .search-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; }
 
-    .field-group { display: flex; flex-direction: column; gap: .3rem; }
+    .field-group { display: flex; flex-direction: column; gap: .3rem; min-width: 100px; flex: 1; }
+    .field-group:first-child { flex: 2; min-width: 160px; }
     .field-group label { font-size: .65rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
     .field-group input,
     .field-group select {
@@ -254,6 +255,7 @@
       white-space: nowrap;
       transition: all .3s ease;
       align-self: flex-end;
+      flex-shrink: 0;
       box-shadow: 0 4px 12px rgba(58,107,53,0.3);
     }
     .analyze-btn:hover:not(:disabled) {
@@ -276,6 +278,7 @@
       white-space: nowrap;
       transition: all .3s ease;
       align-self: flex-end;
+      flex-shrink: 0;
     }
     .batch-btn:hover { border-color: var(--green); color: var(--green); }
 
@@ -815,6 +818,7 @@
       border-radius: 8px;
       padding: .75rem 1rem;
       margin-top: .75rem;
+      margin-bottom: 1rem;
     }
     .hitl-icon { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
     .hitl-title {
@@ -835,7 +839,7 @@
       margin-top: .3rem;
     }
 
-    .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .5rem; }
     .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .65rem .75rem; min-height: 80px; }
     .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
     .score-meta-value { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--text); line-height: 1.5; margin-top: .25rem; }
@@ -845,7 +849,7 @@
     .map-header { padding: 1rem 1.25rem .75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .map-coords { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
     .map-source-tag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: .15rem .5rem; }
-    #map { height: 360px; min-height: 360px; width: 100%; background: var(--bg3); }
+    #map { height: 300px; max-height: 300px; width: 100%; background: var(--bg3); }
 
     /* ── Charts card ─────────────────────────────────────────────────────── */
     .charts-card { grid-column: 1; grid-row: 2; }
@@ -1432,10 +1436,6 @@
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 900px) {
-      .search-row { grid-template-columns: 1fr 1fr; }
-      .analyze-btn { grid-column: 1 / 3; }
-      .batch-btn   { grid-column: 1 / 3; }
-      .refresh-btn { grid-column: 1; }
       .results-grid { grid-template-columns: 1fr; }
       .score-card, .charts-card { grid-row: auto; }
       .map-card  { grid-column: 1; grid-row: auto; }
@@ -1751,19 +1751,19 @@
             <div class="chart-item-delta" id="chart-precip-delta"></div>
             <canvas class="mini-bar" id="canvas-precip"></canvas>
           </div>
-          <div class="chart-item">
+          <div class="chart-item" id="chart-solar-card">
             <div class="chart-item-label" id="t-chart-solar">Solar (kWh/m²/day)</div>
             <div class="chart-item-value" id="chart-solar-val">—</div>
             <div class="chart-item-delta" id="chart-solar-delta"></div>
             <canvas class="mini-bar" id="canvas-solar"></canvas>
           </div>
-          <div class="chart-item">
+          <div class="chart-item" id="chart-et0-card">
             <div class="chart-item-label" id="t-chart-et0">Evapotranspiration (mm/yr)</div>
             <div class="chart-item-value" id="chart-et0-val">—</div>
             <div class="chart-item-delta" id="chart-et0-delta"></div>
             <canvas class="mini-bar" id="canvas-et0"></canvas>
           </div>
-          <div class="chart-item">
+          <div class="chart-item" id="chart-soil-card">
             <div class="chart-item-label" id="t-chart-soil">Soil Moisture (m³/m³)</div>
             <div class="chart-item-value" id="chart-soil-val">—</div>
             <div class="chart-item-delta" id="chart-soil-delta"></div>
@@ -2096,6 +2096,7 @@ const I18N = {
     'recs-label':      'Prioritised Recommendations',
     'export-pdf':      'Export PDF ↓',
     'footer':          'Session data stored as temporary cookie only. No personal data collected or retained. · Powered by NASA POWER API & Claude AI (Anthropic)',
+    'tab-overview': 'Overview', 'tab-datasources': 'Data & Transparency', 'tab-reasoning': 'How the AI Thinks',
   },
   pt: {
     'headline':        'Análise de Risco Climático Físico',
@@ -2118,7 +2119,7 @@ const I18N = {
     'recs-label':      'Recomendações Prioritárias',
     'export-pdf':      'Exportar PDF ↓',
     'footer':          'Dados da sessão armazenados apenas como cookie temporário. Nenhum dado pessoal coletado ou retido. · Powered by NASA POWER API & Claude AI (Anthropic)',
-    'tab-overview': 'Resumo', 'tab-datasources': 'Dados &amp; Transparência',
+    'tab-overview': 'Resumo', 'tab-datasources': 'Dados &amp; Transparência', 'tab-reasoning': 'Como a IA Pensa',
   },
   es: {
     'headline':        'Riesgo Climático Físico\nInteligencia.',
@@ -2141,7 +2142,7 @@ const I18N = {
     'recs-label':      'Recomendaciones Prioritarias',
     'export-pdf':      'Exportar PDF ↓',
     'footer':          'Datos de sesión almacenados solo como cookie temporal. No se recopilan datos personales.',
-    'tab-overview': 'Resumen', 'tab-datasources': 'Fuentes de Datos',
+    'tab-overview': 'Resumen', 'tab-datasources': 'Fuentes de Datos', 'tab-reasoning': 'Cómo Piensa la IA',
   },
   fr: {
     'headline':        'Risque Climatique Physique\nIntelligence.',
@@ -2164,7 +2165,7 @@ const I18N = {
     'recs-label':      'Recommandations Prioritaires',
     'export-pdf':      'Exporter PDF ↓',
     'footer':          'Données de session stockées uniquement comme cookie temporaire. Aucune donnée personnelle collectée.',
-    'tab-overview': 'Aperçu', 'tab-datasources': 'Sources de Données',
+    'tab-overview': 'Aperçu', 'tab-datasources': 'Sources de Données', 'tab-reasoning': 'Comment l\'IA Pense',
   },
   de: {
     'headline':        'Physisches Klimarisiko\nIntelligence.',
@@ -2187,7 +2188,7 @@ const I18N = {
     'recs-label':      'Priorisierte Empfehlungen',
     'export-pdf':      'PDF exportieren ↓',
     'footer':          'Sitzungsdaten werden nur als temporäres Cookie gespeichert. Keine personenbezogenen Daten werden erhoben.',
-    'tab-overview': 'Übersicht', 'tab-datasources': 'Datenquellen',
+    'tab-overview': 'Übersicht', 'tab-datasources': 'Datenquellen', 'tab-reasoning': 'Wie die KI Denkt',
   },
 };
 
@@ -2227,6 +2228,7 @@ function setLang(l) {
   // Tab buttons use tab-btn-* ids, not t-* ids
   if (d['tab-overview'])    { const b = document.getElementById('tab-btn-overview');    if (b) b.textContent = d['tab-overview']; }
   if (d['tab-datasources']) { const b = document.getElementById('tab-btn-datasources'); if (b) b.textContent = d['tab-datasources']; }
+  if (d['tab-reasoning'])   { const b = document.getElementById('tab-btn-reasoning');   if (b) b.textContent = d['tab-reasoning']; }
 
   // Analyze button (only when not mid-run)
   const analyzeBtn = document.getElementById('analyze-btn');
@@ -2574,6 +2576,11 @@ function renderResults(data) {
   document.getElementById('summary-text').textContent = data.executive_summary || '—';
 
   /* charts */
+  // Reset optional chart cards so a fresh analysis always starts visible
+  ['chart-solar-card', 'chart-et0-card', 'chart-soil-card'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = '';
+  });
+
   if (annual.length) {
     const last    = annual[annual.length - 1];
     const nasaRecs = annual.filter(r => (r.source || 'nasa') === 'nasa');
@@ -2585,7 +2592,8 @@ function renderResults(data) {
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
     document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
-    document.getElementById('chart-solar-val').textContent  = (last.solar_mean_kwh_m2   ?? 0).toFixed(2);
+    const lastSolar = last.solar_mean_kwh_m2 ?? 0;
+    document.getElementById('chart-solar-val').textContent  = lastSolar > 0 ? lastSolar.toFixed(2) : '—';
 
     // ET0 value + water-deficit color
     const lastEt0   = last.evapotranspiration_mm ?? 0;
@@ -2606,12 +2614,17 @@ function renderResults(data) {
     setDelta('chart-et0-delta',    cf.et0_trend_mm_per_decade,              'mm/decade',       'down', 'up');
     setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
 
+    // Hide optional cards when no data for this analysis
+    if (!solars.some(v => v > 0)) { const c = document.getElementById('chart-solar-card'); if (c) c.style.display = 'none'; }
+    if (!et0s.some(v => v > 0))   { const c = document.getElementById('chart-et0-card');   if (c) c.style.display = 'none'; }
+    if (!soils.some(v => v > 0))  { const c = document.getElementById('chart-soil-card');  if (c) c.style.display = 'none'; }
+
     setTimeout(() => {
       drawBars('canvas-temp',   temps,   '196,106,42');
       drawBars('canvas-precip', precips, '46,125,154');
-      drawBars('canvas-solar',  solars,  '196,174,58');
-      if (et0s.some(v => v > 0))  drawBars('canvas-et0',  et0s,  '196,106,42');
-      if (soils.some(v => v > 0)) drawBars('canvas-soil', soils, '58,107,53');
+      if (solars.some(v => v > 0)) drawBars('canvas-solar', solars, '196,174,58');
+      if (et0s.some(v => v > 0))   drawBars('canvas-et0',  et0s,  '196,106,42');
+      if (soils.some(v => v > 0))  drawBars('canvas-soil', soils, '58,107,53');
     }, 50);
   }
 
