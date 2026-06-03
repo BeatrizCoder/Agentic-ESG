@@ -62,7 +62,7 @@
 
     /* Smooth theme transitions */
     body, header, footer, .card, .score-meta-item, .rec-item,
-    .compliance-item, .preset-btn, .lang-toggle, .lang-toggle button,
+    .compliance-item, .preset-btn, .lang-select,
     .export-btn, .analyze-btn, #status-bar,
     .field-group input, .field-group select {
       transition: background .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease;
@@ -149,33 +149,18 @@
     }
     .topbar-right { display: flex; align-items: center; gap: 1rem; }
     
-    .lang-toggle {
-      display: flex;
-      background: transparent;
+    .lang-select {
+      background: var(--bg3);
       border: 0.5px solid var(--border);
       border-radius: 8px;
-      overflow: hidden;
-    }
-    .lang-toggle button {
-      background: transparent;
-      border: none;
-      border-right: 0.5px solid var(--border);
-      color: var(--text2);
-      font-family: 'SF Mono', 'DM Mono', monospace;
-      font-size: .72rem;
-      font-weight: 500;
-      padding: .3rem .65rem;
+      color: var(--text);
+      font-family: inherit;
+      font-size: .78rem;
+      padding: .3rem .6rem;
       cursor: pointer;
-      transition: all .3s ease;
+      outline: none;
     }
-    .lang-toggle button:last-child { border-right: none; }
-    .lang-toggle button.active {
-      background: var(--green);
-      color: #ffffff !important;
-    }
-    .lang-toggle button:not(.active) {
-      color: var(--text2);
-    }
+    .lang-select option { background: var(--bg2); }
 
     .theme-toggle {
       background: transparent;
@@ -216,6 +201,7 @@
       color: var(--text);
       margin-bottom: .5rem;
       line-height: 1.2;
+      white-space: pre-line;
     }
     .hero-subtitle {
       font-size: 15px;
@@ -1420,10 +1406,13 @@
   </div>
   <div class="topbar-center">Powered by NASA POWER · Claude AI</div>
   <div class="topbar-right">
-    <div class="lang-toggle">
-      <button class="active" onclick="setLang('en')">EN</button>
-      <button onclick="setLang('pt')">PT</button>
-    </div>
+    <select id="lang-select" onchange="setLang(this.value)" class="lang-select">
+      <option value="en">🇬🇧 EN</option>
+      <option value="pt">🇧🇷 PT</option>
+      <option value="es">🇪🇸 ES</option>
+      <option value="fr">🇫🇷 FR</option>
+      <option value="de">🇩🇪 DE</option>
+    </select>
     <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
       <svg id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
       <svg id="icon-moon" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
@@ -1625,7 +1614,7 @@
 
     <!-- Tab bar -->
     <div class="tab-bar">
-      <button class="tab-btn active" id="tab-btn-overview"   onclick="switchTab('overview')"    id="t-tab-overview">Overview</button>
+      <button class="tab-btn active" id="tab-btn-overview"    onclick="switchTab('overview')">Overview</button>
       <button class="tab-btn"        id="tab-btn-datasources" onclick="switchTab('datasources')">Data &amp; Transparency</button>
     </div>
 
@@ -2068,20 +2057,137 @@ const I18N = {
     'recs-label':      'Recomendações Prioritárias',
     'export-pdf':      'Exportar PDF ↓',
     'footer':          'Dados da sessão armazenados apenas como cookie temporário. Nenhum dado pessoal coletado ou retido. · Powered by NASA POWER API & Claude AI (Anthropic)',
-  }
+    'tab-overview': 'Resumo', 'tab-datasources': 'Dados &amp; Transparência',
+  },
+  es: {
+    'headline':        'Riesgo Climático Físico\nInteligencia.',
+    'sub':             '10 años de datos satelitales NASA + proyecciones IPCC hasta 2050. Conformidad ESG mapeada en segundos.',
+    'lat': 'Latitud', 'lon': 'Longitud', 'from': 'Desde', 'to': 'Hasta', 'region': 'Región',
+    'risk-label':      'Puntuación de Riesgo Climático',
+    'temp-delta':      'Cambio de Temperatura',
+    'precip-delta':    'Cambio de Precipitación',
+    'compliance-exp':  'Exposición Regulatoria',
+    'hottest':         'Año más Cálido / más Seco',
+    'map-label':       'Ubicación',
+    'trends':          'Tendencias Climáticas (10 años)',
+    'chart-temp':      'Temp. Media (°C)',
+    'chart-precip':    'Precipitación (mm/año)',
+    'chart-solar':     'Solar (kWh/m²/día)',
+    'chart-et0':       'Evapotranspiración (mm/año)',
+    'chart-soil':      'Humedad del Suelo (m³/m³)',
+    'summary-label':   'Resumen Ejecutivo',
+    'compliance-label':'Mapeo de Marcos ESG',
+    'recs-label':      'Recomendaciones Prioritarias',
+    'export-pdf':      'Exportar PDF ↓',
+    'footer':          'Datos de sesión almacenados solo como cookie temporal. No se recopilan datos personales.',
+    'tab-overview': 'Resumen', 'tab-datasources': 'Fuentes de Datos',
+  },
+  fr: {
+    'headline':        'Risque Climatique Physique\nIntelligence.',
+    'sub':             '10 ans de données satellitaires NASA + projections IPCC jusqu\'en 2050. Conformité ESG cartographiée en secondes.',
+    'lat': 'Latitude', 'lon': 'Longitude', 'from': 'De', 'to': 'À', 'region': 'Région',
+    'risk-label':      'Score de Risque Climatique',
+    'temp-delta':      'Variation de Température',
+    'precip-delta':    'Variation des Précipitations',
+    'compliance-exp':  'Exposition Réglementaire',
+    'hottest':         'Année la plus Chaude / Sèche',
+    'map-label':       'Localisation',
+    'trends':          'Tendances Climatiques (10 ans)',
+    'chart-temp':      'Temp. Moyenne (°C)',
+    'chart-precip':    'Précipitations (mm/an)',
+    'chart-solar':     'Solaire (kWh/m²/jour)',
+    'chart-et0':       'Évapotranspiration (mm/an)',
+    'chart-soil':      'Humidité du Sol (m³/m³)',
+    'summary-label':   'Résumé Exécutif',
+    'compliance-label':'Cartographie des Cadres ESG',
+    'recs-label':      'Recommandations Prioritaires',
+    'export-pdf':      'Exporter PDF ↓',
+    'footer':          'Données de session stockées uniquement comme cookie temporaire. Aucune donnée personnelle collectée.',
+    'tab-overview': 'Aperçu', 'tab-datasources': 'Sources de Données',
+  },
+  de: {
+    'headline':        'Physisches Klimarisiko\nIntelligence.',
+    'sub':             '10 Jahre NASA-Satellitendaten + IPCC-Projektionen bis 2050. ESG-Compliance in Sekunden kartiert.',
+    'lat': 'Breitengrad', 'lon': 'Längengrad', 'from': 'Von', 'to': 'Bis', 'region': 'Region',
+    'risk-label':      'Klimarisiko-Score',
+    'temp-delta':      'Temperaturveränderung',
+    'precip-delta':    'Niederschlagsveränderung',
+    'compliance-exp':  'Regulatorische Exposition',
+    'hottest':         'Heißestes / Trockenster Jahr',
+    'map-label':       'Standort',
+    'trends':          'Klimatrends (10 Jahre)',
+    'chart-temp':      'Mittl. Temperatur (°C)',
+    'chart-precip':    'Niederschlag (mm/Jahr)',
+    'chart-solar':     'Solar (kWh/m²/Tag)',
+    'chart-et0':       'Evapotranspiration (mm/Jahr)',
+    'chart-soil':      'Bodenfeuchte (m³/m³)',
+    'summary-label':   'Management Summary',
+    'compliance-label':'ESG-Rahmenwerk-Mapping',
+    'recs-label':      'Priorisierte Empfehlungen',
+    'export-pdf':      'PDF exportieren ↓',
+    'footer':          'Sitzungsdaten werden nur als temporäres Cookie gespeichert. Keine personenbezogenen Daten werden erhoben.',
+    'tab-overview': 'Übersicht', 'tab-datasources': 'Datenquellen',
+  },
+};
+
+const ANALYZE_BTN_LABELS = { en: 'Analyze →', pt: 'Analisar →', es: 'Analizar →', fr: 'Analyser →', de: 'Analysieren →' };
+
+const INV_LABELS = {
+  en: { approved: 'Investment Approved',      conditioned: 'Investment Conditioned',    restricted: 'Investment Restricted',    suspended: 'Investment Suspended'    },
+  pt: { approved: 'Investimento Aprovado',    conditioned: 'Investimento Condicionado', restricted: 'Investimento Restrito',    suspended: 'Investimento Suspenso'   },
+  es: { approved: 'Inversión Aprobada',       conditioned: 'Inversión Condicionada',    restricted: 'Inversión Restringida',    suspended: 'Inversión Suspendida'    },
+  fr: { approved: 'Investissement Approuvé',  conditioned: 'Investissement Conditionné',restricted: 'Investissement Restreint', suspended: 'Investissement Suspendu' },
+  de: { approved: 'Investition Genehmigt',    conditioned: 'Investition Bedingt',       restricted: 'Investition Eingeschränkt',suspended: 'Investition Ausgesetzt'  },
+};
+
+const RISK_LABELS = {
+  en: { low: 'LOW RISK',       medium: 'MEDIUM RISK',      high: 'HIGH RISK',       critical: 'CRITICAL RISK'     },
+  pt: { low: 'RISCO BAIXO',    medium: 'RISCO MÉDIO',      high: 'RISCO ALTO',      critical: 'RISCO CRÍTICO'     },
+  es: { low: 'RIESGO BAJO',    medium: 'RIESGO MEDIO',     high: 'RIESGO ALTO',     critical: 'RIESGO CRÍTICO'    },
+  fr: { low: 'RISQUE FAIBLE',  medium: 'RISQUE MOYEN',     high: 'RISQUE ÉLEVÉ',    critical: 'RISQUE CRITIQUE'   },
+  de: { low: 'GERINGES RISIKO',medium: 'MITTLERES RISIKO', high: 'HOHES RISIKO',    critical: 'KRITISCHES RISIKO' },
 };
 
 let _lang = 'en';
 function setLang(l) {
+  if (!I18N[l]) return;
   _lang = l;
-  document.querySelectorAll('.lang-toggle button').forEach(b => b.classList.toggle('active', b.textContent === l.toUpperCase()));
+  localStorage.setItem('cs-lang', l);
+
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = l;
+
   const d = I18N[l];
   for (const [k, v] of Object.entries(d)) {
     const el = document.getElementById('t-' + k);
     if (el) el.textContent = v;
   }
+
+  // Tab buttons use tab-btn-* ids, not t-* ids
+  if (d['tab-overview'])    { const b = document.getElementById('tab-btn-overview');    if (b) b.textContent = d['tab-overview']; }
+  if (d['tab-datasources']) { const b = document.getElementById('tab-btn-datasources'); if (b) b.textContent = d['tab-datasources']; }
+
+  // Analyze button (only when not mid-run)
+  const analyzeBtn = document.getElementById('analyze-btn');
+  if (analyzeBtn && !analyzeBtn.disabled) analyzeBtn.textContent = ANALYZE_BTN_LABELS[l] || 'Analyze →';
+
+  // Re-translate risk badge if a result is shown
+  const badgeEl = document.getElementById('risk-badge');
+  if (badgeEl && badgeEl.textContent !== '—') {
+    const level = badgeEl.className.match(/\b(low|medium|high|critical)\b/)?.[1];
+    if (level) badgeEl.textContent = (RISK_LABELS[l] || RISK_LABELS.en)[level];
+  }
+
+  // Re-translate investment badge if shown
+  const invEl = document.getElementById('investment-badge');
+  if (invEl && invEl.style.display !== 'none') {
+    const cls = invEl.className.match(/\b(approved|conditioned|restricted|suspended)\b/)?.[1];
+    const textEl = document.getElementById('inv-text');
+    if (cls && textEl) textEl.textContent = (INV_LABELS[l] || INV_LABELS.en)[cls];
+  }
+
   document.querySelectorAll('.tooltip-trigger').forEach(el => {
-    const tt = el.getAttribute('data-tooltip-' + l);
+    const tt = el.getAttribute('data-tooltip-' + l) || el.getAttribute('data-tooltip-en');
     if (tt) el.setAttribute('data-tooltip', tt);
   });
 }
@@ -2367,7 +2473,7 @@ async function runAnalysis() {
     document.querySelectorAll('.pipeline-step').forEach(s => s.classList.remove('done'));
     statusBar.classList.remove('visible');
     btn.disabled = false;
-    btn.textContent = _lang === 'pt' ? 'Analisar →' : 'Analyze →';
+    btn.textContent = ANALYZE_BTN_LABELS[_lang] || 'Analyze →';
   }
 }
 
@@ -2375,7 +2481,7 @@ async function runAnalysis() {
 function renderResults(data) {
   const score  = data.risk_score  || 0;
   const level  = data.risk_level  || 'low';
-  const badge  = data.risk_badge_label || level.toUpperCase() + ' RISK';
+  const badge  = (RISK_LABELS[_lang] || RISK_LABELS.en)[level] || data.risk_badge_label || level.toUpperCase() + ' RISK';
   const km     = data.key_metrics || {};
   const annual = data.annual_records || [];
   const comp   = data.compliance_mapping || {};
@@ -2529,20 +2635,20 @@ function renderInvestmentBadge(score) {
   const subEl  = document.getElementById('inv-sub');
   if (!el) return;
 
-  let cls, text, sub;
+  let cls, sub;
   if (score <= 40) {
-    cls = 'approved';    text = 'Investment Approved';       sub = 'Standard ESG Compliance';
+    cls = 'approved';    sub = 'Standard ESG Compliance';
   } else if (score <= 70) {
-    cls = 'conditioned'; text = 'Investment Conditioned';    sub = 'Climate Adaptation Plan Required';
+    cls = 'conditioned'; sub = 'Climate Adaptation Plan Required';
   } else if (score <= 90) {
-    cls = 'restricted';  text = 'Investment Restricted';     sub = 'Mandatory Transition Plan Required';
+    cls = 'restricted';  sub = 'Mandatory Transition Plan Required';
   } else {
-    cls = 'suspended';   text = 'Investment Suspended';      sub = 'Ecological Restoration Priority';
+    cls = 'suspended';   sub = 'Ecological Restoration Priority';
   }
 
   el.className = `investment-badge ${cls}`;
   dotEl.style.background = getComputedStyle(el).color;
-  textEl.textContent = text;
+  textEl.textContent = (INV_LABELS[_lang] || INV_LABELS.en)[cls];
   subEl.textContent  = sub;
   el.style.display   = 'flex';
 }
@@ -2994,11 +3100,16 @@ function _updateScoreCardRiskClass() {
   if (level) scoreCard.classList.add('risk-' + level);
 }
 
-/* Apply saved preference on load */
+/* Apply saved preferences on load */
 (function () {
   const saved = localStorage.getItem('cs-theme') ||
     (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   _applyTheme(saved);
+})();
+
+(function () {
+  const savedLang = localStorage.getItem('cs-lang') || 'en';
+  if (savedLang !== 'en') setLang(savedLang);
 })();
 
 /* Initialize gate on page load — cookie consent deferred until gate passes */
