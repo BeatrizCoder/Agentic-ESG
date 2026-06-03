@@ -62,7 +62,7 @@
 
     /* Smooth theme transitions */
     body, header, footer, .card, .score-meta-item, .rec-item,
-    .compliance-item, .preset-btn, .lang-select-custom,
+    .compliance-item, .preset-btn, .lang-selected,
     .export-btn, .analyze-btn, #status-bar,
     .field-group input, .field-group select {
       transition: background .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease;
@@ -156,28 +156,32 @@
     }
     .topbar-link:hover { color: var(--green); }
     
-    .lang-select-custom {
-      display: flex; align-items: center; gap: 6px;
+    .lang-dropdown { position: relative; }
+    .lang-selected {
+      display: flex; align-items: center; gap: 5px;
       background: var(--bg3); border: 0.5px solid var(--border);
-      border-radius: 8px; padding: .3rem .75rem;
+      border-radius: 8px; padding: .3rem .65rem;
       cursor: pointer; font-size: .78rem; color: var(--text);
-      position: relative; user-select: none;
-      transition: border-color .2s;
+      font-family: inherit; transition: border-color .2s;
     }
-    .lang-select-custom:hover { border-color: var(--green); }
-    .lang-dropdown {
+    .lang-selected:hover { border-color: var(--green); }
+    .lang-arrow { font-size: .6rem; color: var(--muted); }
+    .lang-options {
       display: none; position: absolute; top: calc(100% + 4px); right: 0;
       background: var(--bg2); border: 0.5px solid var(--border);
-      border-radius: 8px; box-shadow: 0 4px 16px var(--shadow);
-      z-index: 300; min-width: 100%; overflow: hidden;
+      border-radius: 10px; box-shadow: 0 8px 24px var(--shadow);
+      overflow: hidden; z-index: 200; min-width: 100px;
     }
-    .lang-dropdown.open { display: block; }
-    .lang-dropdown-item {
-      padding: .45rem .85rem; font-size: .78rem; color: var(--text2);
-      cursor: pointer; white-space: nowrap; transition: background .15s;
+    .lang-options.open { display: block; }
+    .lang-options button {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: .6rem 1rem;
+      background: transparent; border: none;
+      color: var(--text); font-size: .82rem;
+      font-family: inherit; cursor: pointer; text-align: left;
     }
-    .lang-dropdown-item:hover { background: var(--bg3); color: var(--text); }
-    .lang-dropdown-item.active { color: var(--green); font-weight: 600; }
+    .lang-options button:hover { background: var(--bg3); }
+    .lang-options button.active { color: var(--green); font-weight: 500; }
 
     .theme-toggle {
       background: transparent;
@@ -1517,15 +1521,18 @@
     <button class="topbar-link" onclick="openModal('modal-glossary')">📚 Glossary</button>
   </nav>
   <div class="topbar-right">
-    <div class="lang-select-custom" id="lang-custom" onclick="_toggleLangDropdown(event)">
-      <span id="lang-flag">🇬🇧</span>
-      <span id="lang-code">EN</span>
-      <div class="lang-dropdown" id="lang-dropdown">
-        <div class="lang-dropdown-item active" data-lang="en" onclick="_pickLang(event,'en')">🇬🇧 EN</div>
-        <div class="lang-dropdown-item"        data-lang="pt" onclick="_pickLang(event,'pt')">🇧🇷 PT</div>
-        <div class="lang-dropdown-item"        data-lang="es" onclick="_pickLang(event,'es')">🇪🇸 ES</div>
-        <div class="lang-dropdown-item"        data-lang="fr" onclick="_pickLang(event,'fr')">🇫🇷 FR</div>
-        <div class="lang-dropdown-item"        data-lang="de" onclick="_pickLang(event,'de')">🇩🇪 DE</div>
+    <div class="lang-dropdown" id="lang-custom">
+      <button class="lang-selected" onclick="toggleLangDropdown()">
+        <span id="lang-flag">🇬🇧</span>
+        <span id="lang-code">EN</span>
+        <span class="lang-arrow">▾</span>
+      </button>
+      <div class="lang-options" id="lang-options">
+        <button onclick="selectLang('en')">🇬🇧 EN</button>
+        <button onclick="selectLang('pt')">🇧🇷 PT</button>
+        <button onclick="selectLang('es')">🇪🇸 ES</button>
+        <button onclick="selectLang('fr')">🇫🇷 FR</button>
+        <button onclick="selectLang('de')">🇩🇪 DE</button>
       </div>
     </div>
     <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
@@ -2263,19 +2270,25 @@ const _LANG_OPTIONS = {
   de: { flag: '🇩🇪', code: 'DE' },
 };
 
-function _toggleLangDropdown(e) {
-  e.stopPropagation();
-  document.getElementById('lang-dropdown').classList.toggle('open');
+const LANG_FLAGS = { en: '🇬🇧', pt: '🇧🇷', es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪' };
+
+function toggleLangDropdown() {
+  document.getElementById('lang-options').classList.toggle('open');
 }
 
-function _pickLang(e, l) {
-  e.stopPropagation();
-  document.getElementById('lang-dropdown').classList.remove('open');
-  setLang(l);
+function selectLang(lang) {
+  document.getElementById('lang-flag').textContent = LANG_FLAGS[lang];
+  document.getElementById('lang-code').textContent = lang.toUpperCase();
+  document.getElementById('lang-options').classList.remove('open');
+  document.querySelectorAll('.lang-options button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.lang-options button[onclick="selectLang('${lang}')"]`)?.classList.add('active');
+  setLang(lang);
 }
 
-document.addEventListener('click', () => {
-  document.getElementById('lang-dropdown')?.classList.remove('open');
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.lang-dropdown')) {
+    document.getElementById('lang-options')?.classList.remove('open');
+  }
 });
 
 const ANALYZE_BTN_LABELS = { en: 'Analyze →', pt: 'Analisar →', es: 'Analizar →', fr: 'Analyser →', de: 'Analysieren →' };
@@ -2310,8 +2323,8 @@ function setLang(l) {
     if (flagEl) flagEl.textContent = opt.flag;
     if (codeEl) codeEl.textContent = opt.code;
   }
-  document.querySelectorAll('.lang-dropdown-item').forEach(item =>
-    item.classList.toggle('active', item.dataset.lang === l)
+  document.querySelectorAll('.lang-options button').forEach(btn =>
+    btn.classList.toggle('active', btn.getAttribute('onclick') === `selectLang('${l}')`)
   );
 
   const d = I18N[l];
@@ -3409,6 +3422,8 @@ function _updateScoreCardRiskClass() {
 
 (function () {
   const savedLang = localStorage.getItem('cs-lang') || 'en';
+  document.getElementById('lang-flag').textContent = LANG_FLAGS[savedLang] || '🇬🇧';
+  document.getElementById('lang-code').textContent = savedLang.toUpperCase();
   if (savedLang !== 'en') setLang(savedLang);
 })();
 
