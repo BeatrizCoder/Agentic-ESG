@@ -6,12 +6,15 @@ def calculate_climate_risk(annual_records: list) -> dict:
     if not annual_records:
         return {}
 
-    temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in annual_records]
-    precips = [r.get("precip_total_mm") or 0 for r in annual_records]
-    solars  = [r.get("solar_mean_kwh_m2") or 0 for r in annual_records]
-    et0s    = [r.get("evapotranspiration_mm") or 0 for r in annual_records]
-    years   = [r.get("year") or 0 for r in annual_records]
-    n = len(annual_records)
+    nasa_records = [r for r in annual_records if r.get("source") == "nasa"]
+    calc_records = nasa_records if nasa_records else annual_records
+
+    temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in calc_records]
+    precips = [r.get("precip_total_mm") or 0 for r in calc_records]
+    solars  = [r.get("solar_mean_kwh_m2") or 0 for r in calc_records]
+    et0s    = [r.get("evapotranspiration_mm") or 0 for r in calc_records]
+    years   = [r.get("year") or 0 for r in calc_records]
+    n = len(calc_records)
 
     def linear_trend(values):
         if len(values) < 2:
