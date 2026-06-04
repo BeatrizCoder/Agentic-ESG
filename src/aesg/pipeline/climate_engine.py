@@ -16,18 +16,40 @@ def calculate_climate_risk(annual_records: list) -> dict:
     years   = [r.get("year") or 0 for r in calc_records]
     n = len(calc_records)
 
-    def linear_trend(values):
-        if len(values) < 2:
+    def _slope_per_decade(values):
+        """OLS slope × 10 — returns absolute units per decade."""
+        if len(values) < 3:
             return 0
-        x = list(range(len(values)))
-        mx, my = sum(x) / len(x), sum(values) / len(values)
-        num = sum((x[i] - mx) * (values[i] - my) for i in range(len(x)))
-        den = sum((x[i] - mx) ** 2 for i in range(len(x)))
-        return (num / den * 10) if den else 0  # per decade
+        n_ = len(values)
+        x = list(range(n_))
+        mx, my = sum(x) / n_, sum(values) / n_
+        num = sum((x[i] - mx) * (values[i] - my) for i in range(n_))
+        den = sum((x[i] - mx) ** 2 for i in range(n_))
+        return (num / den * 10) if den else 0
 
-    temp_trend   = linear_trend(temps)
-    precip_trend = linear_trend(precips)
-    solar_trend  = linear_trend(solars)
+    def linear_trend_abs(values):
+        """Absolute units per decade (e.g. °C/decade)."""
+        return round(_slope_per_decade(values), 3)
+
+    def linear_trend_pct(values):
+        """Trend per decade as % of the period mean (e.g. %/decade for precip)."""
+        slope = _slope_per_decade(values)
+        mean_ = sum(values) / len(values) if values else 0
+        if mean_ == 0:
+            return 0
+        return round((slope / mean_) * 100, 2)
+
+    temp_trend   = linear_trend_abs(temps)
+    precip_trend = linear_trend_pct(precips)
+    solar_trend  = linear_trend_abs(solars)
+
+    # Sanity-check: >30 %/decade is physically implausible for a 10-year window
+    if abs(precip_trend) > 30:
+        precip_trend_display = None
+        data_quality_flags = ["Precipitation trend outside expected range"]
+    else:
+        precip_trend_display = precip_trend
+        data_quality_flags = []
 
     # Baseline (first 3y) vs recent (last 3y)
     b_temp    = sum(temps[:3]) / 3    if len(temps) >= 3   else temps[0]
@@ -97,9 +119,10 @@ def calculate_climate_risk(annual_records: list) -> dict:
 
     return {
         # Trends
-        "temp_trend_c_per_decade":     round(temp_trend, 3),
-        "precip_trend_pct_per_decade": round(precip_trend, 3),
-        "solar_trend":                 round(solar_trend, 3),
+        "temp_trend_c_per_decade":     temp_trend,
+        "precip_trend_pct_per_decade": precip_trend_display,
+        "solar_trend":                 solar_trend,
+        "data_quality_flags":          data_quality_flags,
         # Changes
         "temp_change_label": (
             f"{temp_change:+.2f}°C vs baseline "

@@ -2798,8 +2798,9 @@ function renderResults(data) {
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
-    // ET0 card — hide when data is unavailable (< 10mm signals missing/zero fill)
-    const hasET0 = et0s.some(v => v > 10);
+    // ET0 card — require at least 3 years with valid readings (> 10mm)
+    const hasValidET0 = et0s.filter(v => v > 10).length >= 3;
+    const hasET0 = hasValidET0;
     const et0Card = document.getElementById('chart-et0-card');
     if (hasET0 && et0Card) {
       const lastET0  = et0s[et0s.length - 1];
@@ -2824,7 +2825,12 @@ function renderResults(data) {
       + (lastSoil > 0 && lastSoil < 0.20 ? ' val-risk-high' : lastSoil > 0.30 ? ' val-risk-low' : '');
 
     setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,              '°C/decade',       'down', 'up');
-    setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade,          '%/decade',        'up',   'down');
+    if (cf.precip_trend_pct_per_decade == null) {
+      const el = document.getElementById('chart-precip-delta');
+      if (el) { el.textContent = 'N/A — data inconsistency'; el.className = 'chart-item-delta'; }
+    } else {
+      setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade, '%/decade', 'up', 'down');
+    }
     setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
 
     // Hide optional cards when no data for this analysis
