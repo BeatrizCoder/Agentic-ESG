@@ -570,10 +570,6 @@ limitations under the License.
 - IBM Bob (watsonx Code Assistant) — AI assistant used for deployment configuration, documentation, and code review. Code architecture and business logic designed by Beatriz Costa Leal.
 - Inspired by the "Become An Agentic Architect" course
 
-**Security:**
-- See [SECURITY.md](SECURITY.md) for security policy and best practices
-- Report vulnerabilities to: biagenai24@outlook.com
-
 ---
 
 *Built by Beatriz Costa — June 2026*  
