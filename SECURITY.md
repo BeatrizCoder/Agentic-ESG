@@ -8,7 +8,7 @@
 
 ## Security Features
 
-Climate Sentinel implements multiple layers of security:
+Agentic ESG implements multiple layers of security:
 
 ### 🔒 Data Protection
 - **No Personal Data Storage** - Only climate data and anonymous session IDs
@@ -42,7 +42,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 ### 📧 Contact
 - **Email:** beatrizcostaleal1996@gmail.com
-- **Subject:** [SECURITY] Climate Sentinel Vulnerability Report
+- **Subject:** [SECURITY] Agentic ESG Vulnerability Report
 
 ### 📝 What to Include
 1. **Description** - Clear explanation of the vulnerability

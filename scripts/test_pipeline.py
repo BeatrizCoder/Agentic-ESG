@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.cs.pipeline.orchestrator import run_analysis
+from src.aesg.pipeline.orchestrator import run_analysis
 
 logging.basicConfig(
     level=logging.INFO,

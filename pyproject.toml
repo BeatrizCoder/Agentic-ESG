@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "climate-sentinel"
+name = "agentic-esg"
 version = "1.0.0"
 description = "ESG climate risk analysis powered by NASA POWER + Claude AI"
 readme = "README.md"
@@ -21,11 +21,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/BeatrizCoder/climate-sentinel"
-Repository = "https://github.com/BeatrizCoder/climate-sentinel.git"
+Homepage = "https://github.com/BeatrizCoder/agentic-esg"
+Repository = "https://github.com/BeatrizCoder/agentic-esg.git"
 
 [project.scripts]
-cs-backend = "cs.backend:main"
+aesg-backend = "aesg.backend:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

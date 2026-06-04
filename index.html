@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Climate Sentinel — ESG Intelligence</title>
+  <title>Agentic ESG — Climate Risk Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
@@ -132,7 +132,7 @@
       color: var(--text);
       letter-spacing: -.02em;
     }
-    .logo-name .sentinel { color: var(--green); font-weight: 600; }
+    .logo-name .esg { color: var(--green); font-weight: 600; }
     .logo-badge {
       font-size: .65rem;
       font-weight: 600;
@@ -1542,8 +1542,8 @@
 <!-- Topbar -->
 <header>
   <div class="logo">
-    <span class="logo-name">Climate <span class="sentinel">Sentinel</span></span>
-    <span class="logo-badge">Agentic ESG</span>
+    <span class="logo-name">Agentic <span class="esg">ESG</span></span>
+    <span class="logo-badge">Climate Intelligence</span>
   </div>
   <div class="topbar-center">Powered by NASA POWER · Claude AI</div>
   <nav class="topbar-links">
@@ -2034,7 +2034,7 @@
 
 <footer id="t-footer">
   <div class="footer-top">
-    © 2026 Beatriz Costa Leal · Climate Sentinel
+    © 2026 Beatriz Costa Leal · Agentic ESG
     &nbsp;·&nbsp;
     <button class="footer-link" onclick="openModal('modal-privacy')">Privacy Policy / Política de Privacidade</button>
     &nbsp;·&nbsp;
@@ -2091,8 +2091,8 @@ function generateSessionId() {
 function acceptCookies() {
   COOKIES_ACCEPTED = true;
   SESSION_ID = generateSessionId();
-  setCookie('cs_session_id', SESSION_ID, 2592000); // 30 days
-  setCookie('cs_consent', 'accepted', 86400);
+  setCookie('aesg_session_id', SESSION_ID, 2592000); // 30 days
+  setCookie('aesg_consent', 'accepted', 86400);
   document.getElementById('cookie-banner').classList.remove('visible');
   loadHistory();
 }
@@ -2100,23 +2100,23 @@ function acceptCookies() {
 function declineCookies() {
   COOKIES_ACCEPTED = false;
   SESSION_ID = null;
-  deleteCookie('cs_session_id');
-  setCookie('cs_consent', 'declined', 86400);
+  deleteCookie('aesg_session_id');
+  setCookie('aesg_consent', 'declined', 86400);
   document.getElementById('cookie-banner').classList.remove('visible');
 }
 
 function checkCookieConsent() {
-  const consent = getCookie('cs_consent');
+  const consent = getCookie('aesg_consent');
   if (!consent) {
     // First visit - show banner
     document.getElementById('cookie-banner').classList.add('visible');
   } else if (consent === 'accepted') {
     COOKIES_ACCEPTED = true;
-    SESSION_ID = getCookie('cs_session_id');
+    SESSION_ID = getCookie('aesg_session_id');
     if (!SESSION_ID) {
       // Cookie expired, generate new one
       SESSION_ID = generateSessionId();
-      setCookie('cs_session_id', SESSION_ID, 86400);
+      setCookie('aesg_session_id', SESSION_ID, 86400);
     }
     loadHistory();
   }
@@ -2358,7 +2358,7 @@ let _lang = 'en';
 function setLang(l) {
   if (!I18N[l]) return;
   _lang = l;
-  localStorage.setItem('cs-lang', l);
+  localStorage.setItem('aesg-lang', l);
 
   // Update custom dropdown trigger
   const opt = _LANG_OPTIONS[l];
@@ -3458,7 +3458,7 @@ function toggleTheme() {
   const isDark = html.getAttribute('data-theme') !== 'light';
   const next   = isDark ? 'light' : 'dark';
   _applyTheme(next);
-  localStorage.setItem('cs-theme', next);
+  localStorage.setItem('aesg-theme', next);
 }
 
 function _applyTheme(theme) {
@@ -3483,13 +3483,13 @@ function _updateScoreCardRiskClass() {
 
 /* Apply saved preferences on load */
 (function () {
-  const saved = localStorage.getItem('cs-theme') ||
+  const saved = localStorage.getItem('aesg-theme') ||
     (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   _applyTheme(saved);
 })();
 
 (function () {
-  const savedLang = localStorage.getItem('cs-lang') || 'en';
+  const savedLang = localStorage.getItem('aesg-lang') || 'en';
   document.getElementById('lang-flag').innerHTML = LANG_FLAGS[savedLang] || _FLAG_HTML.en;
   document.getElementById('lang-code').textContent = savedLang.toUpperCase();
   if (savedLang !== 'en') setLang(savedLang);
@@ -3502,7 +3502,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 /* ── Modal scroll-to-accept ──────────────────────────────────────────────── */
 function _termsAccepted() {
-  return getCookie('cs_terms_accepted') === 'true' && getCookie('cs_privacy_accepted') === 'true';
+  return getCookie('aesg_terms_accepted') === 'true' && getCookie('aesg_privacy_accepted') === 'true';
 }
 
 function _setAcceptBtn(btn, state) {
@@ -3631,14 +3631,14 @@ function acceptModalTerms(modalId) {
   const gateActive = document.getElementById('gate-overlay').classList.contains('active');
 
   if (modalId === 'modal-terms') {
-    setCookie('cs_terms_accepted', 'true', 365 * 86400);
+    setCookie('aesg_terms_accepted', 'true', 365 * 86400);
     closeModal('modal-terms');
     if (gateActive) {
       // Gate flow: advance to Privacy next
       setTimeout(() => openModal('modal-privacy'), 150);
     }
   } else if (modalId === 'modal-privacy') {
-    setCookie('cs_privacy_accepted', 'true', 365 * 86400);
+    setCookie('aesg_privacy_accepted', 'true', 365 * 86400);
     closeModal('modal-privacy');
     if (gateActive && _termsAccepted()) {
       _hideGate();
@@ -3739,7 +3739,7 @@ Buenos Aires Argentina,-34.6037,-58.3816,Agriculture & Food,SSP2-4.5`;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'climate_sentinel_batch_template.csv';
+  a.download = 'agentic_esg_batch_template.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -3878,7 +3878,7 @@ async function exportBatchExcel() {
     const blob = await resp.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = 'climate_sentinel_batch.xlsx';
+    a.href = url; a.download = 'agentic_esg_batch.xlsx';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (err) {
@@ -3913,7 +3913,7 @@ async function viewBatchReport(analysisId) {
   <div class="modal-box">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title">📚 Climate Sentinel Glossary</div>
+        <div class="modal-header-title">📚 Agentic ESG Glossary</div>
         <div class="modal-header-sub">Terms used in this platform · Termos utilizados nesta plataforma</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-glossary')" aria-label="Close">✕</button>
@@ -3983,14 +3983,14 @@ async function viewBatchReport(analysisId) {
 
       <div class="modal-section" data-term="llm judge language model evaluation quality accuracy validation avaliação qualidade precisão modelo linguagem">
         <div class="modal-section-title">LLM-as-Judge</div>
-        <p class="modal-en">AI evaluation technique where one language model assesses the quality and accuracy of another model's output. Used in Climate Sentinel's Validation Layer.</p>
+        <p class="modal-en">AI evaluation technique where one language model assesses the quality and accuracy of another model's output. Used in Agentic ESG's Validation Layer.</p>
         <p class="modal-pt">Técnica de avaliação por IA onde um modelo de linguagem avalia a qualidade e precisão do output de outro modelo.</p>
       </div>
 
       <div class="modal-section" data-term="hitl human in the loop expert validation regulatory decision humano cadeia decisão validação especializada">
         <div class="modal-section-title">HITL (Human-in-the-Loop)</div>
-        <p class="modal-en">Design principle ensuring humans remain in the decision chain. Climate Sentinel flags analyses that require expert human validation before regulatory use.</p>
-        <p class="modal-pt">Princípio de design que garante que humanos permaneçam na cadeia de decisão. O Climate Sentinel sinaliza análises que requerem validação humana especializada.</p>
+        <p class="modal-en">Design principle ensuring humans remain in the decision chain. Agentic ESG flags analyses that require expert human validation before regulatory use.</p>
+        <p class="modal-pt">Princípio de design que garante que humanos permaneçam na cadeia de decisão. O Agentic ESG sinaliza análises que requerem validação humana especializada.</p>
       </div>
 
       <div class="modal-section" data-term="carbon budget co2 paris agreement 1.5 2 degrees warming orçamento carbono acordo de paris aquecimento">
@@ -4055,7 +4055,7 @@ async function viewBatchReport(analysisId) {
     <div class="modal-header">
       <div>
         <div class="modal-header-title">🔒 Privacy Policy</div>
-        <div class="modal-header-sub">Política de Privacidade — Climate Sentinel</div>
+        <div class="modal-header-sub">Política de Privacidade — Agentic ESG</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-privacy')" aria-label="Close">✕</button>
     </div>
@@ -4113,7 +4113,7 @@ async function viewBatchReport(analysisId) {
     <div class="modal-header">
       <div>
         <div class="modal-header-title">📋 Terms of Use</div>
-        <div class="modal-header-sub">Termos de Uso — Climate Sentinel</div>
+        <div class="modal-header-sub">Termos de Uso — Agentic ESG</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-terms')" aria-label="Close">✕</button>
     </div>
@@ -4121,8 +4121,8 @@ async function viewBatchReport(analysisId) {
 
       <div class="modal-section">
         <div class="modal-section-title">1. Decision Support / Suporte à Decisão</div>
-        <p class="modal-en">Climate Sentinel provides AI-assisted climate risk intelligence for ESG and compliance purposes only. It is not a substitute for professional ESG, legal, or financial advice.</p>
-        <p class="modal-pt">O Climate Sentinel fornece inteligência de risco climático assistida por IA apenas para fins de ESG e conformidade regulatória. Não substitui aconselhamento profissional jurídico, financeiro ou de ESG.</p>
+        <p class="modal-en">Agentic ESG provides AI-assisted climate risk intelligence for ESG and compliance purposes only. It is not a substitute for professional ESG, legal, or financial advice.</p>
+        <p class="modal-pt">O Agentic ESG fornece inteligência de risco climático assistida por IA apenas para fins de ESG e conformidade regulatória. Não substitui aconselhamento profissional jurídico, financeiro ou de ESG.</p>
       </div>
 
       <div class="modal-section">
@@ -4133,8 +4133,8 @@ async function viewBatchReport(analysisId) {
 
       <div class="modal-section">
         <div class="modal-section-title">3. Intellectual Property / Propriedade Intelectual</div>
-        <p class="modal-en">© 2026 Beatriz Costa Leal. All rights reserved. Climate Sentinel is an independent project. Commercial use requires written authorization from the author.</p>
-        <p class="modal-pt">© 2026 Beatriz Costa Leal. Todos os direitos reservados. O Climate Sentinel é um projeto independente. O uso comercial requer autorização escrita da autora.</p>
+        <p class="modal-en">© 2026 Beatriz Costa Leal. All rights reserved. Agentic ESG is an independent project. Commercial use requires written authorization from the author.</p>
+        <p class="modal-pt">© 2026 Beatriz Costa Leal. Todos os direitos reservados. O Agentic ESG é um projeto independente. O uso comercial requer autorização escrita da autora.</p>
       </div>
 
       <div class="modal-section">

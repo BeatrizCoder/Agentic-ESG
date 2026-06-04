@@ -15,7 +15,7 @@ from pathlib import Path
 # Make src importable when running from repo root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.cs.data.nasa_adapter import fetch_climate_data
+from src.aesg.data.nasa_adapter import fetch_climate_data
 
 logging.basicConfig(
     level=logging.INFO,

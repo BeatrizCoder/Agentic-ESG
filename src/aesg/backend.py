@@ -1,4 +1,4 @@
-"""Climate Sentinel FastAPI application entry point."""
+"""Agentic ESG FastAPI application entry point."""
 
 import logging
 import os
@@ -19,7 +19,7 @@ from .api.routes import router
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Climate Sentinel",
+    title="Agentic ESG",
     description="ESG climate risk analysis powered by NASA POWER + Claude AI.",
     version="1.0.0",
 )
@@ -63,7 +63,7 @@ async def serve_frontend():
 async def _startup() -> None:
     from .db.mongo import create_indexes, _MONGO_URL
     db_label = "mongodb" if _MONGO_URL else "not connected (MONGO_URL missing)"
-    logger.info("CS backend started | db=%s", db_label)
+    logger.info("AESG backend started | db=%s", db_label)
     await create_indexes()
 
 
@@ -71,7 +71,7 @@ def main() -> int:
     import uvicorn
     from .core.config import PORT
     uvicorn.run(
-        "cs.backend:app",
+        "aesg.backend:app",
         host="0.0.0.0",
         port=PORT,
         log_level="info",

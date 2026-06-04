@@ -1,3 +1,3 @@
-"""Climate Sentinel test suite."""
+"""Agentic ESG test suite."""
 
 # Made with Bob

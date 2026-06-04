@@ -29,9 +29,9 @@ jobs:
 
       - name: Check imports
         run: |
-          python3 -c "from src.cs.api.routes import router; print('routes OK')"
-          python3 -c "from src.cs.db.mongo import save_analysis; print('mongo OK')"
-          python3 -c "from src.cs.agents.definitions import climate_analyst_agent; print('agents OK')"
+          python3 -c "from src.aesg.api.routes import router; print('routes OK')"
+          python3 -c "from src.aesg.db.mongo import save_analysis; print('mongo OK')"
+          python3 -c "from src.aesg.agents.definitions import climate_analyst_agent; print('agents OK')"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MONGO_URL: ""

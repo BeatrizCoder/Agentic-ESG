@@ -1,4 +1,4 @@
-"""Climate Sentinel — MongoDB persistence layer (Motor async driver)."""
+"""Agentic ESG — MongoDB persistence layer (Motor async driver)."""
 
 import dataclasses
 import logging
@@ -13,7 +13,7 @@ _MONGO_URL = os.getenv("MONGO_URL", "")
 
 if _MONGO_URL:
     _client = AsyncIOMotorClient(_MONGO_URL, maxPoolSize=10)
-    db = _client["climate_sentinel"]
+    db = _client["agentic_esg"]
     analyses = db["analyses"]
     logger.info("MongoDB connected via MONGO_URL")
 else:

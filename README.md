@@ -1,4 +1,4 @@
-# Climate Sentinel — Climate Risk Intelligence for ESG & Compliance
+# Agentic ESG — Climate Risk Intelligence for ESG & Compliance
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)](https://fastapi.tiangolo.com)
@@ -11,13 +11,13 @@
 
 > Physical climate risk assessment powered by NASA satellite data, IPCC projections, and Claude AI agents.
 
-📦 **GitHub:** https://github.com/BeatrizCoder/climate-sentinel
+📦 **GitHub:** https://github.com/BeatrizCoder/agentic-esg
 
 ---
 
 ## 🌐 Live Demo
 
-**[climate-sentinel-production.up.railway.app](https://climate-sentinel-production.up.railway.app)**
+**[agentic-esg-production.up.railway.app](https://agentic-esg-production.up.railway.app)**
 
 > Try it: type any city name and get a full ESG climate risk analysis powered by real NASA data.
 
@@ -25,7 +25,7 @@
 
 ## Overview
 
-Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Climate Sentinel delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.04 per location — powered by real NASA satellite data, ERA5 reanalysis, and IPCC projections to 2050.
+Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Agentic ESG delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.04 per location — powered by real NASA satellite data, ERA5 reanalysis, and IPCC projections to 2050.
 
 > **Maps physical climate risk to CSRD ESRS E1, ISSB S2, and EU Taxonomy — translating satellite data into compliance-ready business intelligence.**
 
@@ -35,7 +35,7 @@ Organizations face mounting regulatory pressure to assess and disclose physical 
 
 ## Architecture
 
-![Climate Sentinel Architecture](architecture.svg)
+![Agentic ESG Architecture](architecture.svg)
 
 ---
 
@@ -48,7 +48,7 @@ Organizations face mounting pressure to assess and disclose physical climate ris
 - **EU Taxonomy** — Investment screening requires climate risk evaluation for sustainable finance classification
 - **Traditional assessments** — Manual climate risk analysis costs $5,000-$50,000 and takes weeks
 
-Climate Sentinel delivers executive-ready climate risk assessment in under 30 seconds for ~$0.04 per location.
+Agentic ESG delivers executive-ready climate risk assessment in under 30 seconds for ~$0.04 per location.
 
 ---
 
@@ -244,7 +244,7 @@ Location Input (lat/lon)
 
 ## Auditability & Transparency
 
-Climate Sentinel is designed for auditability:
+Agentic ESG is designed for auditability:
 
 - **Data provenance:** NASA endpoint URL + OpenMeteo model identifier logged per analysis
 - **Timestamp:** Exact analysis datetime recorded and stored
@@ -332,7 +332,7 @@ Agents run **sequentially** (not in parallel) because each depends on the previo
 - **Batch cap:** CSV batch analysis limited to 20 regions per submission; larger portfolios require multiple uploads
 
 ### Compliance Disclaimer
-Climate Sentinel provides **decision support**, not legal advice. Organizations should:
+Agentic ESG provides **decision support**, not legal advice. Organizations should:
 - Validate findings with qualified ESG consultants
 - Conduct site-specific assessments for critical infrastructure
 - Review outputs with legal counsel before regulatory filings
@@ -351,8 +351,8 @@ Climate Sentinel provides **decision support**, not legal advice. Organizations 
 
 ```bash
 # Clone repository
-git clone https://github.com/BeatrizCoder/climate-sentinel.git
-cd climate-sentinel
+git clone https://github.com/BeatrizCoder/agentic-esg.git
+cd agentic-esg
 
 # Create virtual environment
 python3 -m venv venv
@@ -390,7 +390,7 @@ pytest tests/test_nasa_adapter.py -v
 ```bash
 # Terminal 1: Backend
 source venv/bin/activate
-uvicorn src.cs.backend:app --reload --port 8001
+uvicorn src.aesg.backend:app --reload --port 8001
 
 # Terminal 2: Frontend (if serving separately)
 python -m http.server 8080
@@ -412,8 +412,8 @@ python -m http.server 8080
 ## Project Structure
 
 ```
-climate-sentinel/
-├── src/cs/
+agentic-esg/
+├── src/aesg/
 │   ├── backend.py              # FastAPI app entry point
 │   ├── agents/
 │   │   ├── definitions.py      # 5 CrewAI agent definitions
@@ -465,13 +465,13 @@ railway up
 
 ```bash
 # Build image
-docker build -t climate-sentinel .
+docker build -t agentic-esg .
 
 # Run container
 docker run -p 8001:8001 \
   -e ANTHROPIC_API_KEY=your_key \
   -e MONGO_URL=your_mongo_url \
-  climate-sentinel
+  agentic-esg
 ```
 
 ---

@@ -1,4 +1,4 @@
-"""CS FastAPI routes."""
+"""AESG FastAPI routes."""
 
 import asyncio
 import csv
@@ -27,7 +27,7 @@ router = APIRouter()
 async def health(request: Request) -> dict:
     return {
         "status": "ok",
-        "service": "climate-sentinel",
+        "service": "agentic-esg",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
@@ -42,7 +42,7 @@ async def analyze(
     body: AnalyzeRequest,
     x_session_id: str | None = Header(None, alias="X-Session-ID")
 ) -> AnalysisResponse:
-    """Run the full 4-agent CS pipeline and persist the result."""
+    """Run the full 4-agent AESG pipeline and persist the result."""
     logger.info(
         "POST /api/analyze: region=%r lat=%.4f lon=%.4f years=%d-%d session_id=%s",
         body.region_label or "(unnamed)",
@@ -407,7 +407,7 @@ async def batch_export_excel(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": 'attachment; filename="climate_sentinel_batch.xlsx"',
+            "Content-Disposition": 'attachment; filename="agentic_esg_batch.xlsx"',
             "Access-Control-Expose-Headers": "Content-Disposition",
             "Cache-Control": "no-cache",
         },

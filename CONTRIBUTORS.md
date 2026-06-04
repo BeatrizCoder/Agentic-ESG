@@ -33,14 +33,14 @@
 We welcome contributions from the community! Here's how you can help:
 
 ### 🐛 Bug Reports
-Found a bug? Please [open an issue](https://github.com/BeatrizCoder/climate-sentinel/issues) with:
+Found a bug? Please [open an issue](https://github.com/BeatrizCoder/agentic-esg/issues) with:
 - Clear description of the problem
 - Steps to reproduce
 - Expected vs actual behavior
 - Your environment (OS, Python version, etc.)
 
 ### ✨ Feature Requests
-Have an idea? [Open an issue](https://github.com/BeatrizCoder/climate-sentinel/issues) with:
+Have an idea? [Open an issue](https://github.com/BeatrizCoder/agentic-esg/issues) with:
 - Clear description of the feature
 - Use case and benefits
 - Potential implementation approach (optional)
@@ -148,11 +148,11 @@ Violations can be reported to: beatrizcostaleal1996@gmail.com
 
 ## Questions?
 
-- **General questions**: [Open a discussion](https://github.com/BeatrizCoder/climate-sentinel/discussions)
-- **Bug reports**: [Open an issue](https://github.com/BeatrizCoder/climate-sentinel/issues)
+- **General questions**: [Open a discussion](https://github.com/BeatrizCoder/agentic-esg/discussions)
+- **Bug reports**: [Open an issue](https://github.com/BeatrizCoder/agentic-esg/issues)
 - **Security concerns**: Email beatrizcostaleal1996@gmail.com
 - **Direct contact**: beatrizcostaleal1996@gmail.com
 
 ---
 
-**Thank you for contributing to Climate Sentinel! Together, we can accelerate climate action through technology.** 🌍💚
+**Thank you for contributing to Agentic ESG! Together, we can accelerate climate action through technology.** 🌍💚

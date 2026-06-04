@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch
-from src.cs.data.nasa_adapter import (
+from src.aesg.data.nasa_adapter import (
     fetch_climate_data,
     _aggregate_by_year,
     AnnualClimateRecord,

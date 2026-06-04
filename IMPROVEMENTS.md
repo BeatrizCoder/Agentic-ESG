@@ -1,4 +1,4 @@
-# Technical Improvements Applied to Climate Sentinel
+# Technical Improvements Applied to Agentic ESG
 
 This document summarizes all technical improvements made to enhance code quality, reliability, and professionalism for portfolio presentation.
 
@@ -32,7 +32,7 @@ This document summarizes all technical improvements made to enhance code quality
 
 ## 🔒 2. Enhanced Input Validation
 
-### Changes in `src/cs/api/models.py`:
+### Changes in `src/aesg/api/models.py`:
 - Added `field_validator` for coordinate precision (6 decimal places)
 - Added `field_validator` for region_label whitespace handling
 - Added `model_validator` for year range validation (max 50 years)
@@ -57,14 +57,14 @@ This document summarizes all technical improvements made to enhance code quality
 
 ## 🔄 3. Retry Logic for External APIs
 
-### Changes in `src/cs/data/nasa_adapter.py`:
+### Changes in `src/aesg/data/nasa_adapter.py`:
 - Added `tenacity` library for automatic retries
 - Implemented `@retry` decorator with exponential backoff
 - Retry on `TimeoutException` and `NetworkError` (up to 3 attempts)
 - Wait strategy: 2s, 4s, 8s (exponential with max 10s)
 - Enhanced error messages for different failure types
 
-### Changes in `src/cs/data/openmeteo_adapter.py`:
+### Changes in `src/aesg/data/openmeteo_adapter.py`:
 - Added retry logic for OpenMeteo IPCC API
 - Consistent retry strategy across all external APIs
 
@@ -81,14 +81,14 @@ This document summarizes all technical improvements made to enhance code quality
 
 ## 🛡️ 4. Improved Security Configuration
 
-### Changes in `src/cs/core/config.py`:
+### Changes in `src/aesg/core/config.py`:
 - CORS origins now configurable via environment variable
 - Wildcard (`*`) only allowed if explicitly set
 - Default to localhost origins for development
 - Warning logged when wildcard is used
 - Support for comma-separated production origins
 
-### Changes in `src/cs/backend.py`:
+### Changes in `src/aesg/backend.py`:
 - CORS middleware now uses `ALLOWED_ORIGINS` from config
 - Credentials enabled only for non-wildcard origins
 - Proper security for production deployments
@@ -145,7 +145,7 @@ ALLOWED_ORIGINS=https://yourdomain.com,https://api.yourdomain.com
 ## 📊 6. Quality Badges in README
 
 ### Added Badges:
-- ![Tests](https://github.com/BeatrizCoder/climate-sentinel/actions/workflows/tests.yml/badge.svg) - CI/CD status
+- ![Tests](https://github.com/BeatrizCoder/agentic-esg/actions/workflows/tests.yml/badge.svg) - CI/CD status
 - ![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg) - Python version
 - ![License](https://img.shields.io/badge/license-Apache%202.0-green.svg) - License
 - ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg) - Code formatting

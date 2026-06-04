@@ -1,4 +1,4 @@
-"""Climate Sentinel — Excel report generator (openpyxl)."""
+"""Agentic ESG — Excel report generator (openpyxl)."""
 
 import logging
 from datetime import datetime
@@ -62,7 +62,7 @@ def _sheet_summary(wb: Workbook, analysis: dict) -> None:
     ws.sheet_view.showGridLines = True
 
     # Branding header
-    ws["A1"] = "Climate Sentinel · ESG Climate Risk Intelligence"
+    ws["A1"] = "Agentic ESG · ESG Climate Risk Intelligence"
     ws["A1"].font = _BOLD_GRN
     ws.merge_cells("A1:C1")
     ws.row_dimensions[1].height = 22
@@ -236,7 +236,7 @@ def generate_batch_excel(batch_data: dict) -> BytesIO:
     ws.title = "Summary"
     ws.sheet_view.showGridLines = True
 
-    ws["A1"] = "Climate Sentinel · Batch ESG Analysis"
+    ws["A1"] = "Agentic ESG · Batch ESG Analysis"
     ws["A1"].font = _BOLD_GRN
     ws.merge_cells("A1:F1")
     ws.row_dimensions[1].height = 22

@@ -1,4 +1,4 @@
-# Railway Deployment Guide - Climate Sentinel
+# Railway Deployment Guide - Agentic ESG
 
 ## 📋 Prerequisites
 
@@ -11,7 +11,7 @@
 ### 1. Add MongoDB Service to Railway
 
 1. Go to Railway dashboard: https://railway.app/dashboard
-2. Open your `climate-sentinel` project
+2. Open your `agentic-esg` project
 3. Click **"+ New"** → **"Database"** → **"Add MongoDB"**
 4. Railway will automatically:
    - Provision a MongoDB instance
