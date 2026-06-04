@@ -5,7 +5,7 @@
 ### Beatriz Costa Leal
 **Role:** Creator & Lead Developer  
 **GitHub:** [@BeatrizCoder](https://github.com/BeatrizCoder)  
-**Email:** beatrizcostaleal1996@gmail.com  
+**Email:** biagenai24@outlook.com  
 **Contributions:**
 - Project architecture and design
 - Full-stack implementation (Python backend + JavaScript frontend)
@@ -142,7 +142,7 @@ We are committed to providing a welcoming and inclusive environment for all cont
 - Other conduct inappropriate in a professional setting
 
 ### Enforcement
-Violations can be reported to: beatrizcostaleal1996@gmail.com
+Violations can be reported to: biagenai24@outlook.com
 
 ---
 
@@ -150,8 +150,8 @@ Violations can be reported to: beatrizcostaleal1996@gmail.com
 
 - **General questions**: [Open a discussion](https://github.com/BeatrizCoder/agentic-esg/discussions)
 - **Bug reports**: [Open an issue](https://github.com/BeatrizCoder/agentic-esg/issues)
-- **Security concerns**: Email beatrizcostaleal1996@gmail.com
-- **Direct contact**: beatrizcostaleal1996@gmail.com
+- **Security concerns**: Email biagenai24@outlook.com
+- **Direct contact**: biagenai24@outlook.com
 
 ---
 

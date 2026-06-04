@@ -41,7 +41,7 @@ Agentic ESG implements multiple layers of security:
 If you discover a security vulnerability, please report it responsibly:
 
 ### 📧 Contact
-- **Email:** beatrizcostaleal1996@gmail.com
+- **Email:** biagenai24@outlook.com
 - **Subject:** [SECURITY] Agentic ESG Vulnerability Report
 
 ### 📝 What to Include
@@ -173,4 +173,4 @@ None yet - be the first to responsibly disclose a vulnerability!
 
 **Last Updated:** 2026-06-03  
 **Version:** 1.0.0  
-**Maintainer:** Beatriz Costa Leal (beatrizcostaleal1996@gmail.com)
+**Maintainer:** Beatriz Costa Leal (biagenai24@outlook.com)

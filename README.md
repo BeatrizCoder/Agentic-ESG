@@ -572,10 +572,10 @@ limitations under the License.
 
 **Security:**
 - See [SECURITY.md](SECURITY.md) for security policy and best practices
-- Report vulnerabilities to: beatrizcostaleal1996@gmail.com
+- Report vulnerabilities to: biagenai24@outlook.com
 
 ---
 
 *Built by Beatriz Costa — June 2026*  
 *Open source for educational and research purposes*  
-*Contact: beatrizcostaleal1996@gmail.com*
+*Contact: biagenai24@outlook.com*
