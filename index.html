@@ -432,6 +432,18 @@
     }
     #comparison-results { display: none; max-width: 860px; margin: 1rem auto; padding: 0 1rem; }
 
+    /* ── Sector hint ──────────────────────────────────────────────────────── */
+    .sector-hint {
+      font-size: .68rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: .25rem;
+      padding: .3rem .5rem;
+      background: var(--bg3);
+      border-radius: 6px;
+      border-left: 2px solid var(--terra);
+    }
+
     /* ── Batch modal ──────────────────────────────────────────────────────── */
     .modal-box-wide { max-width: 780px !important; }
     #modal-batch {
@@ -1737,6 +1749,9 @@
           <span class="tooltip-trigger"
             data-tooltip-en="Type any city or region. We'll find the coordinates automatically."
             data-tooltip-pt="Digite qualquer cidade ou região. Encontraremos as coordenadas automaticamente."
+            data-tooltip-es="Escriba cualquier ciudad o región. Encontraremos las coordenadas automáticamente."
+            data-tooltip-fr="Tapez n'importe quelle ville ou région. Nous trouverons les coordonnées automatiquement."
+            data-tooltip-de="Geben Sie eine Stadt oder Region ein. Wir finden die Koordinaten automatisch."
             data-tooltip="Type any city or region. We'll find the coordinates automatically.">?</span>
         </label>
         <div class="geocoder-wrap">
@@ -1759,6 +1774,9 @@
           <span class="tooltip-trigger"
             data-tooltip-en="Start year for historical climate analysis (NASA POWER data available from 2000)"
             data-tooltip-pt="Ano inicial para análise climática histórica (dados NASA POWER disponíveis a partir de 2000)"
+            data-tooltip-es="Año inicial para análisis climático histórico (datos NASA POWER disponibles desde 2000)"
+            data-tooltip-fr="Année de début pour l'analyse climatique historique (données NASA POWER disponibles depuis 2000)"
+            data-tooltip-de="Startjahr für historische Klimaanalyse (NASA POWER Daten verfügbar ab 2000)"
             data-tooltip="Start year for historical climate analysis (NASA POWER data available from 2000)">?</span>
         </label>
         <select id="inp-start">
@@ -1795,6 +1813,9 @@
           <span class="tooltip-trigger"
             data-tooltip-en="End year. Years after 2025 use IPCC climate projections (OpenMeteo)"
             data-tooltip-pt="Ano final. Anos após 2025 usam projeções climáticas IPCC (OpenMeteo)"
+            data-tooltip-es="Año final. Los años después de 2025 usan proyecciones climáticas IPCC (OpenMeteo)"
+            data-tooltip-fr="Année de fin. Les années après 2025 utilisent les projections climatiques du GIEC (OpenMeteo)"
+            data-tooltip-de="Endjahr. Jahre nach 2025 verwenden IPCC-Klimaprojektionen (OpenMeteo)"
             data-tooltip="End year. Years after 2025 use IPCC climate projections (OpenMeteo)">?</span>
         </label>
         <select id="inp-end">
@@ -1829,9 +1850,12 @@
       <div class="field-group">
         <label id="t-sector">Sector
           <span class="tooltip-trigger"
-            data-tooltip-en="Your industry sector. Affects how ESG compliance risks are weighted and framed."
-            data-tooltip-pt="Seu setor de atividade. Afeta como os riscos de conformidade ESG são ponderados."
-            data-tooltip="Your industry sector. Affects how ESG compliance risks are weighted and framed.">?</span>
+            data-tooltip-en="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk."
+            data-tooltip-pt="Seu setor de atividade. Cada setor tem diferentes limiares de risco climático e prioridades de compliance ESG. Agricultura é mais sensível à seca. Finanças foca em portfólio e ativos encalhados. Imóveis prioriza risco de inundação e ativos físicos."
+            data-tooltip-es="Su sector industrial. Cada sector tiene diferentes umbrales de riesgo climático y prioridades de cumplimiento ESG. La agricultura es más sensible a la sequía. Las finanzas se centran en carteras y activos varados. Los bienes raíces priorizan el riesgo de inundaciones y activos físicos."
+            data-tooltip-fr="Votre secteur d'activité. Chaque secteur a des seuils de risque climatique et des priorités de conformité ESG différents. L'agriculture est plus sensible à la sécheresse. La finance se concentre sur les portefeuilles et les actifs échoués. L'immobilier priorise les risques d'inondation et d'actifs physiques."
+            data-tooltip-de="Ihr Industriesektor. Jeder Sektor hat unterschiedliche Klimarisikoschwellen und ESG-Compliance-Prioritäten. Die Landwirtschaft ist empfindlicher gegenüber Dürre. Finanzen konzentrieren sich auf Portfolios und gestrandete Vermögenswerte. Immobilien priorisieren Überschwemmungs- und physische Vermögensrisiken."
+            data-tooltip="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk.">?</span>
         </label>
         <select id="inp-sector">
           <option value="General" selected>General</option>
@@ -1843,12 +1867,19 @@
           <option value="Energy & Utilities">Energy &amp; Utilities</option>
           <option value="Retail & Logistics">Retail &amp; Logistics</option>
         </select>
+        <div id="sector-hint" class="sector-hint" style="display:none">
+          <span id="sector-hint-en">💡 General analysis — select your industry sector for more precise ESG recommendations</span>
+          <span id="sector-hint-pt" style="display:none">💡 Análise generalista — selecione seu setor para recomendações ESG mais precisas</span>
+        </div>
       </div>
       <div class="field-group">
         <label id="t-scenario">Scenario
           <span class="tooltip-trigger"
             data-tooltip-en="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)"
             data-tooltip-pt="Cenário de emissões IPCC para projeções futuras:&#10;SSP1-2.6: Otimista (forte ação climática, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas atuais, ~2–3°C)&#10;SSP5-8.5: Pessimista (altas emissões, ~4–5°C)"
+            data-tooltip-es="Escenario de emisiones IPCC para proyecciones futuras:&#10;SSP1-2.6: Optimista (acción climática fuerte, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas actuales, ~2–3°C)&#10;SSP5-8.5: Pesimista (altas emisiones, ~4–5°C)"
+            data-tooltip-fr="Scénario d'émissions du GIEC pour les projections futures:&#10;SSP1-2.6: Optimiste (action climatique forte, ~1,5°C)&#10;SSP2-4.5: Modéré (politiques actuelles, ~2–3°C)&#10;SSP5-8.5: Pessimiste (émissions élevées, ~4–5°C)"
+            data-tooltip-de="IPCC-Emissionsszenario für zukünftige Projektionen:&#10;SSP1-2.6: Optimistisch (starke Klimaschutzmaßnahmen, ~1,5°C)&#10;SSP2-4.5: Moderat (aktuelle Richtlinien, ~2–3°C)&#10;SSP5-8.5: Pessimistisch (hohe Emissionen, ~4–5°C)"
             data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">?</span>
         </label>
         <select id="inp-scenario">
@@ -2646,6 +2677,19 @@ function setLang(l) {
     if (tt) el.setAttribute('data-tooltip', tt);
   });
 
+  // Update sector hint language
+  const sectorHintEn = document.getElementById('sector-hint-en');
+  const sectorHintPt = document.getElementById('sector-hint-pt');
+  if (sectorHintEn && sectorHintPt) {
+    if (l === 'pt') {
+      sectorHintEn.style.display = 'none';
+      sectorHintPt.style.display = 'inline';
+    } else {
+      sectorHintEn.style.display = 'inline';
+      sectorHintPt.style.display = 'none';
+    }
+  }
+
   setGlossaryLang(l);
 }
 
@@ -2674,6 +2718,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('inp-lat-manual').addEventListener('input', _syncManualCoords);
   document.getElementById('inp-lon-manual').addEventListener('input', _syncManualCoords);
+
+  // Sector hint visibility logic
+  const sectorSelect = document.getElementById('inp-sector');
+  const sectorHint = document.getElementById('sector-hint');
+  const sectorHintEn = document.getElementById('sector-hint-en');
+  const sectorHintPt = document.getElementById('sector-hint-pt');
+  
+  function updateSectorHint() {
+    if (sectorSelect && sectorHint) {
+      const isGeneral = sectorSelect.value === 'General';
+      sectorHint.style.display = isGeneral ? 'block' : 'none';
+      
+      // Update hint text based on current language
+      const currentLang = document.documentElement.lang || 'en';
+      if (sectorHintEn && sectorHintPt) {
+        if (currentLang === 'pt') {
+          sectorHintEn.style.display = 'none';
+          sectorHintPt.style.display = 'inline';
+        } else {
+          sectorHintEn.style.display = 'inline';
+          sectorHintPt.style.display = 'none';
+        }
+      }
+    }
+  }
+  
+  if (sectorSelect) {
+    sectorSelect.addEventListener('change', updateSectorHint);
+    // Show hint on page load if General is selected
+    updateSectorHint();
+  }
 });
 
 async function _geocodeSearch(q) {
