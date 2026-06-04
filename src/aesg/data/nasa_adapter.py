@@ -1,8 +1,8 @@
 """Adapter for the NASA POWER Daily Point API.
 
-Fetches T2M (temperature), PRECTOTCORR (precipitation), and
-ALLSKY_SFC_SW_DWN (solar irradiance) for a lat/lon bounding box,
-then aggregates daily values into annual statistics.
+Fetches T2M (temperature), PRECTOTCORR (precipitation),
+ALLSKY_SFC_SW_DWN (solar irradiance), and EVPTRNS (evapotranspiration)
+for a lat/lon bounding box, then aggregates daily values into annual statistics.
 """
 
 import logging
@@ -25,7 +25,7 @@ from ..core.config import (
 
 logger = logging.getLogger(__name__)
 
-_PARAMETERS = "T2M,PRECTOTCORR,ALLSKY_SFC_SW_DWN"
+_PARAMETERS = "T2M,PRECTOTCORR,ALLSKY_SFC_SW_DWN,EVPTRNS"
 _FILL_VALUE = -999.0
 
 
@@ -39,6 +39,7 @@ class AnnualClimateRecord:
     temp_min_celsius: float
     precip_total_mm: float
     solar_mean_kwh_m2: float
+    evapotranspiration_mm: float
     days_sampled: int
 
 
@@ -137,7 +138,7 @@ async def fetch_climate_data(
 
     total_daily_datapoints = sum(
         len([v for v in raw_parameters.get(p, {}).values() if v != _FILL_VALUE])
-        for p in ["T2M", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN"]
+        for p in ["T2M", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN", "EVPTRNS"]
     )
 
     logger.info(
@@ -167,6 +168,7 @@ def _aggregate_by_year(
     temps: dict[int, list[float]] = {}
     precips: dict[int, list[float]] = {}
     solars: dict[int, list[float]] = {}
+    et0s: dict[int, list[float]] = {}
 
     for date_key, value in parameters.get("T2M", {}).items():
         if value != _FILL_VALUE:
@@ -180,6 +182,10 @@ def _aggregate_by_year(
         if value != _FILL_VALUE:
             solars.setdefault(int(date_key[:4]), []).append(value)
 
+    for date_key, value in parameters.get("EVPTRNS", {}).items():
+        if value != _FILL_VALUE:
+            et0s.setdefault(int(date_key[:4]), []).append(value)
+
     all_years = sorted(set(temps) | set(precips) | set(solars))
 
     records = []
@@ -187,6 +193,7 @@ def _aggregate_by_year(
         t = temps.get(year, [])
         p = precips.get(year, [])
         s = solars.get(year, [])
+        e = et0s.get(year, [])
 
         records.append(
             AnnualClimateRecord(
@@ -198,6 +205,7 @@ def _aggregate_by_year(
                 temp_min_celsius=round(min(t), 2) if t else 0.0,
                 precip_total_mm=round(sum(p), 1) if p else 0.0,
                 solar_mean_kwh_m2=_mean(s),
+                evapotranspiration_mm=round(sum(e), 1) if e else 0.0,
                 days_sampled=max(len(t), len(p), len(s)),
             )
         )

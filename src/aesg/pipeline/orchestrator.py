@@ -346,7 +346,7 @@ async def run_analysis(
             "precip_total_mm":       r.precip_total_mm,
             "solar_mean_kwh_m2":     r.solar_mean_kwh_m2,
             "days_sampled":          r.days_sampled,
-            "evapotranspiration_mm": None,
+            "evapotranspiration_mm": r.evapotranspiration_mm or None,
             "soil_moisture_m3m3":    None,
             "source":                "nasa",
         }
