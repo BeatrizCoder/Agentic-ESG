@@ -287,21 +287,26 @@
     }
     .analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .action-row { display: flex; gap: .75rem; margin-top: .5rem; flex-wrap: wrap; }
-    .action-btn {
-      background: var(--bg2);
+    .compare-toggle-row { margin-top: .5rem; margin-left: .25rem; display: flex; align-items: center; }
+    .batch-row {
+      display: flex;
+      align-items: center;
+      margin-top: 1rem;
+      padding-top: .75rem;
+      border-top: 0.5px solid var(--border);
+    }
+    .batch-btn {
+      background: transparent;
       border: 0.5px solid var(--border);
       border-radius: 10px;
       color: var(--text2);
-      font-size: .8rem;
-      font-weight: 500;
+      font-size: .78rem;
       padding: .5rem 1rem;
       cursor: pointer;
-      transition: all .2s ease;
+      transition: all .2s;
       white-space: nowrap;
     }
-    .action-btn:hover { border-color: var(--green); color: var(--green); }
-    .compare-toggle-row { margin-top: .5rem; display: flex; align-items: center; }
+    .batch-btn:hover { border-color: var(--green); color: var(--green); }
     .compare-checkbox-label {
       display: flex;
       align-items: center;
@@ -313,8 +318,8 @@
     }
     .compare-checkbox-label input[type="checkbox"] { accent-color: var(--green); width: 14px; height: 14px; cursor: pointer; }
     .compare-checkbox-label:hover { color: var(--green); }
-    .compare-fields-row { display: flex; gap: .75rem; align-items: flex-end; margin-top: .5rem; flex-wrap: wrap; }
-    .compare-hint { font-size: .65rem; color: var(--muted); align-self: center; }
+    .compare-fields-row { display: flex; gap: .75rem; align-items: flex-end; margin-top: .5rem; margin-left: .25rem; flex-wrap: wrap; }
+    .compare-hint { font-size: .65rem; color: var(--muted); align-self: center; font-style: italic; }
 
     .comparison-card {
       background: var(--bg2);
@@ -1817,12 +1822,8 @@
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
     </div>
-    <div class="action-row">
-      <button class="action-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
-    </div>
-
-    <!-- Compare checkbox -->
-    <div class="compare-toggle-row" style="margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid var(--border)">
+    <!-- Compare checkbox — directly below the search row -->
+    <div class="compare-toggle-row">
       <label class="compare-checkbox-label">
         <input type="checkbox" id="comparison-checkbox" onchange="toggleComparisonMode(this.checked)">
         <span>⚖️ Compare with another period</span>
@@ -1882,6 +1883,11 @@
     <p style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
       ✦ Years after 2025 use OpenMeteo IPCC climate projections (model varies by scenario)
     </p>
+
+    <!-- Batch — separated below with visual gap -->
+    <div class="batch-row">
+      <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis — analyze multiple regions at once</button>
+    </div>
 
     <!-- History Section -->
     <div id="history-section">
