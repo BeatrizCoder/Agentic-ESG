@@ -788,12 +788,13 @@ async def run_comparison_pipeline(
     temp_mean = round(sum(temps) / len(temps), 2) if temps else 0.0
 
     return {
-        "label":        f"{start_year}–{end_year}",
-        "risk_score":   risk_score,
-        "risk_level":   risk_level,
-        "temp_mean":    temp_mean,
-        "temp_trend":   climate_metrics.get("temp_trend_c_per_decade", 0),
-        "precip_trend": climate_metrics.get("precip_trend_pct_per_decade"),
-        "drought_score": climate_metrics.get("drought_score", 0),
-        "key_finding":  climate_narrative,
+        "label":             f"{start_year}–{end_year}",
+        "risk_score":        risk_score,
+        "risk_level":        risk_level,
+        "temp_mean":         temp_mean,
+        "temp_trend":        climate_metrics.get("temp_trend_c_per_decade", 0),
+        "precip_trend":      climate_metrics.get("precip_trend_pct_per_decade"),
+        "drought_score":     climate_metrics.get("drought_score", 0),
+        "heat_stress_score": climate_metrics.get("heat_stress_score", 0),
+        "key_finding":       climate_narrative,
     }

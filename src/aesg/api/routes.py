@@ -252,6 +252,18 @@ def _inv_label(score: int) -> str:
 
 
 
+def _extract_comparison_score(result: dict) -> int | None:
+    """Return risk_score, or a composite fallback if score is 0."""
+    score = result.get("risk_score") or 0
+    if score > 0:
+        return score
+    drought = result.get("drought_score") or 0
+    heat    = result.get("heat_stress_score") or 0
+    if drought > 0 or heat > 0:
+        return min(100, int(drought * 0.6 + heat * 0.4))
+    return None
+
+
 @router.post("/api/analyze/compare")
 @limiter.limit("5/hour")
 async def compare_periods(request: Request, body: CompareRequest) -> dict:
@@ -284,14 +296,17 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
         logger.exception("Comparison pipeline failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Comparison failed: {exc}")
 
-    if p1["risk_score"] == 0:
-        logger.warning("compare_periods: period_1 (%d-%d) returned risk_score=0 — check metrics in orchestrator log",
-                       body.period_1.start_year, body.period_1.end_year)
-    if p2["risk_score"] == 0:
-        logger.warning("compare_periods: period_2 (%d-%d) returned risk_score=0 — check metrics in orchestrator log",
-                       body.period_2.start_year, body.period_2.end_year)
+    logger.info("compare_periods period_1 raw: %s", p1)
+    logger.info("compare_periods period_2 raw: %s", p2)
 
-    score_delta  = p1["risk_score"] - p2["risk_score"]
+    p1["risk_score"] = _extract_comparison_score(p1)
+    p2["risk_score"] = _extract_comparison_score(p2)
+
+    logger.info("compare_periods scores after extract: p1=%s p2=%s", p1["risk_score"], p2["risk_score"])
+
+    s1 = p1["risk_score"] or 0
+    s2 = p2["risk_score"] or 0
+    score_delta  = s1 - s2
     temp_delta   = round((p1["temp_mean"] or 0) - (p2["temp_mean"] or 0), 2)
     trend_delta  = round((p1["temp_trend"] or 0) - (p2["temp_trend"] or 0), 3)
     p1_pt        = p1["precip_trend"]
