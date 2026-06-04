@@ -1417,6 +1417,22 @@
       color: var(--muted);
       padding: 1.5rem 0;
     }
+    .glossary-lang-toggle {
+      display: flex; gap: .35rem; padding: .5rem 1.5rem .25rem; flex-shrink: 0;
+    }
+    .glossary-lang-toggle button {
+      background: var(--bg3); border: 0.5px solid var(--border);
+      border-radius: 6px; color: var(--text2); cursor: pointer;
+      font-family: inherit; font-size: .75rem; padding: .28rem .55rem;
+      transition: border-color .15s, color .15s;
+    }
+    .glossary-lang-toggle button.active { border-color: var(--green); color: var(--green); font-weight: 600; }
+    .glossary-lang-toggle button:hover:not(.active) { border-color: var(--text2); }
+    .glossary-count { font-size: .72rem; color: var(--muted); padding: .25rem 1.5rem 0; flex-shrink: 0; }
+    .glossary-term { padding: .85rem 0; border-bottom: 0.5px solid var(--border); }
+    .glossary-term:last-child { border-bottom: none; }
+    .term-title { font-size: .85rem; font-weight: 600; color: var(--text); margin-bottom: .35rem; }
+    .term-body { font-size: .78rem; color: var(--text2); line-height: 1.6; }
 
     /* ── AI Transparency panel ───────────────────────────────────────────── */
     .transparency-panel {
@@ -2406,6 +2422,8 @@ function setLang(l) {
     const tt = el.getAttribute('data-tooltip-' + l) || el.getAttribute('data-tooltip-en');
     if (tt) el.setAttribute('data-tooltip', tt);
   });
+
+  setGlossaryLang(l);
 }
 
 /* ── Preset ──────────────────────────────────────────────────────────────── */
@@ -3591,7 +3609,8 @@ function openModal(id) {
   // Reset glossary search when opening
   if (id === 'modal-glossary') {
     const inp = document.getElementById('glossary-search');
-    if (inp) { inp.value = ''; filterGlossary(''); }
+    if (inp) inp.value = '';
+    setGlossaryLang(currentGlossaryLang);
   }
 
   if (!btn) return;
@@ -3652,26 +3671,179 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ── Glossary search ─────────────────────────────────────────────────────── */
-function filterGlossary(query) {
-  const q       = query.trim().toLowerCase();
-  const sections = document.querySelectorAll('#modal-glossary .modal-section');
-  const noResult = document.getElementById('glossary-no-results');
-  let visible = 0;
+/* ── Glossary data + render ──────────────────────────────────────────────── */
+const GLOSSARY_TERMS = [
+  { id: 'csrd', title: 'CSRD', translations: {
+    en: 'EU directive requiring large companies to report on environmental, social and governance impacts. Mandatory for EU companies from 2024-2025 under ESRS standards.',
+    pt: 'Diretiva da UE que exige que grandes empresas reportem impactos ambientais, sociais e de governança. Obrigatória para empresas europeias a partir de 2024-2025.',
+    es: 'Directiva de la UE que exige que las grandes empresas reporten impactos ambientales, sociales y de gobernanza. Obligatoria para empresas europeas desde 2024-2025.',
+    fr: 'Directive européenne exigeant que les grandes entreprises déclarent leurs impacts environnementaux, sociaux et de gouvernance. Obligatoire pour les entreprises de l\'UE à partir de 2024-2025.',
+    de: 'EU-Richtlinie, die große Unternehmen zur Berichterstattung über ökologische, soziale und Governance-Auswirkungen verpflichtet. Ab 2024-2025 für EU-Unternehmen verbindlich.'
+  }},
+  { id: 'issb_s2', title: 'ISSB S2', translations: {
+    en: 'Global standard by IFRS requiring companies to disclose climate-related risks and opportunities, including physical and transition risks with scenario analysis.',
+    pt: 'Padrão global do IFRS exigindo divulgação de riscos e oportunidades relacionados ao clima, incluindo análise de cenários.',
+    es: 'Estándar global del IFRS que exige a las empresas divulgar riesgos y oportunidades relacionados con el clima, incluyendo análisis de escenarios.',
+    fr: 'Norme mondiale de l\'IFRS exigeant la divulgation des risques et opportunités liés au climat, incluant une analyse de scénarios.',
+    de: 'Globaler IFRS-Standard, der Unternehmen zur Offenlegung klimabezogener Risiken und Chancen, einschließlich Szenarioanalysen, verpflichtet.'
+  }},
+  { id: 'eu_taxonomy', title: 'EU Taxonomy', translations: {
+    en: 'EU classification system for sustainable economic activities. Companies must demonstrate alignment to access green finance and avoid greenwashing.',
+    pt: 'Sistema de classificação da UE para atividades econômicas sustentáveis. Empresas precisam demonstrar alinhamento para acessar financiamento verde.',
+    es: 'Sistema de clasificación de la UE para actividades económicas sostenibles. Las empresas deben demostrar alineación para acceder a financiamiento verde.',
+    fr: 'Système de classification européen pour les activités économiques durables. Les entreprises doivent démontrer leur alignement pour accéder à la finance verte.',
+    de: 'EU-Klassifizierungssystem für nachhaltige Wirtschaftsaktivitäten. Unternehmen müssen Konformität nachweisen, um grüne Finanzierung zu erhalten.'
+  }},
+  { id: 'physical_risk', title: 'Physical Climate Risk', translations: {
+    en: 'Direct risks from climate change affecting operations and assets: droughts, floods, extreme heat, water stress, sea level rise.',
+    pt: 'Riscos diretos das mudanças climáticas que afetam operações e ativos: secas, inundações, calor extremo, estresse hídrico.',
+    es: 'Riesgos directos del cambio climático que afectan operaciones y activos: sequías, inundaciones, calor extremo, estrés hídrico.',
+    fr: 'Risques directs du changement climatique affectant les opérations et les actifs: sécheresses, inondations, chaleur extrême, stress hydrique.',
+    de: 'Direkte Risiken des Klimawandels für Betrieb und Vermögenswerte: Dürren, Überschwemmungen, extreme Hitze, Wasserstress.'
+  }},
+  { id: 'double_materiality', title: 'Double Materiality', translations: {
+    en: 'CSRD concept requiring companies to assess both how climate affects them (financial materiality) AND how they affect the climate (impact materiality).',
+    pt: 'Conceito do CSRD exigindo que empresas avaliem tanto como o clima as afeta quanto como elas afetam o clima.',
+    es: 'Concepto del CSRD que exige evaluar tanto cómo el clima afecta a la empresa como cómo la empresa afecta al clima.',
+    fr: 'Concept CSRD exigeant d\'évaluer à la fois comment le climat affecte l\'entreprise ET comment l\'entreprise affecte le climat.',
+    de: 'CSRD-Konzept, das Unternehmen verpflichtet, sowohl die Auswirkungen des Klimas auf sie als auch ihre Auswirkungen auf das Klima zu bewerten.'
+  }},
+  { id: 'ssp', title: 'SSP Scenarios', translations: {
+    en: 'IPCC Shared Socioeconomic Pathways — emission scenarios: SSP1-2.6 (optimistic ~1.5°C), SSP2-4.5 (moderate ~2-3°C), SSP5-8.5 (high emissions ~4-5°C).',
+    pt: 'Cenários de emissões do IPCC: SSP1-2.6 (otimista ~1,5°C), SSP2-4.5 (moderado ~2-3°C), SSP5-8.5 (altas emissões ~4-5°C).',
+    es: 'Escenarios de emisiones del IPCC: SSP1-2.6 (optimista ~1,5°C), SSP2-4.5 (moderado ~2-3°C), SSP5-8.5 (altas emisiones ~4-5°C).',
+    fr: 'Scénarios d\'émissions du GIEC: SSP1-2.6 (optimiste ~1,5°C), SSP2-4.5 (modéré ~2-3°C), SSP5-8.5 (émissions élevées ~4-5°C).',
+    de: 'IPCC-Emissionsszenarien: SSP1-2.6 (optimistisch ~1,5°C), SSP2-4.5 (moderat ~2-3°C), SSP5-8.5 (hohe Emissionen ~4-5°C).'
+  }},
+  { id: 'esrs', title: 'ESRS E1', translations: {
+    en: 'European Sustainability Reporting Standard for Climate Change — specifies exactly what companies must disclose about climate risks, targets and transition plans.',
+    pt: 'Padrão Europeu de Reporte de Sustentabilidade para Mudanças Climáticas — especifica o que empresas devem divulgar sobre riscos climáticos.',
+    es: 'Estándar Europeo de Reporte de Sostenibilidad para Cambio Climático — especifica qué deben divulgar las empresas sobre riesgos climáticos.',
+    fr: 'Norme européenne de reporting de durabilité pour le changement climatique — spécifie ce que les entreprises doivent divulguer.',
+    de: 'Europäischer Nachhaltigkeitsberichtsstandard für den Klimawandel — legt fest, was Unternehmen über Klimarisiken offenlegen müssen.'
+  }},
+  { id: 'nasa_power', title: 'NASA POWER API', translations: {
+    en: 'NASA\'s Prediction Of Worldwide Energy Resources — provides real satellite-derived climate data (temperature, precipitation, solar radiation) for any location, free and open access.',
+    pt: 'Sistema da NASA que fornece dados climáticos reais derivados de satélite para qualquer localização no planeta, gratuito e de acesso aberto.',
+    es: 'Sistema de la NASA que proporciona datos climáticos reales derivados de satélites para cualquier ubicación en el planeta, gratuito y de acceso abierto.',
+    fr: 'Système de la NASA fournissant des données climatiques réelles dérivées de satellites pour n\'importe quel endroit sur Terre, gratuit et en accès libre.',
+    de: 'NASA-System, das reale satellitenbasierte Klimadaten für jeden Ort der Erde bereitstellt, kostenlos und frei zugänglich.'
+  }},
+  { id: 'ipcc', title: 'IPCC', translations: {
+    en: 'Intergovernmental Panel on Climate Change — UN body that assesses climate science. Their AR6 report and SSP scenarios are the global reference for climate risk.',
+    pt: 'Painel Intergovernamental sobre Mudanças Climáticas — organismo da ONU que avalia a ciência do clima.',
+    es: 'Panel Intergubernamental sobre Cambio Climático — organismo de la ONU que evalúa la ciencia del clima.',
+    fr: 'Groupe d\'experts intergouvernemental sur l\'évolution du climat — organe de l\'ONU évaluant la science climatique.',
+    de: 'Zwischenstaatlicher Ausschuss für Klimaänderungen — UN-Gremium zur Bewertung der Klimawissenschaft.'
+  }},
+  { id: 'llm_judge', title: 'LLM-as-Judge', translations: {
+    en: 'AI evaluation technique where one language model assesses the quality and accuracy of another model\'s output. Used in Agentic ESG\'s Validation Layer.',
+    pt: 'Técnica de avaliação por IA onde um modelo de linguagem avalia a qualidade do output de outro modelo. Usado na Validation Layer do Agentic ESG.',
+    es: 'Técnica de evaluación de IA donde un modelo evalúa la calidad del output de otro modelo. Usado en la Capa de Validación de Agentic ESG.',
+    fr: 'Technique d\'évaluation IA où un modèle évalue la qualité des sorties d\'un autre modèle. Utilisé dans la couche de validation d\'Agentic ESG.',
+    de: 'KI-Bewertungstechnik, bei der ein Sprachmodell die Qualität der Ausgaben eines anderen Modells bewertet. Wird im Validierungs-Layer von Agentic ESG verwendet.'
+  }},
+  { id: 'hitl', title: 'HITL — Human-in-the-Loop', translations: {
+    en: 'Design principle ensuring humans remain in the decision chain. Agentic ESG flags analyses that require expert human validation before regulatory use.',
+    pt: 'Princípio de design que garante que humanos permaneçam na cadeia de decisão. O Agentic ESG sinaliza análises que requerem validação humana especializada.',
+    es: 'Principio de diseño que garantiza que los humanos permanezcan en la cadena de decisión. Agentic ESG señala análisis que requieren validación humana.',
+    fr: 'Principe de conception garantissant que les humains restent dans la chaîne de décision. Agentic ESG signale les analyses nécessitant une validation humaine.',
+    de: 'Designprinzip, das sicherstellt, dass Menschen in der Entscheidungskette bleiben. Agentic ESG kennzeichnet Analysen, die menschliche Expertvalidierung erfordern.'
+  }},
+  { id: 'era5', title: 'ERA5 Reanalysis', translations: {
+    en: 'ECMWF\'s global climate dataset combining historical observations with weather model outputs. Provides consistent climate data from 1940 to present.',
+    pt: 'Dataset climático global do ECMWF combinando observações históricas com modelos meteorológicos. Fornece dados de 1940 ao presente.',
+    es: 'Dataset climático global del ECMWF que combina observaciones históricas con modelos meteorológicos. Proporciona datos desde 1940 hasta el presente.',
+    fr: 'Jeu de données climatiques mondial de l\'ECMWF combinant observations historiques et sorties de modèles météorologiques. Données disponibles de 1940 à aujourd\'hui.',
+    de: 'Globaler Klimadatensatz des ECMWF, der historische Beobachtungen mit Wettermodellausgaben kombiniert. Klimadaten von 1940 bis heute.'
+  }},
+  { id: 'et0', title: 'Evapotranspiration (ET0)', translations: {
+    en: 'Combined water loss through soil evaporation and plant transpiration. When ET0 exceeds precipitation, a region is in water deficit — a key drought indicator.',
+    pt: 'Perda combinada de água por evaporação do solo e transpiração das plantas. Quando ET0 supera a precipitação, a região está em déficit hídrico.',
+    es: 'Pérdida combinada de agua por evaporación del suelo y transpiración de plantas. Cuando ET0 supera la precipitación, la región está en déficit hídrico.',
+    fr: 'Perte d\'eau combinée par évaporation du sol et transpiration des plantes. Quand ET0 dépasse les précipitations, la région est en déficit hydrique.',
+    de: 'Kombinierter Wasserverlust durch Bodenverdunstung und Pflanzentranspiration. Wenn ET0 den Niederschlag übersteigt, befindet sich die Region im Wasserdefizit.'
+  }},
+  { id: 'water_stress', title: 'Water Stress', translations: {
+    en: 'Condition where water demand exceeds available supply. Measured by the ratio of water withdrawals to renewable freshwater resources.',
+    pt: 'Condição em que a demanda de água supera a oferta disponível. Medido pela razão entre retiradas e recursos hídricos renováveis.',
+    es: 'Condición en que la demanda de agua supera la oferta disponible. Medido por la relación entre extracciones y recursos hídricos renovables.',
+    fr: 'Condition où la demande en eau dépasse l\'offre disponible. Mesuré par le ratio prélèvements/ressources en eau douce renouvelables.',
+    de: 'Zustand, in dem die Wassernachfrage das verfügbare Angebot übersteigt. Gemessen am Verhältnis von Wasserentnahmen zu erneuerbaren Süßwasserressourcen.'
+  }},
+  { id: 'transition_risk', title: 'Transition Risk', translations: {
+    en: 'Financial risks from the transition to a low-carbon economy — policy changes, technology shifts, and changing consumer preferences affecting asset values.',
+    pt: 'Riscos financeiros da transição para uma economia de baixo carbono — mudanças de política, tecnologia e preferências que afetam valores de ativos.',
+    es: 'Riesgos financieros de la transición a una economía baja en carbono — cambios de política, tecnología y preferencias del consumidor.',
+    fr: 'Risques financiers de la transition vers une économie bas-carbone — changements de politiques, technologies et préférences des consommateurs.',
+    de: 'Finanzielle Risiken des Übergangs zu einer kohlenstoffarmen Wirtschaft — Politikänderungen, Technologiewandel und veränderte Verbraucherpräferenzen.'
+  }},
+  { id: 'stranded_assets', title: 'Stranded Assets', translations: {
+    en: 'Assets that suffer unexpected devaluations due to climate change or energy transition — e.g. fossil fuel reserves that cannot be extracted profitably.',
+    pt: 'Ativos que sofrem desvalorização inesperada devido às mudanças climáticas ou à transição energética.',
+    es: 'Activos que sufren devaluaciones inesperadas por el cambio climático o la transición energética — ej. reservas de combustibles fósiles.',
+    fr: 'Actifs subissant des dépréciations inattendues dues au changement climatique ou à la transition énergétique.',
+    de: 'Vermögenswerte, die durch den Klimawandel oder die Energiewende unerwartete Wertverluste erleiden.'
+  }},
+  { id: 'net_zero', title: 'Net Zero', translations: {
+    en: 'A state where greenhouse gas emissions are balanced by removals. Many companies have net zero targets by 2050 aligned with the Paris Agreement.',
+    pt: 'Estado em que as emissões de gases de efeito estufa são compensadas por remoções. Muitas empresas têm metas de net zero para 2050.',
+    es: 'Estado en que las emisiones de gases de efecto invernadero son compensadas por absorciones. Muchas empresas tienen objetivos net zero para 2050.',
+    fr: 'État où les émissions de gaz à effet de serre sont compensées par des absorptions. De nombreuses entreprises visent le net zéro d\'ici 2050.',
+    de: 'Zustand, in dem Treibhausgasemissionen durch Entnahmen ausgeglichen werden. Viele Unternehmen haben Net-Zero-Ziele bis 2050.'
+  }},
+  { id: 'scope3', title: 'Scope 3 Emissions', translations: {
+    en: 'Indirect emissions in a company\'s value chain — from suppliers, business travel, product use and disposal. Often the largest share of corporate emissions.',
+    pt: 'Emissões indiretas na cadeia de valor de uma empresa — fornecedores, viagens, uso e descarte de produtos.',
+    es: 'Emisiones indirectas en la cadena de valor — proveedores, viajes de negocios, uso y eliminación de productos.',
+    fr: 'Émissions indirectes dans la chaîne de valeur — fournisseurs, voyages d\'affaires, utilisation et élimination des produits.',
+    de: 'Indirekte Emissionen in der Wertschöpfungskette — Lieferanten, Geschäftsreisen, Produktnutzung und -entsorgung.'
+  }},
+  { id: 'eu_ai_act', title: 'EU AI Act', translations: {
+    en: 'EU regulation on artificial intelligence. Article 13 requires transparency and explainability for AI systems used in high-stakes decisions.',
+    pt: 'Regulamento da UE sobre inteligência artificial. O Artigo 13 exige transparência e explicabilidade para sistemas de IA em decisões de alto impacto.',
+    es: 'Reglamento de la UE sobre inteligencia artificial. El Artículo 13 exige transparencia y explicabilidad para sistemas de IA en decisiones de alto impacto.',
+    fr: 'Règlement européen sur l\'intelligence artificielle. L\'Article 13 exige transparence et explicabilité pour les systèmes d\'IA dans les décisions à enjeux élevés.',
+    de: 'EU-Verordnung über künstliche Intelligenz. Artikel 13 fordert Transparenz und Erklärbarkeit für KI-Systeme bei folgenreichen Entscheidungen.'
+  }},
+  { id: 'carbon_budget', title: 'Carbon Budget', translations: {
+    en: 'Maximum cumulative CO2 emissions allowed to limit warming to 1.5°C or 2°C as per the Paris Agreement.',
+    pt: 'Emissões máximas acumuladas de CO2 permitidas para limitar o aquecimento conforme o Acordo de Paris.',
+    es: 'Emisiones máximas acumuladas de CO2 permitidas para limitar el calentamiento según el Acuerdo de París.',
+    fr: 'Émissions cumulées maximales de CO2 autorisées pour limiter le réchauffement climatique conformément à l\'Accord de Paris.',
+    de: 'Maximale kumulierte CO2-Emissionen, die zur Begrenzung der Erwärmung gemäß dem Pariser Abkommen zulässig sind.'
+  }}
+];
 
-  sections.forEach(sec => {
-    const haystack = (
-      (sec.dataset.term || '') + ' ' +
-      (sec.querySelector('.modal-section-title')?.textContent || '') + ' ' +
-      (sec.querySelector('.modal-en')?.textContent || '') + ' ' +
-      (sec.querySelector('.modal-pt')?.textContent || '')
-    ).toLowerCase();
-    const show = !q || haystack.includes(q);
-    sec.style.display = show ? '' : 'none';
-    if (show) visible++;
+let currentGlossaryLang = 'en';
+
+function renderGlossary(filterText = '') {
+  const container = document.getElementById('glossary-terms');
+  const noResult  = document.getElementById('glossary-no-results');
+  const countEl   = document.getElementById('glossary-count');
+  if (!container) return;
+  const q = (filterText || '').trim().toLowerCase();
+  const filtered = GLOSSARY_TERMS.filter(term => {
+    if (!q) return true;
+    return term.title.toLowerCase().includes(q) ||
+      Object.values(term.translations).some(t => t.toLowerCase().includes(q));
   });
+  container.innerHTML = filtered.map(term => `
+    <div class="glossary-term">
+      <div class="term-title">${term.title}</div>
+      <div class="term-body">${term.translations[currentGlossaryLang] || term.translations['en']}</div>
+    </div>
+  `).join('');
+  noResult.style.display  = filtered.length === 0 ? 'block' : 'none';
+  if (countEl) countEl.textContent = `${filtered.length} term${filtered.length !== 1 ? 's' : ''}`;
+}
 
-  noResult.style.display = visible === 0 ? 'block' : 'none';
+function setGlossaryLang(lang) {
+  currentGlossaryLang = lang;
+  document.querySelectorAll('.glossary-lang-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  renderGlossary(document.getElementById('glossary-search')?.value || '');
 }
 
 /* ── Batch Analysis ───────────────────────────────────────────────────────── */
@@ -3914,137 +4086,31 @@ async function viewBatchReport(analysisId) {
     <div class="modal-header">
       <div>
         <div class="modal-header-title">📚 Agentic ESG Glossary</div>
-        <div class="modal-header-sub">Terms used in this platform · Termos utilizados nesta plataforma</div>
+        <div class="modal-header-sub">20 terms · 5 languages</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-glossary')" aria-label="Close">✕</button>
     </div>
+    <div class="glossary-lang-toggle">
+      <button onclick="setGlossaryLang('en')" data-lang="en"><span class="fi fi-gb"></span> EN</button>
+      <button onclick="setGlossaryLang('pt')" data-lang="pt"><span class="fi fi-br"></span> PT</button>
+      <button onclick="setGlossaryLang('es')" data-lang="es"><span class="fi fi-es"></span> ES</button>
+      <button onclick="setGlossaryLang('fr')" data-lang="fr"><span class="fi fi-fr"></span> FR</button>
+      <button onclick="setGlossaryLang('de')" data-lang="de"><span class="fi fi-de"></span> DE</button>
+    </div>
     <div class="glossary-search-wrap">
       <input id="glossary-search" class="glossary-search" type="text"
-        placeholder="Search terms… / Buscar termos…"
-        oninput="filterGlossary(this.value)"
+        placeholder="Search terms…"
+        oninput="renderGlossary(this.value)"
         autocomplete="off" />
     </div>
+    <div class="glossary-count" id="glossary-count">20 terms</div>
     <div class="modal-body glossary-body">
-      <div class="glossary-no-results" id="glossary-no-results">No results / Sem resultados</div>
-
-      <div class="modal-section" data-term="csrd eu directive environmental social governance esrs diretiva ue governança">
-        <div class="modal-section-title">CSRD</div>
-        <p class="modal-en">EU directive requiring large companies to report on environmental, social and governance impacts. Mandatory for EU companies from 2024–2025 under ESRS standards.</p>
-        <p class="modal-pt">Diretiva da UE que exige que grandes empresas reportem impactos ambientais, sociais e de governança. Obrigatória para empresas europeias a partir de 2024–2025.</p>
-      </div>
-
-      <div class="modal-section" data-term="issb s2 ifrs climate disclosure physical transition risk scenario ifrs clima divulgação riscos">
-        <div class="modal-section-title">ISSB S2</div>
-        <p class="modal-en">Global standard by IFRS requiring companies to disclose climate-related risks and opportunities, including physical and transition risks with scenario analysis.</p>
-        <p class="modal-pt">Padrão global do IFRS exigindo divulgação de riscos e oportunidades relacionados ao clima, incluindo análise de cenários.</p>
-      </div>
-
-      <div class="modal-section" data-term="eu taxonomy classification sustainable green finance greenwashing taxonomia classificação sustentável financiamento verde">
-        <div class="modal-section-title">EU Taxonomy</div>
-        <p class="modal-en">EU classification system for sustainable economic activities. Companies must demonstrate alignment to access green finance and avoid greenwashing.</p>
-        <p class="modal-pt">Sistema de classificação da UE para atividades econômicas sustentáveis. Empresas precisam demonstrar alinhamento para acessar financiamento verde.</p>
-      </div>
-
-      <div class="modal-section" data-term="physical climate risk drought flood heat water stress sea level risco climático físico seca inundação calor hídrico">
-        <div class="modal-section-title">Physical Climate Risk</div>
-        <p class="modal-en">Direct risks from climate change affecting operations and assets: droughts, floods, extreme heat, water stress, sea level rise.</p>
-        <p class="modal-pt">Riscos diretos das mudanças climáticas que afetam operações e ativos: secas, inundações, calor extremo, estresse hídrico.</p>
-      </div>
-
-      <div class="modal-section" data-term="double materiality csrd financial impact materialidade dupla financeiro impacto">
-        <div class="modal-section-title">Double Materiality</div>
-        <p class="modal-en">CSRD concept requiring companies to assess both how climate affects them (financial materiality) AND how they affect the climate (impact materiality).</p>
-        <p class="modal-pt">Conceito do CSRD exigindo que empresas avaliem tanto como o clima as afeta quanto como elas afetam o clima.</p>
-      </div>
-
-      <div class="modal-section" data-term="ssp scenarios ipcc shared socioeconomic pathways emission 1.5 2 3 4 5 cenários emissões projeções">
-        <div class="modal-section-title">SSP Scenarios</div>
-        <p class="modal-en">IPCC Shared Socioeconomic Pathways — emission scenarios for climate projections: SSP1-2.6 (optimistic ~1.5°C), SSP2-4.5 (moderate ~2–3°C), SSP5-8.5 (high ~4–5°C).</p>
-        <p class="modal-pt">Cenários de emissões do IPCC para projeções climáticas futuras, do otimista ao pessimista.</p>
-      </div>
-
-      <div class="modal-section" data-term="esrs e1 european sustainability reporting standard climate change disclosure transition plano europeu reporte mudanças climáticas">
-        <div class="modal-section-title">ESRS E1</div>
-        <p class="modal-en">European Sustainability Reporting Standard for Climate Change — specifies exactly what companies must disclose about climate risks, targets and transition plans.</p>
-        <p class="modal-pt">Padrão Europeu de Reporte de Sustentabilidade para Mudanças Climáticas — especifica o que empresas devem divulgar sobre riscos climáticos e planos de transição.</p>
-      </div>
-
-      <div class="modal-section" data-term="nasa power api satellite temperature precipitation solar radiation dados satélite temperatura precipitação solar">
-        <div class="modal-section-title">NASA POWER API</div>
-        <p class="modal-en">NASA's Prediction Of Worldwide Energy Resources — provides real satellite-derived climate data (temperature, precipitation, solar radiation) for any location on Earth, free and open access.</p>
-        <p class="modal-pt">Sistema da NASA que fornece dados climáticos reais derivados de satélite para qualquer localização no planeta, gratuito e de acesso aberto.</p>
-      </div>
-
-      <div class="modal-section" data-term="ipcc intergovernmental panel climate change un ar6 scenarios painel intergovernamental mudanças climáticas onu">
-        <div class="modal-section-title">IPCC</div>
-        <p class="modal-en">Intergovernmental Panel on Climate Change — UN body that assesses climate science. Their AR6 report and SSP scenarios are the global reference for climate risk.</p>
-        <p class="modal-pt">Painel Intergovernamental sobre Mudanças Climáticas — organismo da ONU que avalia a ciência do clima.</p>
-      </div>
-
-      <div class="modal-section" data-term="llm judge language model evaluation quality accuracy validation avaliação qualidade precisão modelo linguagem">
-        <div class="modal-section-title">LLM-as-Judge</div>
-        <p class="modal-en">AI evaluation technique where one language model assesses the quality and accuracy of another model's output. Used in Agentic ESG's Validation Layer.</p>
-        <p class="modal-pt">Técnica de avaliação por IA onde um modelo de linguagem avalia a qualidade e precisão do output de outro modelo.</p>
-      </div>
-
-      <div class="modal-section" data-term="hitl human in the loop expert validation regulatory decision humano cadeia decisão validação especializada">
-        <div class="modal-section-title">HITL (Human-in-the-Loop)</div>
-        <p class="modal-en">Design principle ensuring humans remain in the decision chain. Agentic ESG flags analyses that require expert human validation before regulatory use.</p>
-        <p class="modal-pt">Princípio de design que garante que humanos permaneçam na cadeia de decisão. O Agentic ESG sinaliza análises que requerem validação humana especializada.</p>
-      </div>
-
-      <div class="modal-section" data-term="carbon budget co2 paris agreement 1.5 2 degrees warming orçamento carbono acordo de paris aquecimento">
-        <div class="modal-section-title">Carbon Budget</div>
-        <p class="modal-en">Maximum amount of CO₂ that can be emitted globally while limiting warming to 1.5°C or 2°C as per Paris Agreement.</p>
-        <p class="modal-pt">Quantidade máxima de CO₂ que pode ser emitida globalmente para limitar o aquecimento conforme o Acordo de Paris.</p>
-      </div>
-
-      <div class="modal-section" data-term="net zero greenhouse gas emissions removals 2050 paris zero líquido emissões remoções">
-        <div class="modal-section-title">Net Zero</div>
-        <p class="modal-en">A state where greenhouse gas emissions are balanced by removals. Many companies have net zero targets by 2050 aligned with the Paris Agreement.</p>
-        <p class="modal-pt">Estado em que as emissões de gases de efeito estufa são compensadas por remoções. Muitas empresas têm metas de net zero para 2050.</p>
-      </div>
-
-      <div class="modal-section" data-term="stranded assets fossil fuel devaluation energy transition climate change ativos encalhados combustíveis fósseis desvalorização transição energética">
-        <div class="modal-section-title">Stranded Assets</div>
-        <p class="modal-en">Assets that suffer unexpected devaluations due to climate change or energy transition — e.g. fossil fuel reserves that cannot be extracted profitably.</p>
-        <p class="modal-pt">Ativos que sofrem desvalorização inesperada devido às mudanças climáticas ou à transição energética — ex: reservas de combustíveis fósseis não extraíveis com lucro.</p>
-      </div>
-
-      <div class="modal-section" data-term="water stress demand supply freshwater withdrawals estresse hídrico demanda oferta água doce retiradas">
-        <div class="modal-section-title">Water Stress</div>
-        <p class="modal-en">Condition where water demand exceeds available supply. Measured by the ratio of water withdrawals to renewable freshwater resources.</p>
-        <p class="modal-pt">Condição em que a demanda de água supera a oferta disponível. Medido pela razão entre retiradas e recursos hídricos renováveis.</p>
-      </div>
-
-      <div class="modal-section" data-term="transition risk policy technology low carbon economy asset value risco de transição política tecnologia economia baixo carbono valor ativo">
-        <div class="modal-section-title">Transition Risk</div>
-        <p class="modal-en">Financial risks from the transition to a low-carbon economy — policy changes, technology shifts, and changing consumer preferences affecting asset values.</p>
-        <p class="modal-pt">Riscos financeiros da transição para uma economia de baixo carbono — mudanças de política, tecnologia e preferências que afetam valores de ativos.</p>
-      </div>
-
-      <div class="modal-section" data-term="scope 3 emissions indirect value chain suppliers business travel disposal escopo 3 emissões indiretas cadeia de valor fornecedores viagens descarte">
-        <div class="modal-section-title">Scope 3 Emissions</div>
-        <p class="modal-en">Indirect emissions in a company's value chain — from suppliers, business travel, product use and disposal. Often the largest share of corporate emissions.</p>
-        <p class="modal-pt">Emissões indiretas na cadeia de valor de uma empresa — fornecedores, viagens, uso e descarte de produtos. Frequentemente a maior parcela das emissões corporativas.</p>
-      </div>
-
-      <div class="modal-section" data-term="era5 reanalysis ecmwf historical climate dataset weather model 1940 reanálise dados climáticos históricos modelo meteorológico">
-        <div class="modal-section-title">ERA5 Reanalysis</div>
-        <p class="modal-en">ECMWF's global climate dataset combining historical observations with weather model outputs. Provides consistent climate data from 1940 to present.</p>
-        <p class="modal-pt">Dataset climático global do ECMWF combinando observações históricas com modelos meteorológicos. Fornece dados climáticos consistentes de 1940 ao presente.</p>
-      </div>
-
-      <div class="modal-section" data-term="evapotranspiration et0 soil evaporation plant transpiration water deficit drought indicator evapotranspiração solo evaporação transpiração déficit hídrico seca">
-        <div class="modal-section-title">Evapotranspiration (ET0)</div>
-        <p class="modal-en">Combined water loss through soil evaporation and plant transpiration. When ET0 exceeds precipitation, a region is in water deficit — a key drought indicator.</p>
-        <p class="modal-pt">Perda combinada de água por evaporação do solo e transpiração das plantas. Quando ET0 supera a precipitação, a região está em déficit hídrico.</p>
-      </div>
-
+      <div class="glossary-no-results" id="glossary-no-results" style="display:none">No results</div>
+      <div id="glossary-terms"></div>
     </div>
     <div class="modal-footer">
       <div class="modal-footer-btns">
-        <button class="modal-close-btn" onclick="closeModal('modal-glossary')">Close / Fechar</button>
+        <button class="modal-close-btn" onclick="closeModal('modal-glossary')">Close</button>
       </div>
     </div>
   </div>
