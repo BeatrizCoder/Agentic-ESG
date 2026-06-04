@@ -2753,7 +2753,12 @@ function renderResults(data) {
   document.getElementById('meta-temp').textContent       = km.temp_change_label            || '—';
   document.getElementById('meta-precip').textContent     = km.precip_change_label           || '—';
   document.getElementById('meta-compliance').textContent = km.compliance_exposure_label      || '—';
-  document.getElementById('meta-years').textContent      = `${km.hottest_year || '—'} / ${km.driest_year || '—'}`;
+  const currentYear   = new Date().getFullYear();
+  const hottestYear   = data.key_metrics?.hottest_year;
+  const driestYear    = data.key_metrics?.driest_year;
+  const hottestLabel  = hottestYear ? (hottestYear > currentYear ? `${hottestYear} (projected)` : `${hottestYear}`) : '—';
+  const driestLabel   = driestYear  ? (driestYear  > currentYear ? `${driestYear} (projected)`  : `${driestYear}`)  : '—';
+  document.getElementById('meta-years').textContent = `${hottestLabel} / ${driestLabel}`;
 
   /* map */
   document.getElementById('map-coords').textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;

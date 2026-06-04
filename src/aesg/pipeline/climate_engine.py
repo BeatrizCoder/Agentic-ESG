@@ -49,8 +49,13 @@ def calculate_climate_risk(annual_records: list) -> dict:
         if (std_t and abs(temps[i] - mean_t) > 1.5 * std_t)
         or (std_p and abs(precips[i] - mean_p) > 1.5 * std_p)
     ]
-    hottest_year = years[temps.index(max(temps))]     if temps   else None
+    nasa_temps = list(zip(years, temps))
+    hottest_year = max(nasa_temps, key=lambda x: x[1])[0] if nasa_temps else None
     driest_year  = years[precips.index(min(precips))] if precips else None
+
+    proj_records = [r for r in annual_records if r.get("source") == "projection"]
+    proj_temps = [(r.get("year"), r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0) for r in proj_records]
+    projected_hottest = max(proj_temps, key=lambda x: x[1])[0] if proj_temps else None
 
     # ET0 water deficit
     avg_et0    = sum(et0s[-3:]) / 3    if et0s and len(et0s) >= 3 else (et0s[-1] if et0s else 0)
@@ -105,9 +110,10 @@ def calculate_climate_risk(annual_records: list) -> dict:
             f"({b_precip:.1f}mm → {r_precip:.1f}mm)"
         ),
         # Anomalies
-        "hottest_year":  hottest_year,
-        "driest_year":   driest_year,
-        "anomaly_years": anomaly_years,
+        "hottest_year":           hottest_year,
+        "projected_hottest_year": projected_hottest,
+        "driest_year":            driest_year,
+        "anomaly_years":          anomaly_years,
         # Scores
         "drought_score":     round(drought_score, 1),
         "heat_stress_score": round(heat_stress_score, 1),
