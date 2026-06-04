@@ -122,13 +122,16 @@ Location Input (lat/lon)
 
 ### Agent Details
 
-| Agent | Model | Role | Output |
-|-------|-------|------|--------|
-| **Data Collector** | Python + httpx | Fetches and normalizes climate data | Annual records (temp, precip, solar, ET0, soil moisture) |
-| **Climate Analyst** | Claude Haiku 4.5 | Detects trends and anomalies | Risk levels, key findings, data quality |
-| **ESG Strategist** | Claude Sonnet 4.6 | Maps risks to compliance frameworks | CSRD/ISSB/Taxonomy exposure + urgency |
-| **Report Writer** | Claude Sonnet 4.6 | Generates executive report | Risk score, summary, recommendations |
-| **Validation Layer** | Claude Sonnet 4.6 | Validates output coherence, flags inconsistencies | Confidence score (0-100) |
+| Component | Type | Tokens | Role |
+|-----------|------|--------|------|
+| Data Collector | Python | 0 | Fetches NASA + OpenMeteo |
+| Climate Risk Engine | Python | 0 | Trends, scores, anomalies |
+| Climate Interpreter | Claude Haiku 4.5 | ~200 | Contextual synthesis |
+| ESG Strategist | Claude Sonnet 4.6 | ~1,200 | CSRD/ISSB/EU Taxonomy mapping |
+| Report Writer | Claude Sonnet 4.6 | ~1,500 | Executive report |
+| Quality Judge | Claude Sonnet 4.6 | ~1,000 | Validation + confidence score |
+
+Hybrid design: deterministic Python engine handles quantitative risk calculation (zero tokens, fully auditable), LLMs only where language reasoning adds measurable value. Demonstrates that not everything needs to be an agent — a key principle in production agentic systems.
 
 ---
 

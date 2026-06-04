@@ -51,24 +51,24 @@ def _extract_json(raw: str) -> dict:
         raise
 
 
-async def run_climate_analysis_crew(serialised_records: str) -> tuple[dict, dict]:
-    """Agent 2 — Climate Analyst. Returns (findings, tokens)."""
+async def run_climate_analysis_crew(climate_task_input_str: str) -> tuple[str, dict]:
+    """Agent 2 — Climate Interpreter. Returns (narrative_text, tokens)."""
     from .tasks import make_climate_analysis_task
     from .definitions import climate_analyst_agent
 
     crew = Crew(
         agents=[climate_analyst_agent],
-        tasks=[make_climate_analysis_task(serialised_records)],
+        tasks=[make_climate_analysis_task(climate_task_input_str)],
         process=Process.sequential,
         verbose=False,
     )
     result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
-        return _extract_json(result.tasks_output[0].raw), tokens
+        return result.tasks_output[0].raw.strip(), tokens
     except Exception as error:
-        logger.error("Climate analysis crew parsing failed: %s", error)
-        return {"error": str(error), "key_findings": [], "data_quality": "poor"}, tokens
+        logger.error("Climate interpreter crew failed: %s", error)
+        return "", tokens
 
 
 async def run_esg_strategy_crew(

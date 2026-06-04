@@ -14,6 +14,7 @@ from ..data.openmeteo_adapter import (
     Era5Result, OpenMeteoResult,
     fetch_era5_recent, fetch_projection_range, _PROJECTION_MODEL,
 )
+from .climate_engine import calculate_climate_risk
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +211,7 @@ def _build_transparency(
 
     reasoning_chain = [
         {
-            "agent": "Climate Analyst", "model": "claude-haiku-4-5", "step": 2,
+            "agent": "Climate Risk Engine + Interpreter", "model": "Python + claude-haiku-4-5", "step": "2a+2b",
             "received": f"{nasa_years} years of NASA POWER data for {region_label}",
             "key_finding": str(key_finding)[:120],
             "anomaly": anomaly_str or "No extreme anomalies detected",
@@ -260,6 +261,70 @@ def _build_transparency(
             "confidence": confidence_score,
             "recommendation": rec,
         },
+    }
+
+
+def _score_to_risk(score: float) -> str:
+    if score > 70: return "critical"
+    if score > 45: return "high"
+    if score > 25: return "medium"
+    return "low"
+
+
+def _build_climate_findings(
+    metrics: dict,
+    narrative: str,
+    annual_records: list[dict],
+) -> dict:
+    """Merge Python engine metrics with Haiku narrative into the climate_findings dict."""
+    n = len(annual_records)
+    b3 = min(3, n)
+
+    temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in annual_records]
+    precips = [r.get("precip_total_mm") or 0 for r in annual_records]
+    years   = [r.get("year") or 0 for r in annual_records]
+
+    solar_val = metrics.get("solar_trend", 0) or 0
+    solar_str = "increasing" if solar_val > 0.05 else "decreasing" if solar_val < -0.05 else "stable"
+
+    wettest_year = years[precips.index(max(precips))] if precips else None
+
+    missing = sum(
+        1 for r in annual_records
+        if not (r.get("temp_mean_celsius") or r.get("temp_mean_c"))
+    )
+    data_quality = "poor" if missing > n * 0.3 else "partial" if missing > 0 else "good"
+
+    return {
+        "temp_trend_c_per_decade":     metrics.get("temp_trend_c_per_decade"),
+        "precip_trend_pct_per_decade": metrics.get("precip_trend_pct_per_decade"),
+        "hottest_year":                metrics.get("hottest_year"),
+        "driest_year":                 metrics.get("driest_year"),
+        "wettest_year":                wettest_year,
+        "compliance_urgency":          metrics.get("compliance_urgency"),
+        "compliance_exposure":         metrics.get("compliance_exposure"),
+        "water_deficit":               metrics.get("water_deficit"),
+        "et0_precip_ratio":            metrics.get("et0_precip_ratio"),
+        "drought_score":               metrics.get("drought_score"),
+        "heat_stress_score":           metrics.get("heat_stress_score"),
+        "flood_score":                 metrics.get("flood_score"),
+        "temp_change_label":           metrics.get("temp_change_label"),
+        "precip_change_label":         metrics.get("precip_change_label"),
+        # Translated to risk levels expected by downstream agents
+        "heat_stress_risk": _score_to_risk(metrics.get("heat_stress_score") or 0),
+        "drought_risk":     _score_to_risk(metrics.get("drought_score") or 0),
+        "flood_risk":       _score_to_risk(metrics.get("flood_score") or 0),
+        "solar_trend":      solar_str,
+        # Baseline vs recent computed from raw records
+        "baseline_temp_mean_c": round(sum(temps[:b3]) / b3, 2) if b3 else None,
+        "latest_temp_mean_c":   round(sum(temps[-b3:]) / b3, 2) if b3 else None,
+        "baseline_precip_mm":   round(sum(precips[:b3]) / b3, 1) if b3 else None,
+        "latest_precip_mm":     round(sum(precips[-b3:]) / b3, 1) if b3 else None,
+        "temp_anomaly_years":   metrics.get("anomaly_years", []),
+        "precip_anomaly_years": metrics.get("anomaly_years", []),
+        "data_quality":         data_quality,
+        # Haiku 2-3 sentence narrative
+        "key_findings": [narrative] if narrative and narrative.strip() else [],
     }
 
 
@@ -389,19 +454,6 @@ async def run_analysis(
             for r in om_result.projection_records
         ]
 
-    serialised_records = json.dumps([
-        {
-            "year":                  r["year"],
-            "temp_mean_c":           r.get("temp_mean_celsius") or 0,
-            "precip_total_mm":       r.get("precip_total_mm") or 0,
-            "solar_mean_kwh_m2":     r.get("solar_mean_kwh_m2"),
-            "evapotranspiration_mm": r.get("evapotranspiration_mm"),
-            "soil_moisture_m3m3":    r.get("soil_moisture_m3m3"),
-            "source":                r["source"],
-        }
-        for r in unified_records
-    ])
-
     logger.info(
         "Step 1/5 complete: nasa=%d years  era5=%d years  projection=%d years  total=%d",
         len(nasa_result.annual_records),
@@ -410,13 +462,37 @@ async def run_analysis(
         len(unified_records),
     )
 
-    # ── Step 2: Climate Analyst ────────────────────────────────────────────────
+    # ── Step 2a: Deterministic climate engine (no LLM) ────────────────────────
+    climate_metrics = calculate_climate_risk(unified_records)
+    logger.info(
+        "Step 2a/5 — Climate Engine: drought=%.1f heat_stress=%.1f flood=%.1f urgency=%s",
+        climate_metrics.get("drought_score", 0),
+        climate_metrics.get("heat_stress_score", 0),
+        climate_metrics.get("flood_score", 0),
+        climate_metrics.get("compliance_urgency"),
+    )
+
+    # ── Step 2b: Climate Interpreter (Haiku) — 2-3 sentence synthesis ─────────
     from ..agents.crews import run_climate_analysis_crew
 
-    logger.info("Step 2/5 — Climate Analyst: analysing trends")
-    climate_findings, tokens_analyst = await run_climate_analysis_crew(serialised_records)
+    logger.info("Step 2b/5 — Climate Interpreter: narrative synthesis")
+    climate_task_input = json.dumps({
+        "metrics": climate_metrics,
+        "sample_years": [
+            {
+                "year":           r.get("year"),
+                "temp_mean_c":    r.get("temp_mean_celsius") or r.get("temp_mean_c"),
+                "precip_total_mm": r.get("precip_total_mm"),
+            }
+            for r in unified_records[-5:]
+        ],
+        "region": label,
+        "sector": sector,
+    })
+    climate_narrative, tokens_analyst = await run_climate_analysis_crew(climate_task_input)
+    climate_findings = _build_climate_findings(climate_metrics, climate_narrative, unified_records)
     logger.info(
-        "Step 2/4 complete: heat_stress=%s drought=%s flood=%s tokens=%s",
+        "Step 2/5 complete: heat_stress=%s drought=%s flood=%s tokens=%s",
         climate_findings.get("heat_stress_risk"),
         climate_findings.get("drought_risk"),
         climate_findings.get("flood_risk"),
@@ -548,7 +624,12 @@ async def run_analysis(
                 "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
             },
             {
-                "step": 2, "name": "Climate Analyst",
+                "step": "2a", "name": "Climate Risk Engine",
+                "model": "Python (no LLM)",
+                "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+            },
+            {
+                "step": "2b", "name": "Climate Interpreter",
                 "model": "claude-haiku-4-5",
                 **tokens_analyst,
             },

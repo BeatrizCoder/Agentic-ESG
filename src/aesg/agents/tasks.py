@@ -1,5 +1,6 @@
 """CS Task factories — compact schemas embedded inline, strict JSON-only output."""
 
+import json
 from crewai import Task
 
 from .definitions import (
@@ -7,29 +8,6 @@ from .definitions import (
     report_writer_agent, quality_judge_agent,
 )
 
-_CLIMATE_SCHEMA = """{
-  "temp_trend_c_per_decade": <float>,
-  "precip_trend_pct_per_decade": <float>,
-  "temp_anomaly_years": [<int>, ...],
-  "precip_anomaly_years": [<int>, ...],
-  "heat_stress_risk": "low|medium|high|critical",
-  "drought_risk": "low|medium|high|critical",
-  "flood_risk": "low|medium|high|critical",
-  "solar_trend": "stable|increasing|decreasing",
-  "hottest_year": <int>,
-  "driest_year": <int>,
-  "wettest_year": <int>,
-  "baseline_temp_mean_c": <float>,
-  "latest_temp_mean_c": <float>,
-  "baseline_precip_mm": <float>,
-  "latest_precip_mm": <float>,
-  "key_findings": ["<string>", "<string>", "<string>"],
-  "data_quality": "good|partial|poor",
-  "projected_temp_2050_c": <float or null>,
-  "projected_precip_2050_mm": <float or null>,
-  "projected_warming_vs_latest_c": <float or null>,
-  "chronic_risk_horizon_2050": "low|medium|high|critical|unavailable"
-}"""
 
 _ESG_SCHEMA = """{
   "csrd_exposure": "low|medium|high|critical",
@@ -98,59 +76,37 @@ _REPORT_SCHEMA = """{
 }"""
 
 
-def make_climate_analysis_task(serialised_records: str) -> Task:
-    # Parse unified list (new) or legacy dict format
+def make_climate_analysis_task(climate_task_input_str: str) -> Task:
     try:
-        import json as _j
-        parsed = _j.loads(serialised_records)
-        if isinstance(parsed, list):
-            historical = [r for r in parsed if r.get("source", "nasa") == "nasa"]
-            projection = [r for r in parsed if r.get("source") == "projection"]
-        else:
-            historical = parsed.get("historical_nasa", [])
-            projection = parsed.get("projection_openmeteo", [])
-        has_proj = bool(projection)
+        inp = json.loads(climate_task_input_str)
+        metrics = inp.get("metrics", {})
+        sample_years = inp.get("sample_years", [])
+        region = inp.get("region", "")
+        sector = inp.get("sector", "General")
     except Exception:
-        historical = []
-        projection = []
-        has_proj = False
+        metrics = {}
+        sample_years = []
+        region = ""
+        sector = "General"
 
-    proj_section = ""
-    if has_proj and len(projection) >= 3:
-        # Pass sparse sample: every 3rd year + first + last
-        sample_years = sorted({projection[0]["year"], projection[-1]["year"]}
-                               | {r["year"] for r in projection[::3]})
-        sample = [r for r in projection if r["year"] in sample_years]
-        proj_section = f"""
-FUTURE PROJECTIONS 2024–2050 (OpenMeteo IPCC {_j.dumps(sample, separators=(',',':'))}):
-- projected_temp_2050_c: mean of last 3 projection years
-- projected_precip_2050_mm: mean of last 3 projection years
-- projected_warming_vs_latest_c: projected_temp_2050_c minus latest_temp_mean_c
-- chronic_risk_horizon_2050: critical if warming>2°C or precip drop>30%; high if>1°C/20%; else medium/low
-"""
-    else:
-        proj_section = "\nFUTURE PROJECTIONS: unavailable — set projected fields to null, chronic_risk_horizon_2050 to \"unavailable\""
-
-    historical_str = _j.dumps(historical) if isinstance(historical, list) else str(historical)
+    metrics_json = json.dumps(metrics, indent=2)
+    sample_json = json.dumps(sample_years, indent=2)
 
     return Task(
-        description=f"""Analyse this climate dataset and return ONLY the JSON object below.
-No explanations, no markdown, no extra fields.
+        description=f"""You are a Climate Interpreter for {region!r} ({sector} sector).
 
-HISTORICAL DATA — NASA POWER (year, temp_mean_c, precip_total_mm, solar_mean_kwh_m2):
-{historical_str}
+Pre-calculated climate risk metrics from the Python engine:
+{metrics_json}
 
-RULES (historical analysis):
-- baseline = mean of first 3 years; latest = mean of last 3 years
-- temp_trend_c_per_decade = (latest_temp - baseline_temp) / (n_years / 10)
-- precip_trend_pct_per_decade = (latest_precip - baseline_precip) / baseline_precip * 100 / (n_years / 10)
-- anomaly year = value deviates > 1.5 standard deviations from period mean
-- heat_stress_risk: high if temp_trend > 0.5°C/decade; critical if > 1.0
-- drought_risk: high if latest_precip < 80% of baseline; critical if < 60%
-{proj_section}
-RETURN EXACTLY THIS JSON STRUCTURE (replace <placeholders>):
-{_CLIMATE_SCHEMA}""",
-        expected_output="Valid flat JSON matching the schema above, no extra keys",
+Recent climate data — last 5 years:
+{sample_json}
+
+Write 2-3 executive sentences explaining what these numbers mean in plain language.
+Highlight compound risks (e.g. heat + drought together).
+Provide context for an ESG Strategist who will use this to map compliance obligations.
+
+Maximum 150 words. No bullet points. No headers. Just 2-3 clear executive sentences.""",
+        expected_output="2-3 sentences of executive climate interpretation, maximum 150 words, no JSON, no bullet points",
         agent=climate_analyst_agent,
     )
 
