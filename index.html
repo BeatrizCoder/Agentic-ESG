@@ -3030,9 +3030,24 @@ function renderComparison(data) {
     );
   }
 
-  document.getElementById('comp-score-1').textContent  = p1.risk_score;
-  document.getElementById('comp-score-2').textContent  = p2.risk_score;
-  setCompDelta('comp-score-delta', d.risk_score, true);
+  function formatScore(val) {
+    return (!val || val === 0) ? 'N/A' : String(val);
+  }
+
+  function formatScoreDelta(v1, v2) {
+    const el = document.getElementById('comp-score-delta');
+    if (!el) return;
+    if (!v1 || v1 === 0 || !v2 || v2 === 0) {
+      el.textContent = 'N/A'; el.className = 'comp-delta neutral'; return;
+    }
+    const diff = v1 - v2;
+    el.textContent = `${diff > 0 ? '+' : ''}${diff}`;
+    el.className = `comp-delta ${diff > 0 ? 'worse' : diff < 0 ? 'better' : 'neutral'}`;
+  }
+
+  document.getElementById('comp-score-1').textContent = formatScore(p1.risk_score);
+  document.getElementById('comp-score-2').textContent = formatScore(p2.risk_score);
+  formatScoreDelta(p1.risk_score, p2.risk_score);
 
   document.getElementById('comp-temp-1').textContent   = p1.temp_mean?.toFixed(1) + '°C';
   document.getElementById('comp-temp-2').textContent   = p2.temp_mean?.toFixed(1) + '°C';
@@ -3046,8 +3061,8 @@ function renderComparison(data) {
   document.getElementById('comp-precip-2').textContent = p2.precip_trend != null ? `${p2.precip_trend?.toFixed(1)}%/dec` : 'N/A';
   if (d.precip_trend != null) setCompDelta('comp-precip-delta', d.precip_trend?.toFixed(1), false);
 
-  document.getElementById('comp-drought-1').textContent = p1.drought_score?.toFixed(0);
-  document.getElementById('comp-drought-2').textContent = p2.drought_score?.toFixed(0);
+  document.getElementById('comp-drought-1').textContent = (p1.drought_score > 0) ? p1.drought_score.toFixed(0) : 'N/A';
+  document.getElementById('comp-drought-2').textContent = (p2.drought_score > 0) ? p2.drought_score.toFixed(0) : 'N/A';
   setCompDelta('comp-drought-delta', d.drought_score, true);
 
   document.getElementById('comp-interpretation').textContent = d.interpretation || p1.key_finding || '';
