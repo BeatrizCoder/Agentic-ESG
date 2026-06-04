@@ -301,7 +301,20 @@
       white-space: nowrap;
     }
     .action-btn:hover { border-color: var(--green); color: var(--green); }
-    #comparison-toggle-btn.active { background: var(--green-lt, rgba(58,170,120,.12)); border-color: var(--green); color: var(--green); }
+    .compare-toggle-row { margin-top: .5rem; display: flex; align-items: center; }
+    .compare-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .75rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .compare-checkbox-label input[type="checkbox"] { accent-color: var(--green); width: 14px; height: 14px; cursor: pointer; }
+    .compare-checkbox-label:hover { color: var(--green); }
+    .compare-fields-row { display: flex; gap: .75rem; align-items: flex-end; margin-top: .5rem; flex-wrap: wrap; }
+    .compare-hint { font-size: .65rem; color: var(--muted); align-self: center; }
 
     .comparison-card {
       background: var(--bg2);
@@ -1806,11 +1819,18 @@
     </div>
     <div class="action-row">
       <button class="action-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
-      <button class="action-btn" id="comparison-toggle-btn" onclick="toggleComparisonMode()">⚖️ Compare Periods</button>
     </div>
 
-    <!-- Comparison period selectors — shown when comparison mode is active -->
-    <div id="comparison-period" style="display:none;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin:.5rem 0">
+    <!-- Compare checkbox -->
+    <div class="compare-toggle-row">
+      <label class="compare-checkbox-label">
+        <input type="checkbox" id="comparison-checkbox" onchange="toggleComparisonMode(this.checked)">
+        <span>⚖️ Compare with another period</span>
+      </label>
+    </div>
+
+    <!-- Comparison period selectors — shown when comparison checkbox is checked -->
+    <div id="comparison-period" class="compare-fields-row" style="display:none">
       <div class="field-group">
         <label>Compare From</label>
         <select id="inp-start-2">
@@ -1847,7 +1867,7 @@
           <option value="2025">2025</option>
         </select>
       </div>
-      <p style="font-size:.65rem;color:var(--muted);margin:0;align-self:center">Historical periods only (2000–2025)</p>
+      <span class="compare-hint">Historical periods only (2000–2025)</span>
     </div>
 
     <div class="presets">
@@ -2891,13 +2911,11 @@ async function runAnalysis() {
 }
 
 /* ── Comparison Mode ─────────────────────────────────────────────────────── */
-function toggleComparisonMode() {
-  comparisonMode = !comparisonMode;
-  const btn   = document.getElementById('comparison-toggle-btn');
+function toggleComparisonMode(checked) {
+  comparisonMode = checked;
   const panel = document.getElementById('comparison-period');
-  btn.classList.toggle('active', comparisonMode);
-  panel.style.display = comparisonMode ? 'flex' : 'none';
-  if (comparisonMode) {
+  panel.style.display = checked ? 'flex' : 'none';
+  if (checked) {
     document.getElementById('inp-start-2').value = '2000';
     document.getElementById('inp-end-2').value   = '2010';
   }
