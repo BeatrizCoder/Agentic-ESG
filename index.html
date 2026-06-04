@@ -2049,14 +2049,12 @@
             <div class="chart-item-delta" id="chart-solar-delta"></div>
             <canvas class="mini-bar" id="canvas-solar"></canvas>
           </div>
-          <!-- ET0 card removed — ET0 used internally for drought_score only
-          <div class="chart-item" id="chart-et0-card">
-            <div class="chart-item-label" id="t-chart-et0">Evapotranspiration (mm/yr)</div>
-            <div class="chart-item-value" id="chart-et0-val">—</div>
-            <div class="chart-item-delta" id="chart-et0-delta"></div>
-            <canvas class="mini-bar" id="canvas-et0"></canvas>
+          <div class="chart-item" id="chart-drought-card">
+            <div class="chart-item-label">Drought Score</div>
+            <div class="chart-item-value" id="chart-drought-val">—</div>
+            <div class="chart-item-delta" id="chart-drought-delta"></div>
+            <canvas class="mini-bar" id="canvas-drought"></canvas>
           </div>
-          -->
           <div class="chart-item" id="chart-soil-card">
             <div class="chart-item-label" id="t-chart-soil">Soil Moisture (m³/m³)</div>
             <div class="chart-item-value" id="chart-soil-val">—</div>
@@ -3154,6 +3152,50 @@ function renderResults(data) {
       setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade, '%/decade', 'up', 'down');
     }
     setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
+
+    // Drought Score
+    const droughtScore = cf.drought_score || 0;
+    if (droughtScore > 0) {
+      document.getElementById('chart-drought-val')
+        .textContent = droughtScore.toFixed(0);
+      
+      const droughtEl = document.getElementById('chart-drought-delta');
+      if (droughtEl) {
+        const level = droughtScore > 70 ? 'HIGH'
+          : droughtScore > 40 ? 'MEDIUM' : 'LOW';
+        droughtEl.textContent = level;
+        droughtEl.className = `chart-item-delta ${
+          droughtScore > 70 ? 'up' :
+          droughtScore > 40 ? 'warn' : 'down'
+        }`;
+      }
+      
+      // Bar chart from precipitation deviation per year
+      // Use drought_score per year if available,
+      // otherwise approximate from precipitation deviation
+      const droughtBars = annual.map(r => {
+        if (r.drought_score && r.drought_score > 0) {
+          return r.drought_score;
+        }
+        const precip = r.precip_total_mm || 0;
+        const meanPrecip = annual.reduce(
+          (s, x) => s + (x.precip_total_mm || 0), 0
+        ) / (annual.length || 1);
+        return Math.max(0,
+          ((meanPrecip - precip) / (meanPrecip || 1)) * 100
+        );
+      });
+      
+      // Check which type drawBars accepts as 3rd argument
+      // Use 'up' or 'rising' if 'declining' doesn't exist
+      setTimeout(() => {
+        try {
+          drawBars('canvas-drought', droughtBars, 'up');
+        } catch(e) {
+          drawBars('canvas-drought', droughtBars);
+        }
+      }, 50);
+    }
 
     // Hide optional cards when no data for this analysis
     if (!solars.some(v => v > 0)) { const c = document.getElementById('chart-solar-card'); if (c) c.style.display = 'none'; }
