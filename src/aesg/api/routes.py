@@ -15,7 +15,7 @@ from ..db.mongo import delete_analysis as _db_delete
 from ..db.mongo import get_analysis as _db_get
 from ..db.mongo import get_recent_analyses, get_session_history, save_analysis
 from ..pipeline.orchestrator import run_analysis
-from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult
+from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult, CompareRequest
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +250,66 @@ def _inv_label(score: int) -> str:
     if score <= 85: return "Investment Restricted"
     return "Investment Suspended"
 
+
+
+@router.post("/api/analyze/compare")
+@limiter.limit("5/hour")
+async def compare_periods(request: Request, body: CompareRequest) -> dict:
+    """Lightweight dual-period comparison: Data Collector + Climate Engine + Haiku only."""
+    from ..pipeline.orchestrator import run_comparison_pipeline
+
+    try:
+        p1, p2 = await asyncio.wait_for(
+            asyncio.gather(
+                run_comparison_pipeline(
+                    latitude=body.latitude, longitude=body.longitude,
+                    region_label=body.region_label, sector=body.sector,
+                    start_year=body.period_1.start_year, end_year=body.period_1.end_year,
+                ),
+                run_comparison_pipeline(
+                    latitude=body.latitude, longitude=body.longitude,
+                    region_label=body.region_label, sector=body.sector,
+                    start_year=body.period_2.start_year, end_year=body.period_2.end_year,
+                ),
+            ),
+            timeout=120,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Comparison timed out. Please try again.")
+    except Exception:
+        logger.exception("Comparison pipeline failed")
+        raise HTTPException(status_code=500, detail="Comparison failed. Please try again.")
+
+    score_delta  = p1["risk_score"] - p2["risk_score"]
+    temp_delta   = round((p1["temp_mean"] or 0) - (p2["temp_mean"] or 0), 2)
+    trend_delta  = round((p1["temp_trend"] or 0) - (p2["temp_trend"] or 0), 3)
+    p1_pt        = p1["precip_trend"]
+    p2_pt        = p2["precip_trend"]
+    precip_delta = round(p1_pt - p2_pt, 1) if p1_pt is not None and p2_pt is not None else None
+    drought_delta = round((p1["drought_score"] or 0) - (p2["drought_score"] or 0), 1)
+
+    if score_delta > 20:
+        interp = f"Risk increased significantly from {p2['label']} to {p1['label']} (+{score_delta} pts). {p1.get('key_finding', '')}".strip()
+    elif score_delta > 5:
+        interp = f"Risk increased moderately from {p2['label']} to {p1['label']} (+{score_delta} pts). {p1.get('key_finding', '')}".strip()
+    elif score_delta < -5:
+        interp = f"Risk decreased from {p2['label']} to {p1['label']} ({score_delta} pts). {p1.get('key_finding', '')}".strip()
+    else:
+        interp = f"Risk remained stable between {p2['label']} and {p1['label']}. {p1.get('key_finding', '')}".strip()
+
+    return {
+        "region_label": body.region_label,
+        "period_1": p1,
+        "period_2": p2,
+        "delta": {
+            "risk_score":    score_delta,
+            "temp_mean":     temp_delta,
+            "temp_trend":    trend_delta,
+            "precip_trend":  precip_delta,
+            "drought_score": drought_delta,
+            "interpretation": interp,
+        },
+    }
 
 
 @router.post("/api/analyze/batch")

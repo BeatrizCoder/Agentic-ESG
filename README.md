@@ -540,7 +540,7 @@ limitations under the License.
 
 **Near-term:**
 - [ ] API key authentication for enterprise use
-- [ ] Historical comparison mode (1980-2000 vs 2000-2020)
+- ✅ Historical comparison mode — compare climate risk between two time periods for the same location
 - [ ] Batch analysis expanded to 20 regions
 
 **Medium-term:**

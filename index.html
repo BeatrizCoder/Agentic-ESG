@@ -304,6 +304,96 @@
     }
     .batch-btn:hover { border-color: var(--green); color: var(--green); }
 
+    .comparison-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text2);
+      font-size: .85rem;
+      font-weight: 500;
+      padding: .65rem 1rem;
+      cursor: pointer;
+      transition: all .3s ease;
+      white-space: nowrap;
+      align-self: flex-end;
+      flex-shrink: 0;
+    }
+    .comparison-btn:hover { border-color: var(--green); color: var(--green); }
+    .comparison-btn.active { background: var(--green-lt, rgba(58,170,120,.12)); border-color: var(--green); color: var(--green); }
+
+    .comparison-card {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+      box-shadow: 0 2px 20px var(--shadow);
+    }
+    .comp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .comp-header h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
+    .comp-region { font-size: .78rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .comp-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1fr;
+      gap: .5rem;
+      align-items: center;
+    }
+    .comp-label, .comp-period, .comp-delta-label {
+      font-size: .65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      padding-bottom: .5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .comp-period:nth-child(2) { color: #2e7d9a; }
+    .comp-period:nth-child(3) { color: var(--green); }
+    .comp-metric {
+      font-size: .78rem;
+      color: var(--text2);
+      padding: .4rem 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .comp-val {
+      font-family: 'DM Mono', monospace;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--text);
+      text-align: center;
+      border-bottom: 0.5px solid var(--border);
+      padding: .4rem 0;
+    }
+    .comp-delta {
+      font-family: 'DM Mono', monospace;
+      font-size: .78rem;
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 0.5px solid var(--border);
+      padding: .4rem 0;
+    }
+    .comp-delta.worse  { color: var(--risk-high, #c42a2a); }
+    .comp-delta.better { color: var(--risk-low,  #3aaa78); }
+    .comp-delta.neutral { color: var(--muted); }
+    .comp-interpretation {
+      margin-top: 1rem;
+      padding: .85rem 1rem;
+      background: var(--bg3, var(--bg));
+      border-radius: 8px;
+      font-size: .82rem;
+      color: var(--text2);
+      line-height: 1.6;
+      border-left: 3px solid var(--green);
+    }
+    #comparison-results { display: none; max-width: 860px; margin: 1rem auto; padding: 0 1rem; }
+
     /* ── Batch modal ──────────────────────────────────────────────────────── */
     .modal-box-wide { max-width: 780px !important; }
     #modal-batch {
@@ -1732,7 +1822,50 @@
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
       <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
+      <button class="comparison-btn" id="comparison-toggle-btn" onclick="toggleComparisonMode()">⚖️ Compare Periods</button>
     </div>
+
+    <!-- Comparison period selectors — shown when comparison mode is active -->
+    <div id="comparison-period" style="display:none;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin:.5rem 0">
+      <div class="field-group">
+        <label>Compare From</label>
+        <select id="inp-start-2">
+          <option value="2000" selected>2000</option>
+          <option value="2001">2001</option><option value="2002">2002</option>
+          <option value="2003">2003</option><option value="2004">2004</option>
+          <option value="2005">2005</option><option value="2006">2006</option>
+          <option value="2007">2007</option><option value="2008">2008</option>
+          <option value="2009">2009</option><option value="2010">2010</option>
+          <option value="2011">2011</option><option value="2012">2012</option>
+          <option value="2013">2013</option><option value="2014">2014</option>
+          <option value="2015">2015</option><option value="2016">2016</option>
+          <option value="2017">2017</option><option value="2018">2018</option>
+          <option value="2019">2019</option><option value="2020">2020</option>
+          <option value="2021">2021</option><option value="2022">2022</option>
+          <option value="2023">2023</option><option value="2024">2024</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Compare To</label>
+        <select id="inp-end-2">
+          <option value="2001">2001</option><option value="2002">2002</option>
+          <option value="2003">2003</option><option value="2004">2004</option>
+          <option value="2005">2005</option><option value="2006">2006</option>
+          <option value="2007">2007</option><option value="2008">2008</option>
+          <option value="2009">2009</option><option value="2010" selected>2010</option>
+          <option value="2011">2011</option><option value="2012">2012</option>
+          <option value="2013">2013</option><option value="2014">2014</option>
+          <option value="2015">2015</option><option value="2016">2016</option>
+          <option value="2017">2017</option><option value="2018">2018</option>
+          <option value="2019">2019</option><option value="2020">2020</option>
+          <option value="2021">2021</option><option value="2022">2022</option>
+          <option value="2023">2023</option><option value="2024">2024</option>
+          <option value="2025">2025</option>
+        </select>
+      </div>
+      <p style="font-size:.65rem;color:var(--muted);margin:0;align-self:center">Historical periods only (2000–2025)</p>
+    </div>
+
     <div class="presets">
       <button class="preset-btn" onclick="setPreset(-15.7801,-47.9292,'Brasília, Brazil')">Brasília</button>
       <button class="preset-btn" onclick="setPreset(-23.5505,-46.6333,'São Paulo, Brazil')">São Paulo</button>
@@ -1774,6 +1907,48 @@
       </div>
     </div>
     <span id="status-text">Running pipeline…</span>
+  </div>
+
+  <!-- Comparison Results -->
+  <div id="comparison-results">
+    <div class="comparison-card">
+      <div class="comp-header">
+        <h3>Climate Risk Comparison</h3>
+        <span class="comp-region" id="comp-region">—</span>
+      </div>
+      <div class="comp-grid">
+        <div class="comp-label">Metric</div>
+        <div class="comp-period" id="comp-period-1-label">Period 1</div>
+        <div class="comp-period" id="comp-period-2-label">Period 2</div>
+        <div class="comp-delta-label">Change</div>
+
+        <div class="comp-metric">Risk Score</div>
+        <div class="comp-val" id="comp-score-1">—</div>
+        <div class="comp-val" id="comp-score-2">—</div>
+        <div class="comp-delta" id="comp-score-delta">—</div>
+
+        <div class="comp-metric">Temp Mean (°C)</div>
+        <div class="comp-val" id="comp-temp-1">—</div>
+        <div class="comp-val" id="comp-temp-2">—</div>
+        <div class="comp-delta" id="comp-temp-delta">—</div>
+
+        <div class="comp-metric">Warming Trend</div>
+        <div class="comp-val" id="comp-trend-1">—</div>
+        <div class="comp-val" id="comp-trend-2">—</div>
+        <div class="comp-delta" id="comp-trend-delta">—</div>
+
+        <div class="comp-metric">Precip Trend</div>
+        <div class="comp-val" id="comp-precip-1">—</div>
+        <div class="comp-val" id="comp-precip-2">—</div>
+        <div class="comp-delta" id="comp-precip-delta">—</div>
+
+        <div class="comp-metric">Drought Score</div>
+        <div class="comp-val" id="comp-drought-1">—</div>
+        <div class="comp-val" id="comp-drought-2">—</div>
+        <div class="comp-delta" id="comp-drought-delta">—</div>
+      </div>
+      <div class="comp-interpretation" id="comp-interpretation"></div>
+    </div>
   </div>
 
   <!-- Results -->
@@ -2084,6 +2259,7 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 /* ── Cookie & Session Management ─────────────────────────────────────────── */
 let SESSION_ID = null;
 let COOKIES_ACCEPTED = false;
+let comparisonMode = false;
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -2658,6 +2834,8 @@ function highlightStep(idx) {
 }
 
 async function runAnalysis() {
+  if (comparisonMode) { runComparison(); return; }
+
   const lat      = parseFloat(document.getElementById('inp-lat').value);
   const lon      = parseFloat(document.getElementById('inp-lon').value);
   const label    = document.getElementById('inp-label').value.trim();
@@ -2726,6 +2904,108 @@ async function runAnalysis() {
     btn.disabled = false;
     btn.textContent = ANALYZE_BTN_LABELS[_lang] || 'Analyze →';
   }
+}
+
+/* ── Comparison Mode ─────────────────────────────────────────────────────── */
+function toggleComparisonMode() {
+  comparisonMode = !comparisonMode;
+  const btn   = document.getElementById('comparison-toggle-btn');
+  const panel = document.getElementById('comparison-period');
+  btn.classList.toggle('active', comparisonMode);
+  panel.style.display = comparisonMode ? 'flex' : 'none';
+  if (comparisonMode) {
+    document.getElementById('inp-start-2').value = '2000';
+    document.getElementById('inp-end-2').value   = '2010';
+  }
+}
+
+async function runComparison() {
+  const lat      = parseFloat(document.getElementById('inp-lat')?.value || 0);
+  const lon      = parseFloat(document.getElementById('inp-lon')?.value || 0);
+  const label    = document.getElementById('inp-label')?.value || document.getElementById('inp-location')?.value || '';
+  const sector   = document.getElementById('inp-sector').value;
+  const scenario = document.getElementById('inp-scenario').value;
+  const start1   = parseInt(document.getElementById('inp-start').value);
+  const end1     = parseInt(document.getElementById('inp-end').value);
+  const start2   = parseInt(document.getElementById('inp-start-2').value);
+  const end2     = parseInt(document.getElementById('inp-end-2').value);
+
+  if (isNaN(lat) || isNaN(lon)) { alert('Please select a valid location.'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = 'Comparing…';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: lat, longitude: lon,
+        region_label: label, sector, scenario,
+        period_1: { start_year: start1, end_year: Math.min(end1, 2025) },
+        period_2: { start_year: start2, end_year: Math.min(end2, 2025) },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    renderComparison(await res.json());
+  } catch (err) {
+    alert('Comparison failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze →';
+  }
+}
+
+function renderComparison(data) {
+  const p1 = data.period_1;
+  const p2 = data.period_2;
+  const d  = data.delta;
+
+  document.getElementById('comp-region').textContent       = data.region_label || '';
+  document.getElementById('comp-period-1-label').textContent = p1.label;
+  document.getElementById('comp-period-2-label').textContent = p2.label;
+
+  function setCompDelta(id, value, higherIsBad = true) {
+    const el = document.getElementById(id);
+    if (!el || value == null) return;
+    const v = parseFloat(value);
+    el.textContent = `${v > 0 ? '+' : ''}${value}`;
+    el.className = 'comp-delta ' + (
+      v === 0 ? 'neutral' :
+      higherIsBad ? (v > 0 ? 'worse' : 'better') :
+                    (v > 0 ? 'better' : 'worse')
+    );
+  }
+
+  document.getElementById('comp-score-1').textContent  = p1.risk_score;
+  document.getElementById('comp-score-2').textContent  = p2.risk_score;
+  setCompDelta('comp-score-delta', d.risk_score, true);
+
+  document.getElementById('comp-temp-1').textContent   = p1.temp_mean?.toFixed(1) + '°C';
+  document.getElementById('comp-temp-2').textContent   = p2.temp_mean?.toFixed(1) + '°C';
+  setCompDelta('comp-temp-delta', d.temp_mean?.toFixed(2), true);
+
+  document.getElementById('comp-trend-1').textContent  = `+${p1.temp_trend?.toFixed(2)}°C/dec`;
+  document.getElementById('comp-trend-2').textContent  = `+${p2.temp_trend?.toFixed(2)}°C/dec`;
+  setCompDelta('comp-trend-delta', d.temp_trend?.toFixed(2), true);
+
+  document.getElementById('comp-precip-1').textContent = p1.precip_trend != null ? `${p1.precip_trend?.toFixed(1)}%/dec` : 'N/A';
+  document.getElementById('comp-precip-2').textContent = p2.precip_trend != null ? `${p2.precip_trend?.toFixed(1)}%/dec` : 'N/A';
+  if (d.precip_trend != null) setCompDelta('comp-precip-delta', d.precip_trend?.toFixed(1), false);
+
+  document.getElementById('comp-drought-1').textContent = p1.drought_score?.toFixed(0);
+  document.getElementById('comp-drought-2').textContent = p2.drought_score?.toFixed(0);
+  setCompDelta('comp-drought-delta', d.drought_score, true);
+
+  document.getElementById('comp-interpretation').textContent = d.interpretation || p1.key_finding || '';
+
+  const panel = document.getElementById('comparison-results');
+  panel.style.display = '';
+  panel.scrollIntoView({ behavior: 'smooth' });
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */

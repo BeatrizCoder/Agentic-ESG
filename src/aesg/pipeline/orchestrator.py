@@ -690,3 +690,89 @@ async def run_analysis(
         },
         error=report.get("error", ""),
     )
+
+
+async def run_comparison_pipeline(
+    latitude: float,
+    longitude: float,
+    region_label: str,
+    start_year: int,
+    end_year: int,
+    sector: str = "General",
+) -> dict:
+    """Lightweight pipeline for comparison mode: Data Collector + Climate Engine + Haiku only.
+    Skips ESG Strategist, Report Writer, and Quality Judge for speed (~30s per period).
+    """
+    label = region_label or f"{latitude:.4f},{longitude:.4f}"
+
+    nasa_result = await fetch_climate_data(
+        latitude=latitude, longitude=longitude, region_label=label,
+        start_year=start_year, end_year=min(end_year, 2025),
+    )
+
+    unified_records = [
+        {
+            "year":                  r.year,
+            "temp_mean_celsius":     r.temp_mean_celsius,
+            "precip_total_mm":       r.precip_total_mm,
+            "solar_mean_kwh_m2":     r.solar_mean_kwh_m2,
+            "evapotranspiration_mm": r.evapotranspiration_mm or None,
+            "source":                "nasa",
+        }
+        for r in nasa_result.annual_records
+    ]
+
+    climate_metrics = calculate_climate_risk(unified_records)
+
+    from ..agents.crews import run_climate_analysis_crew
+    climate_task_input = json.dumps({
+        "metrics": climate_metrics,
+        "sample_years": [
+            {
+                "year":           r.get("year"),
+                "temp_mean_c":    r.get("temp_mean_celsius"),
+                "precip_total_mm": r.get("precip_total_mm"),
+            }
+            for r in unified_records[-5:]
+        ],
+        "region": label,
+        "sector": sector,
+    })
+    climate_narrative, _ = await run_climate_analysis_crew(climate_task_input)
+
+    # Derive risk score using the same scoring matrix as the Report Writer
+    hs = climate_metrics.get("heat_stress_score") or 0
+    dr = climate_metrics.get("drought_score") or 0
+    fl = climate_metrics.get("flood_score") or 0
+    tt = climate_metrics.get("temp_trend_c_per_decade") or 0
+    pt = climate_metrics.get("precip_trend_pct_per_decade") or 0
+
+    score = 0
+    if hs > 70:   score += 35
+    elif hs > 45: score += 20
+    if dr > 70:   score += 25
+    elif dr > 45: score += 15
+    if fl > 70:   score += 25
+    elif fl > 45: score += 15
+    if tt > 0.5:  score += 5
+    if pt < -10:  score += 5
+    risk_score = min(100, max(0, score))
+
+    if risk_score > 70:   risk_level = "critical"
+    elif risk_score > 45: risk_level = "high"
+    elif risk_score > 25: risk_level = "medium"
+    else:                 risk_level = "low"
+
+    temps = [r.get("temp_mean_celsius") or 0 for r in unified_records]
+    temp_mean = round(sum(temps) / len(temps), 2) if temps else 0.0
+
+    return {
+        "label":        f"{start_year}–{end_year}",
+        "risk_score":   risk_score,
+        "risk_level":   risk_level,
+        "temp_mean":    temp_mean,
+        "temp_trend":   climate_metrics.get("temp_trend_c_per_decade", 0),
+        "precip_trend": climate_metrics.get("precip_trend_pct_per_decade"),
+        "drought_score": climate_metrics.get("drought_score", 0),
+        "key_finding":  climate_narrative,
+    }

@@ -156,3 +156,24 @@ class BatchAnalysisResponse(BaseModel):
     completed: int
     failed: int
     results: list[BatchRowResult]
+
+
+class ComparisonPeriod(BaseModel):
+    start_year: int = Field(..., ge=2000, le=2025)
+    end_year: int = Field(..., ge=2001, le=2025)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "ComparisonPeriod":
+        if self.end_year <= self.start_year:
+            raise ValueError("end_year must be greater than start_year")
+        return self
+
+
+class CompareRequest(BaseModel):
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    region_label: str = Field("", max_length=120)
+    sector: str = Field("General", max_length=60)
+    scenario: str = Field("SSP2-4.5", pattern="^(SSP1-2\\.6|SSP2-4\\.5|SSP5-8\\.5)$")
+    period_1: ComparisonPeriod
+    period_2: ComparisonPeriod
