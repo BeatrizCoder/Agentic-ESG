@@ -722,6 +722,22 @@ async def run_comparison_pipeline(
         for r in nasa_result.annual_records
     ]
 
+    if not unified_records:
+        logger.warning(
+            "run_comparison_pipeline: no records for %r %d-%d",
+            label, start_year, end_year,
+        )
+        return {
+            "label":         f"{start_year}–{end_year}",
+            "risk_score":    0,
+            "risk_level":    "low",
+            "temp_mean":     0.0,
+            "temp_trend":    0.0,
+            "precip_trend":  None,
+            "drought_score": 0.0,
+            "key_finding":   "No climate data available for this period.",
+        }
+
     climate_metrics = calculate_climate_risk(unified_records)
 
     from ..agents.crews import run_climate_analysis_crew

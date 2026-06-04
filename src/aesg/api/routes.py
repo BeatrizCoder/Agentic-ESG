@@ -259,26 +259,30 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
     from ..pipeline.orchestrator import run_comparison_pipeline
 
     try:
-        p1, p2 = await asyncio.wait_for(
-            asyncio.gather(
-                run_comparison_pipeline(
-                    latitude=body.latitude, longitude=body.longitude,
-                    region_label=body.region_label, sector=body.sector,
-                    start_year=body.period_1.start_year, end_year=body.period_1.end_year,
-                ),
-                run_comparison_pipeline(
-                    latitude=body.latitude, longitude=body.longitude,
-                    region_label=body.region_label, sector=body.sector,
-                    start_year=body.period_2.start_year, end_year=body.period_2.end_year,
-                ),
+        # Run sequentially with a gap to avoid NASA POWER rate-limiting
+        # concurrent requests from the same coordinates (same pattern as batch)
+        p1 = await asyncio.wait_for(
+            run_comparison_pipeline(
+                latitude=body.latitude, longitude=body.longitude,
+                region_label=body.region_label, sector=body.sector,
+                start_year=body.period_1.start_year, end_year=body.period_1.end_year,
             ),
-            timeout=120,
+            timeout=90,
+        )
+        await asyncio.sleep(1)
+        p2 = await asyncio.wait_for(
+            run_comparison_pipeline(
+                latitude=body.latitude, longitude=body.longitude,
+                region_label=body.region_label, sector=body.sector,
+                start_year=body.period_2.start_year, end_year=body.period_2.end_year,
+            ),
+            timeout=90,
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Comparison timed out. Please try again.")
-    except Exception:
-        logger.exception("Comparison pipeline failed")
-        raise HTTPException(status_code=500, detail="Comparison failed. Please try again.")
+    except Exception as exc:
+        logger.exception("Comparison pipeline failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {exc}")
 
     score_delta  = p1["risk_score"] - p2["risk_score"]
     temp_delta   = round((p1["temp_mean"] or 0) - (p2["temp_mean"] or 0), 2)
