@@ -269,7 +269,7 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
             ),
             timeout=90,
         )
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         p2 = await asyncio.wait_for(
             run_comparison_pipeline(
                 latitude=body.latitude, longitude=body.longitude,

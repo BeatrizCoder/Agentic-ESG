@@ -1,5 +1,6 @@
 """CS CrewAI crew runner — three sequential single-agent crews."""
 
+import asyncio
 import io
 import json
 import logging
@@ -9,6 +10,10 @@ import sys
 from crewai import Crew, Process
 
 logger = logging.getLogger(__name__)
+
+# Serialises all Crew.kickoff_async() calls — CrewAI agent instances are
+# module-level singletons whose executor cannot be invoked concurrently.
+_crew_lock = asyncio.Lock()
 
 
 async def _kickoff_silent(crew: Crew):
@@ -62,7 +67,8 @@ async def run_climate_analysis_crew(climate_task_input_str: str) -> tuple[str, d
         process=Process.sequential,
         verbose=False,
     )
-    result = await _kickoff_silent(crew)
+    async with _crew_lock:
+        result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return result.tasks_output[0].raw.strip(), tokens
@@ -84,7 +90,8 @@ async def run_esg_strategy_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = await _kickoff_silent(crew)
+    async with _crew_lock:
+        result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
@@ -110,7 +117,8 @@ async def run_report_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = await _kickoff_silent(crew)
+    async with _crew_lock:
+        result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
@@ -137,7 +145,8 @@ async def run_quality_judge_crew(
         process=Process.sequential,
         verbose=False,
     )
-    result = await _kickoff_silent(crew)
+    async with _crew_lock:
+        result = await _kickoff_silent(crew)
     tokens = _get_tokens(result)
     try:
         return _extract_json(result.tasks_output[0].raw), tokens
