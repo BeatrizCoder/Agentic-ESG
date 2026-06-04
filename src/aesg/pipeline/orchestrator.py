@@ -774,6 +774,11 @@ async def run_comparison_pipeline(
     if pt < -10:  score += 5
     risk_score = min(100, max(0, score))
 
+    logger.info(
+        "run_comparison_pipeline %r %d-%d: hs=%.1f dr=%.1f fl=%.1f tt=%.3f pt=%s → score=%d",
+        label, start_year, end_year, hs, dr, fl, tt, pt, risk_score,
+    )
+
     if risk_score > 70:   risk_level = "critical"
     elif risk_score > 45: risk_level = "high"
     elif risk_score > 25: risk_level = "medium"

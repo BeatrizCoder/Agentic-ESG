@@ -2270,6 +2270,7 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 let SESSION_ID = null;
 let COOKIES_ACCEPTED = false;
 let comparisonMode = false;
+let currentGlossaryLang = 'en';
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -2968,7 +2969,7 @@ async function runComparison() {
     alert('Comparison failed: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Analyze →';
+    btn.textContent = ANALYZE_BTN_LABELS[_lang] || 'Analyze →';
     statusBar.classList.remove('visible');
   }
 }
@@ -4110,8 +4111,6 @@ const GLOSSARY_TERMS = [
     de: 'Maximale kumulierte CO2-Emissionen, die zur Begrenzung der Erwärmung gemäß dem Pariser Abkommen zulässig sind.'
   }}
 ];
-
-let currentGlossaryLang = 'en';
 
 function renderGlossary(filterText = '') {
   const container = document.getElementById('glossary-terms');

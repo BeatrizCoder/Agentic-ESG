@@ -284,6 +284,13 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
         logger.exception("Comparison pipeline failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Comparison failed: {exc}")
 
+    if p1["risk_score"] == 0:
+        logger.warning("compare_periods: period_1 (%d-%d) returned risk_score=0 — check metrics in orchestrator log",
+                       body.period_1.start_year, body.period_1.end_year)
+    if p2["risk_score"] == 0:
+        logger.warning("compare_periods: period_2 (%d-%d) returned risk_score=0 — check metrics in orchestrator log",
+                       body.period_2.start_year, body.period_2.end_year)
+
     score_delta  = p1["risk_score"] - p2["risk_score"]
     temp_delta   = round((p1["temp_mean"] or 0) - (p2["temp_mean"] or 0), 2)
     trend_delta  = round((p1["temp_trend"] or 0) - (p2["temp_trend"] or 0), 3)
