@@ -287,40 +287,21 @@
     }
     .analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .batch-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text2);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Sora', sans-serif;
-      font-size: .85rem;
-      font-weight: 500;
-      padding: .65rem 1rem;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all .3s ease;
-      align-self: flex-end;
-      flex-shrink: 0;
-    }
-    .batch-btn:hover { border-color: var(--green); color: var(--green); }
     .action-row { display: flex; gap: .75rem; margin-top: .5rem; flex-wrap: wrap; }
-
-    .comparison-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 12px;
+    .action-btn {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: 10px;
       color: var(--text2);
-      font-size: .85rem;
+      font-size: .8rem;
       font-weight: 500;
-      padding: .65rem 1rem;
+      padding: .5rem 1rem;
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .2s ease;
       white-space: nowrap;
-      align-self: flex-end;
-      flex-shrink: 0;
     }
-    .comparison-btn:hover { border-color: var(--green); color: var(--green); }
-    .comparison-btn.active { background: var(--green-lt, rgba(58,170,120,.12)); border-color: var(--green); color: var(--green); }
+    .action-btn:hover { border-color: var(--green); color: var(--green); }
+    #comparison-toggle-btn.active { background: var(--green-lt, rgba(58,170,120,.12)); border-color: var(--green); color: var(--green); }
 
     .comparison-card {
       background: var(--bg2);
@@ -1824,8 +1805,8 @@
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
     </div>
     <div class="action-row">
-      <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
-      <button class="comparison-btn" id="comparison-toggle-btn" onclick="toggleComparisonMode()">⚖️ Compare Periods</button>
+      <button class="action-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
+      <button class="action-btn" id="comparison-toggle-btn" onclick="toggleComparisonMode()">⚖️ Compare Periods</button>
     </div>
 
     <!-- Comparison period selectors — shown when comparison mode is active -->
@@ -2837,7 +2818,7 @@ function highlightStep(idx) {
 }
 
 async function runAnalysis() {
-  if (comparisonMode) { runComparison(); return; }
+  if (comparisonMode) { await runComparison(); return; }
 
   const lat      = parseFloat(document.getElementById('inp-lat').value);
   const lon      = parseFloat(document.getElementById('inp-lon').value);
@@ -2935,9 +2916,13 @@ async function runComparison() {
 
   if (isNaN(lat) || isNaN(lon)) { alert('Please select a valid location.'); return; }
 
-  const btn = document.getElementById('analyze-btn');
+  const btn        = document.getElementById('analyze-btn');
+  const statusBar  = document.getElementById('status-bar');
+  const statusText = document.getElementById('status-text');
   btn.disabled = true;
   btn.textContent = 'Comparing…';
+  statusText.textContent = 'Running comparison analysis for two periods…';
+  statusBar.classList.add('visible');
 
   try {
     const res = await fetch(`${API_BASE}/api/analyze/compare`, {
@@ -2960,6 +2945,7 @@ async function runComparison() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Analyze →';
+    statusBar.classList.remove('visible');
   }
 }
 
@@ -3007,7 +2993,7 @@ function renderComparison(data) {
   document.getElementById('comp-interpretation').textContent = d.interpretation || p1.key_finding || '';
 
   const panel = document.getElementById('comparison-results');
-  panel.style.display = '';
+  panel.style.display = 'block';
   panel.scrollIntoView({ behavior: 'smooth' });
 }
 
