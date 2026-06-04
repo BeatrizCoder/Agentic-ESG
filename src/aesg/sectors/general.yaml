@@ -1,0 +1,18 @@
+sector: "General"
+risk_thresholds:
+  drought_critical: 45
+  heat_critical: 50
+  flood_critical: 40
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "ISSB S2"
+key_risks:
+  - "Temperature increase impacts"
+  - "Precipitation variability"
+  - "Extreme weather events"
+focus_articles:
+  - "ESRS E1-1 transition plan"
+  - "ISSB S2 paragraph 10"
+recommendation_tone: "general operations"
+
+# Made with Bob

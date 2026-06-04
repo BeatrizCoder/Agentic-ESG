@@ -1,10 +1,29 @@
 """Deterministic climate risk engine. No LLM — pure arithmetic."""
 
 
-def calculate_climate_risk(annual_records: list) -> dict:
-    """Deterministic climate risk calculation. No LLM."""
+def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None = None) -> dict:
+    """
+    Deterministic climate risk calculation. No LLM.
+    
+    Args:
+        annual_records: List of annual climate records
+        sector_thresholds: Optional dict with drought_critical, heat_critical, flood_critical
+                          If None, uses default thresholds (45, 50, 40)
+    
+    Returns:
+        Dictionary with climate risk metrics and scores
+    """
     if not annual_records:
         return {}
+    
+    # Default thresholds (General sector)
+    thresholds = {
+        "drought_critical": 45,
+        "heat_critical": 50,
+        "flood_critical": 40,
+    }
+    if sector_thresholds:
+        thresholds.update(sector_thresholds)
 
     nasa_records = [r for r in annual_records if r.get("source") == "nasa"]
     calc_records = nasa_records if nasa_records else annual_records
@@ -106,9 +125,17 @@ def calculate_climate_risk(annual_records: list) -> dict:
         + (20 if std_p > mean_p * 0.3 else 0)
     ))
 
-    # Urgency
+    # Urgency (using sector-specific thresholds)
     max_score = max(drought_score, heat_stress_score, flood_score)
-    if max_score > 70:
+    
+    # Determine urgency based on which risk exceeds its sector-specific critical threshold
+    is_critical = (
+        drought_score > thresholds["drought_critical"] or
+        heat_stress_score > thresholds["heat_critical"] or
+        flood_score > thresholds["flood_critical"]
+    )
+    
+    if is_critical or max_score > 70:
         urgency = "CRITICAL"
     elif max_score > 45:
         urgency = "HIGH"

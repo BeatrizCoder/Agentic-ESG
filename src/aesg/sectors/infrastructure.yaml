@@ -1,0 +1,23 @@
+sector: "Infrastructure"
+risk_thresholds:
+  drought_critical: 43
+  heat_critical: 40
+  flood_critical: 28
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "EU Taxonomy (climate adaptation)"
+  - "ISSB S2"
+key_risks:
+  - "Flood damage to critical infrastructure"
+  - "Heat stress on materials and systems"
+  - "Water availability for operations"
+  - "Extreme weather disruption"
+  - "Asset lifespan reduction"
+  - "Maintenance cost increases"
+focus_articles:
+  - "ESRS E1-6 physical risks"
+  - "EU Taxonomy CCA screening criteria"
+  - "ISSB S2 paragraph 10a (acute risks)"
+recommendation_tone: "infrastructure resilience planning"
+
+# Made with Bob

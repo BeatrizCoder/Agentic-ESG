@@ -1,0 +1,23 @@
+sector: "Finance & Banking"
+risk_thresholds:
+  drought_critical: 48
+  heat_critical: 48
+  flood_critical: 38
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "ISSB S2"
+  - "EU Taxonomy (financed emissions)"
+key_risks:
+  - "Portfolio climate risk exposure"
+  - "Loan default risk from climate events"
+  - "Stranded asset risk"
+  - "Regulatory compliance costs"
+  - "Reputational risk"
+  - "Physical risk to branch operations"
+focus_articles:
+  - "ESRS E1-9 financed emissions"
+  - "ISSB S2 paragraph 29 (scenario analysis)"
+  - "EU Taxonomy Article 8 disclosure"
+recommendation_tone: "financial portfolio management"
+
+# Made with Bob

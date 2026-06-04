@@ -1,0 +1,23 @@
+sector: "Manufacturing"
+risk_thresholds:
+  drought_critical: 42
+  heat_critical: 44
+  flood_critical: 36
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "CSRD ESRS E3 (water)"
+  - "ISSB S2"
+key_risks:
+  - "Water availability for production"
+  - "Heat stress on equipment and workers"
+  - "Supply chain disruption"
+  - "Energy cost volatility"
+  - "Production downtime from extreme weather"
+  - "Raw material availability"
+focus_articles:
+  - "ESRS E1-6 physical risks"
+  - "ESRS E3-4 water consumption"
+  - "ISSB S2 paragraph 10b (chronic risks)"
+recommendation_tone: "manufacturing operations"
+
+# Made with Bob

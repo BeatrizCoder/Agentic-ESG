@@ -1,0 +1,23 @@
+sector: "Agriculture & Food"
+risk_thresholds:
+  drought_critical: 40
+  heat_critical: 45
+  flood_critical: 35
+primary_frameworks:
+  - "CSRD ESRS E3 (water)"
+  - "CSRD ESRS E4 (biodiversity)"
+  - "ISSB S2"
+key_risks:
+  - "Crop yield reduction from drought"
+  - "Irrigation water availability"
+  - "Supply chain disruption"
+  - "Soil degradation"
+  - "Heat stress on livestock"
+  - "Pest and disease pressure"
+focus_articles:
+  - "ESRS E3-4 water consumption"
+  - "ESRS E4-6 biodiversity"
+  - "ISSB S2 paragraph 10b (physical risks)"
+recommendation_tone: "agricultural operations"
+
+# Made with Bob

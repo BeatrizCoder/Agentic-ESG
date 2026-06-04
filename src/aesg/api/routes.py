@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/api/sectors")
+@limiter.limit("60/minute")
+async def list_sectors(request: Request) -> dict:
+    """List all available sector profiles for ESG analysis."""
+    from ..sectors import list_available_sectors, SECTOR_MAPPING
+    
+    sectors = list_available_sectors()
+    
+    return {
+        "sectors": sectors,
+        "aliases": {
+            alias: target for alias, target in SECTOR_MAPPING.items()
+        },
+        "count": len(sectors),
+    }
+
+
 @router.api_route("/health", methods=["GET", "HEAD"])
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:

@@ -1,0 +1,23 @@
+sector: "Retail & Logistics"
+risk_thresholds:
+  drought_critical: 46
+  heat_critical: 43
+  flood_critical: 32
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "ISSB S2"
+  - "EU Taxonomy"
+key_risks:
+  - "Supply chain disruption from extreme weather"
+  - "Transportation route flooding"
+  - "Heat stress on cold chain logistics"
+  - "Warehouse flooding risk"
+  - "Inventory damage from climate events"
+  - "Delivery delay costs"
+focus_articles:
+  - "ESRS E1-6 physical risks"
+  - "ISSB S2 paragraph 10a (acute risks)"
+  - "EU Taxonomy CCA Annex II"
+recommendation_tone: "retail and logistics operations"
+
+# Made with Bob

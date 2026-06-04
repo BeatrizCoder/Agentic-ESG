@@ -1,0 +1,23 @@
+sector: "Energy & Utilities"
+risk_thresholds:
+  drought_critical: 38
+  heat_critical: 41
+  flood_critical: 34
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "CSRD ESRS E3 (water)"
+  - "EU Taxonomy"
+key_risks:
+  - "Water availability for cooling systems"
+  - "Heat stress on transmission infrastructure"
+  - "Hydropower generation variability"
+  - "Extreme weather grid disruption"
+  - "Renewable energy output fluctuation"
+  - "Thermal efficiency reduction"
+focus_articles:
+  - "ESRS E1-6 physical risks"
+  - "ESRS E3-4 water consumption"
+  - "EU Taxonomy Article 10 (substantial contribution)"
+recommendation_tone: "energy and utility operations"
+
+# Made with Bob

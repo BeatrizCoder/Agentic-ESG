@@ -1,0 +1,23 @@
+sector: "Real Estate"
+risk_thresholds:
+  drought_critical: 50
+  heat_critical: 42
+  flood_critical: 30
+primary_frameworks:
+  - "CSRD ESRS E1 (climate change)"
+  - "EU Taxonomy (climate adaptation)"
+  - "ISSB S2"
+key_risks:
+  - "Flood damage to properties"
+  - "Heat stress on building systems"
+  - "Water scarcity for operations"
+  - "Asset value depreciation"
+  - "Insurance cost increases"
+  - "Cooling system strain"
+focus_articles:
+  - "ESRS E1-6 physical risks"
+  - "EU Taxonomy CCA Annex II"
+  - "ISSB S2 paragraph 14 (asset resilience)"
+recommendation_tone: "real estate portfolio management"
+
+# Made with Bob

@@ -112,11 +112,16 @@ Maximum 150 words. No bullet points. No headers. Just 2-3 clear executive senten
 
 
 def make_esg_strategy_task(climate_summary: str, region_label: str, sector: str = "General") -> Task:
+    from ..sectors import get_sector_context
+    
+    sector_context = get_sector_context(sector)
+    
     return Task(
         description=f"""Map these climate risk findings for {region_label!r} to ESG compliance obligations.
 Return ONLY the JSON object below. No prose, no markdown, no extra keys.
 
-SECTOR: {sector}
+{sector_context}
+
 CLIMATE FINDINGS:
 {climate_summary}
 
@@ -125,6 +130,9 @@ MAPPING RULES:
 - flood_risk → ESRS E1 and EU Taxonomy climate change adaptation
 - ISSB S2 chronic = temperature/precipitation trends; acute = anomaly years
 - compliance_urgency must be at least "high" if drought_risk or heat_stress_risk is high/critical
+- Use the sector-specific risk thresholds above to determine when risks become CRITICAL
+- Prioritize the primary frameworks listed for this sector
+- Focus on the key sector-specific risks when mapping compliance obligations
 
 DOUBLE MATERIALITY RULES (use the real numbers from CLIMATE FINDINGS above):
 - physical_risk_summary: "For {sector} operations in {region_label}, the [REAL temp_trend]°C/decade warming and [REAL precip_trend]%/decade precipitation change indicate [specific operational risk]"

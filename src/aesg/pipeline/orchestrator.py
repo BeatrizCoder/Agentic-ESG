@@ -463,7 +463,24 @@ async def run_analysis(
     )
 
     # ── Step 2a: Deterministic climate engine (no LLM) ────────────────────────
-    climate_metrics = calculate_climate_risk(unified_records)
+    # Load sector-specific risk thresholds
+    from ..sectors import load_sector_profile
+    
+    try:
+        sector_config = load_sector_profile(sector)
+        sector_thresholds = sector_config.get("risk_thresholds", {})
+        logger.info(
+            "Using sector-specific thresholds for %s: drought=%s heat=%s flood=%s",
+            sector_config.get("sector"),
+            sector_thresholds.get("drought_critical"),
+            sector_thresholds.get("heat_critical"),
+            sector_thresholds.get("flood_critical"),
+        )
+    except Exception as e:
+        logger.warning("Could not load sector profile for %r: %s. Using default thresholds.", sector, e)
+        sector_thresholds = None
+    
+    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds)
     logger.info(
         "Step 2a/5 — Climate Engine: drought=%.1f heat_stress=%.1f flood=%.1f urgency=%s",
         climate_metrics.get("drought_score", 0),
@@ -738,7 +755,16 @@ async def run_comparison_pipeline(
             "key_finding":   "No climate data available for this period.",
         }
 
-    climate_metrics = calculate_climate_risk(unified_records)
+    # Load sector-specific risk thresholds
+    from ..sectors import load_sector_profile
+    
+    try:
+        sector_config = load_sector_profile(sector)
+        sector_thresholds = sector_config.get("risk_thresholds", {})
+    except Exception:
+        sector_thresholds = None
+    
+    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds)
 
     from ..agents.crews import run_climate_analysis_crew
     climate_task_input = json.dumps({
