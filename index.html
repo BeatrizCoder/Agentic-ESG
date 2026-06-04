@@ -287,7 +287,48 @@
     }
     .analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .compare-toggle-row { margin-top: .5rem; margin-left: .25rem; display: flex; align-items: center; }
+    .comparison-invite-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--bg3, var(--bg2));
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: .85rem 1.25rem;
+      margin-top: .75rem;
+      cursor: pointer;
+      transition: all .2s ease;
+    }
+    .comparison-invite-card:hover { border-color: var(--green); background: var(--green-lt, rgba(58,170,120,.08)); }
+    .comp-invite-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .comp-invite-title { font-size: .85rem; font-weight: 600; color: var(--text); }
+    .comp-invite-sub { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
+    .comp-invite-btn {
+      margin-left: auto;
+      background: var(--green);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: .4rem .85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+    .compare-fields-inline {
+      display: flex;
+      gap: .75rem;
+      margin-top: .75rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      padding: 1rem;
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+    }
+    .compare-hint { font-size: .65rem; color: var(--muted); align-self: center; font-style: italic; }
     .batch-row {
       display: flex;
       align-items: center;
@@ -318,8 +359,6 @@
     }
     .compare-checkbox-label input[type="checkbox"] { accent-color: var(--green); width: 14px; height: 14px; cursor: pointer; }
     .compare-checkbox-label:hover { color: var(--green); }
-    .compare-fields-row { display: flex; gap: .75rem; align-items: flex-end; margin-top: .5rem; margin-left: .25rem; flex-wrap: wrap; }
-    .compare-hint { font-size: .65rem; color: var(--muted); align-self: center; font-style: italic; }
 
     .comparison-card {
       background: var(--bg2);
@@ -1822,55 +1861,6 @@
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
     </div>
-    <!-- Compare checkbox — directly below the search row -->
-    <div class="compare-toggle-row">
-      <label class="compare-checkbox-label">
-        <input type="checkbox" id="comparison-checkbox" onchange="toggleComparisonMode(this.checked)">
-        <span>⚖️ Compare with another period</span>
-      </label>
-    </div>
-
-    <!-- Comparison period selectors — shown when comparison checkbox is checked -->
-    <div id="comparison-period" class="compare-fields-row" style="display:none">
-      <div class="field-group">
-        <label>Compare From</label>
-        <select id="inp-start-2">
-          <option value="2000" selected>2000</option>
-          <option value="2001">2001</option><option value="2002">2002</option>
-          <option value="2003">2003</option><option value="2004">2004</option>
-          <option value="2005">2005</option><option value="2006">2006</option>
-          <option value="2007">2007</option><option value="2008">2008</option>
-          <option value="2009">2009</option><option value="2010">2010</option>
-          <option value="2011">2011</option><option value="2012">2012</option>
-          <option value="2013">2013</option><option value="2014">2014</option>
-          <option value="2015">2015</option><option value="2016">2016</option>
-          <option value="2017">2017</option><option value="2018">2018</option>
-          <option value="2019">2019</option><option value="2020">2020</option>
-          <option value="2021">2021</option><option value="2022">2022</option>
-          <option value="2023">2023</option><option value="2024">2024</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label>Compare To</label>
-        <select id="inp-end-2">
-          <option value="2001">2001</option><option value="2002">2002</option>
-          <option value="2003">2003</option><option value="2004">2004</option>
-          <option value="2005">2005</option><option value="2006">2006</option>
-          <option value="2007">2007</option><option value="2008">2008</option>
-          <option value="2009">2009</option><option value="2010" selected>2010</option>
-          <option value="2011">2011</option><option value="2012">2012</option>
-          <option value="2013">2013</option><option value="2014">2014</option>
-          <option value="2015">2015</option><option value="2016">2016</option>
-          <option value="2017">2017</option><option value="2018">2018</option>
-          <option value="2019">2019</option><option value="2020">2020</option>
-          <option value="2021">2021</option><option value="2022">2022</option>
-          <option value="2023">2023</option><option value="2024">2024</option>
-          <option value="2025">2025</option>
-        </select>
-      </div>
-      <span class="compare-hint">Historical periods only (2000–2025)</span>
-    </div>
-
     <div class="presets">
       <button class="preset-btn" onclick="setPreset(-15.7801,-47.9292,'Brasília, Brazil')">Brasília</button>
       <button class="preset-btn" onclick="setPreset(-23.5505,-46.6333,'São Paulo, Brazil')">São Paulo</button>
@@ -2022,6 +2012,58 @@
             <div class="score-meta-label" id="t-hottest">Hottest / Driest Year</div>
             <div class="score-meta-value" id="meta-years">—</div>
           </div>
+        </div>
+
+        <!-- Compare invite — shown after analysis -->
+        <div id="comparison-invite" class="comparison-invite-card" style="display:none">
+          <span class="comp-invite-icon">⚖️</span>
+          <div class="comp-invite-text">
+            <div class="comp-invite-title">Compare with a historical period</div>
+            <div class="comp-invite-sub">See how climate risk changed over time for this location</div>
+          </div>
+          <button onclick="openComparisonPanel()" class="comp-invite-btn">Compare →</button>
+        </div>
+
+        <!-- Inline comparison period selectors -->
+        <div id="comparison-period" class="compare-fields-inline" style="display:none">
+          <div class="field-group">
+            <label>Compare From</label>
+            <select id="inp-start-2">
+              <option value="2000" selected>2000</option>
+              <option value="2001">2001</option><option value="2002">2002</option>
+              <option value="2003">2003</option><option value="2004">2004</option>
+              <option value="2005">2005</option><option value="2006">2006</option>
+              <option value="2007">2007</option><option value="2008">2008</option>
+              <option value="2009">2009</option><option value="2010">2010</option>
+              <option value="2011">2011</option><option value="2012">2012</option>
+              <option value="2013">2013</option><option value="2014">2014</option>
+              <option value="2015">2015</option><option value="2016">2016</option>
+              <option value="2017">2017</option><option value="2018">2018</option>
+              <option value="2019">2019</option><option value="2020">2020</option>
+              <option value="2021">2021</option><option value="2022">2022</option>
+              <option value="2023">2023</option><option value="2024">2024</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Compare To</label>
+            <select id="inp-end-2">
+              <option value="2001">2001</option><option value="2002">2002</option>
+              <option value="2003">2003</option><option value="2004">2004</option>
+              <option value="2005">2005</option><option value="2006">2006</option>
+              <option value="2007">2007</option><option value="2008">2008</option>
+              <option value="2009">2009</option><option value="2010" selected>2010</option>
+              <option value="2011">2011</option><option value="2012">2012</option>
+              <option value="2013">2013</option><option value="2014">2014</option>
+              <option value="2015">2015</option><option value="2016">2016</option>
+              <option value="2017">2017</option><option value="2018">2018</option>
+              <option value="2019">2019</option><option value="2020">2020</option>
+              <option value="2021">2021</option><option value="2022">2022</option>
+              <option value="2023">2023</option><option value="2024">2024</option>
+              <option value="2025">2025</option>
+            </select>
+          </div>
+          <button onclick="runComparison()" class="analyze-btn" style="align-self:flex-end">Run Comparison →</button>
+          <span class="compare-hint">Historical only (2000–2025)</span>
         </div>
       </div>
 
@@ -2269,7 +2311,6 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 /* ── Cookie & Session Management ─────────────────────────────────────────── */
 let SESSION_ID = null;
 let COOKIES_ACCEPTED = false;
-let comparisonMode = false;
 let currentGlossaryLang = 'en';
 
 function getCookie(name) {
@@ -2845,7 +2886,6 @@ function highlightStep(idx) {
 }
 
 async function runAnalysis() {
-  if (comparisonMode) { await runComparison(); return; }
 
   const lat      = parseFloat(document.getElementById('inp-lat').value);
   const lon      = parseFloat(document.getElementById('inp-lon').value);
@@ -2918,14 +2958,9 @@ async function runAnalysis() {
 }
 
 /* ── Comparison Mode ─────────────────────────────────────────────────────── */
-function toggleComparisonMode(checked) {
-  comparisonMode = checked;
+function openComparisonPanel() {
   const panel = document.getElementById('comparison-period');
-  panel.style.display = checked ? 'flex' : 'none';
-  if (checked) {
-    document.getElementById('inp-start-2').value = '2000';
-    document.getElementById('inp-end-2').value   = '2010';
-  }
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
 }
 
 async function runComparison() {
@@ -3168,6 +3203,12 @@ function renderResults(data) {
 
   /* reasoning tab */
   renderReasoningTab(data);
+
+  /* show invite card; reset comparison panel to collapsed */
+  const inviteEl = document.getElementById('comparison-invite');
+  if (inviteEl) inviteEl.style.display = 'flex';
+  const compPanel = document.getElementById('comparison-period');
+  if (compPanel) compPanel.style.display = 'none';
 
   /* show panels — always land on Overview */
   switchTab('overview');
