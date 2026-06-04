@@ -23,7 +23,7 @@ else:
     analyses = None
 
 
-def _result_to_doc(result, session_id: str | None = None) -> dict:
+def _result_to_doc(result, session_id: str | None = None, source: str = "single") -> dict:
     """Convert an AnalysisResult dataclass (or dict) to a MongoDB-ready document."""
     if dataclasses.is_dataclass(result) and not isinstance(result, type):
         doc = dataclasses.asdict(result)
@@ -31,22 +31,22 @@ def _result_to_doc(result, session_id: str | None = None) -> dict:
         doc = dict(result)
     else:
         raise TypeError(f"Cannot convert {type(result)} to MongoDB document")
-    
-    # Add session_id and expires_at if session_id is provided
+
+    doc["source"] = source
     if session_id:
         doc["session_id"] = session_id
         doc["expires_at"] = datetime.utcnow() + timedelta(days=30)
-    
+
     return doc
 
 
-async def save_analysis(result, session_id: str | None = None) -> str:
+async def save_analysis(result, session_id: str | None = None, source: str = "single") -> str:
     """Persist an AnalysisResult and return the MongoDB _id as string."""
     if analyses is None:
         logger.warning("save_analysis: MONGO_URL not configured, skipping")
         return getattr(result, "analysis_id", "")
 
-    doc = _result_to_doc(result, session_id)
+    doc = _result_to_doc(result, session_id, source=source)
     doc.pop("_id", None)
 
     existing = await analyses.find_one({"analysis_id": doc["analysis_id"]}, {"_id": 1})

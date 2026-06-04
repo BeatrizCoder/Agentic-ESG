@@ -265,9 +265,9 @@ async def start_batch(
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
         try:
-            text = content.decode("latin-1")
+            text = content.decode("utf-8")
         except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="CSV must be UTF-8 or Latin-1 encoded")
+            text = content.decode("latin-1")
 
     reader = csv.DictReader(io.StringIO(text))
     try:
@@ -321,8 +321,10 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
             scenario = "SSP2-4.5"
 
         try:
-            lat = float(row.get("latitude") or 0)
-            lon = float(row.get("longitude") or 0)
+            lat        = float(row.get("latitude") or 0)
+            lon        = float(row.get("longitude") or 0)
+            start_year = int(row.get("start_year") or 2014)
+            end_year   = int(row.get("end_year")   or 2025)
         except (ValueError, TypeError):
             job["results"].append({
                 "region": region, "latitude": 0.0, "longitude": 0.0,
@@ -342,13 +344,13 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
             result = await asyncio.wait_for(
                 run_analysis(
                     latitude=lat, longitude=lon, region_label=region,
-                    start_year=2014, end_year=2023,
+                    start_year=start_year, end_year=end_year,
                     sector=sector, scenario=scenario,
                 ),
                 timeout=120,
             )
             try:
-                await save_analysis(result, session_id=session_id)
+                await save_analysis(result, session_id=session_id, source="batch")
             except Exception:
                 logger.warning("Batch %s: failed to persist %s", job_id, result.analysis_id)
 

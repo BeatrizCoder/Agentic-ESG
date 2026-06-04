@@ -2784,7 +2784,7 @@ function renderResults(data) {
     const temps    = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
     const precips  = annual.map(r => r.precip_total_mm   ?? 0);
     const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
-    const et0s     = annual.map(r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0 ?? 0);
+    const et0s     = annual.map(r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0_mm ?? 0);
     const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
@@ -2793,28 +2793,21 @@ function renderResults(data) {
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
-    // ET0 value + water-deficit color — scan backwards for last non-null value
-    const _et0From = r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0 ?? 0;
-    const lastEt0  = _et0From(last) || [...annual].reverse().reduce((v, r) => v || _et0From(r), 0);
-    const lastPrecip = last.precip_total_mm ?? 0;
-    const et0El = document.getElementById('chart-et0-val');
+    // ET0 card — computed directly from annual data
     const et0Card = document.getElementById('chart-et0-card');
-
-    if (et0s.some(v => v > 0)) {
-      et0El.textContent = lastEt0 > 0 ? lastEt0.toFixed(0) : '—';
-      et0El.className = 'chart-item-value' + (lastEt0 > 0 && lastPrecip > 0 && lastEt0 / lastPrecip > 1.3 ? ' val-deficit' : '');
-    } else {
-      // Fall back to soil moisture in the ET0 card slot
-      const soilFallbacks = annual.map(r => r.soil_moisture_m3m3 ?? r.soil_moisture ?? 0);
-      if (soilFallbacks.some(v => v > 0) && et0Card) {
-        const labelEl = document.querySelector('#chart-et0-card .chart-item-label');
-        if (labelEl) labelEl.textContent = 'Soil Moisture (m³/m³)';
-        et0El.textContent = soilFallbacks[soilFallbacks.length - 1].toFixed(3);
-        setTimeout(() => drawBars('canvas-et0', soilFallbacks, 'stable'), 50);
-        et0Card.style.display = '';
-      } else if (et0Card) {
-        et0Card.style.display = 'none';
-      }
+    if (et0s.some(v => v > 0) && et0Card) {
+      const lastET0  = et0s[et0s.length - 1];
+      document.getElementById('chart-et0-val').textContent = lastET0.toFixed(0);
+      const firstET0 = et0s.find(v => v > 0) || 0;
+      const trend    = lastET0 > firstET0 ? 'up' : 'down';
+      const pct      = ((lastET0 - firstET0) / (firstET0 || 1) * 100).toFixed(1);
+      const deltaEl  = document.getElementById('chart-et0-delta');
+      deltaEl.textContent = `${pct > 0 ? '+' : ''}${pct}%/decade`;
+      deltaEl.className   = `chart-item-delta ${trend}`;
+      setTimeout(() => drawBars('canvas-et0', et0s, 'stable'), 50);
+      et0Card.style.display = '';
+    } else if (et0Card) {
+      et0Card.style.display = 'none';
     }
 
     // Soil moisture value + risk color
@@ -2826,7 +2819,6 @@ function renderResults(data) {
 
     setDelta('chart-temp-delta',   cf.temp_trend_c_per_decade,              '°C/decade',       'down', 'up');
     setDelta('chart-precip-delta', cf.precip_trend_pct_per_decade,          '%/decade',        'up',   'down');
-    setDelta('chart-et0-delta',    cf.et0_trend_mm_per_decade,              'mm/decade',       'down', 'up');
     setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
 
     // Hide optional cards when no data for this analysis
@@ -2837,7 +2829,6 @@ function renderResults(data) {
       drawBars('canvas-temp',   temps,   'rising');
       drawBars('canvas-precip', precips, 'declining');
       if (solars.some(v => v > 0)) drawBars('canvas-solar', solars, 'stable');
-      if (et0s.some(v => v > 0))   drawBars('canvas-et0',  et0s,  'rising');
       if (soils.some(v => v > 0))  drawBars('canvas-soil', soils, 'stable');
     }, 50);
   }
@@ -3895,14 +3886,14 @@ function closeBatchModal() {
 }
 
 function downloadBatchTemplate() {
-  const csv = `region,latitude,longitude,sector,scenario
-Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5
-São Paulo Brazil,-23.5505,-46.6333,Real Estate,SSP2-4.5
-Berlin Germany,52.5200,13.4050,Finance & Banking,SSP1-2.6
-Helsinki Finland,60.1699,24.9384,General,SSP1-2.6
-Amsterdam Netherlands,52.3676,4.9041,Finance & Banking,SSP1-2.6`;
+  const csv = `region,latitude,longitude,start_year,end_year,sector,scenario
+Brasília Brazil,-15.7801,-47.9292,2014,2025,General,SSP2-4.5
+São Paulo Brazil,-23.5505,-46.6333,2014,2025,Real Estate,SSP2-4.5
+Berlin Germany,52.5200,13.4050,2014,2025,Finance & Banking,SSP1-2.6
+Helsinki Finland,60.1699,24.9384,2014,2025,General,SSP1-2.6
+Amsterdam Netherlands,52.3676,4.9041,2014,2025,Finance & Banking,SSP1-2.6`;
 
-  const BOM = '﻿';
+  const BOM = '\uFEFF';
   const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
