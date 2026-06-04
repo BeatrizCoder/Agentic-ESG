@@ -156,20 +156,23 @@ async def get_history(
         raise HTTPException(status_code=400, detail="X-Session-ID header required")
     
     rows = await get_session_history(x_session_id, limit=10)
-    return [
-        AnalysisSummary(
-            analysis_id=r["analysis_id"],
-            region_label=r["region_label"],
-            latitude=r["latitude"],
-            longitude=r["longitude"],
-            risk_score=r["risk_score"],
-            risk_level=r["risk_level"],
-            risk_badge_label=r["risk_badge_label"],
-            created_at=r["created_at"],
-            pipeline_duration_sec=r["pipeline_duration_sec"],
-        )
-        for r in rows
-    ]
+    items = []
+    for r in rows:
+        try:
+            items.append(AnalysisSummary(
+                analysis_id=r.get("analysis_id", ""),
+                region_label=r.get("region_label", r.get("region", "Unknown")),
+                latitude=float(r.get("latitude", 0)),
+                longitude=float(r.get("longitude", 0)),
+                risk_score=int(r.get("risk_score", 0)),
+                risk_level=r.get("risk_level", ""),
+                risk_badge_label=r.get("risk_badge_label", r.get("risk_level", "")),
+                created_at=r.get("created_at", ""),
+                pipeline_duration_sec=float(r.get("pipeline_duration_sec", 0)),
+            ))
+        except Exception as exc:
+            logger.warning("Skipping malformed history doc %s: %s", r.get("analysis_id", "?"), exc)
+    return items
 
 
 @router.get("/api/analyses/{analysis_id}", response_model=AnalysisResponse)
@@ -261,13 +264,14 @@ async def start_batch(
     content = await file.read()
     if len(content) > _BATCH_MAX_FILE_BYTES:
         raise HTTPException(status_code=413, detail="File too large. Maximum 1 MB.")
-    try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError:
+    for encoding in ["utf-8-sig", "utf-8", "latin-1", "cp1252"]:
         try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content.decode("latin-1")
+            text = content.decode(encoding)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    else:
+        raise HTTPException(status_code=400, detail="CSV encoding not supported. Save as UTF-8 and try again.")
 
     reader = csv.DictReader(io.StringIO(text))
     try:
@@ -349,10 +353,12 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                 ),
                 timeout=120,
             )
+            logger.info(f"Saving batch analysis for session: {session_id}")
             try:
                 await save_analysis(result, session_id=session_id, source="batch")
-            except Exception:
-                logger.warning("Batch %s: failed to persist %s", job_id, result.analysis_id)
+                logger.info("Batch analysis saved to history: %s (session=%s)", result.analysis_id, session_id)
+            except Exception as save_exc:
+                logger.warning("Batch save error: %s (analysis=%s session=%s)", save_exc, result.analysis_id, session_id)
 
             job["results"].append({
                 "region": region, "latitude": lat, "longitude": lon,
