@@ -303,6 +303,7 @@
       flex-shrink: 0;
     }
     .batch-btn:hover { border-color: var(--green); color: var(--green); }
+    .action-row { display: flex; gap: .75rem; margin-top: .5rem; flex-wrap: wrap; }
 
     .comparison-btn {
       background: transparent;
@@ -1821,6 +1822,8 @@
       </div>
       <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
       <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
+    </div>
+    <div class="action-row">
       <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis</button>
       <button class="comparison-btn" id="comparison-toggle-btn" onclick="toggleComparisonMode()">⚖️ Compare Periods</button>
     </div>
