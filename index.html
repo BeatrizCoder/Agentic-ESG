@@ -2049,12 +2049,14 @@
             <div class="chart-item-delta" id="chart-solar-delta"></div>
             <canvas class="mini-bar" id="canvas-solar"></canvas>
           </div>
+          <!-- ET0 card removed — ET0 used internally for drought_score only
           <div class="chart-item" id="chart-et0-card">
             <div class="chart-item-label" id="t-chart-et0">Evapotranspiration (mm/yr)</div>
             <div class="chart-item-value" id="chart-et0-val">—</div>
             <div class="chart-item-delta" id="chart-et0-delta"></div>
             <canvas class="mini-bar" id="canvas-et0"></canvas>
           </div>
+          -->
           <div class="chart-item" id="chart-soil-card">
             <div class="chart-item-label" id="t-chart-soil">Soil Moisture (m³/m³)</div>
             <div class="chart-item-value" id="chart-soil-val">—</div>
@@ -2442,7 +2444,6 @@ const I18N = {
     'chart-temp':      'Temp Mean (°C)',
     'chart-precip':    'Precipitation (mm/yr)',
     'chart-solar':     'Solar (kWh/m²/day)',
-    'chart-et0':       'Evapotranspiration (mm/yr)',
     'chart-soil':      'Soil Moisture (m³/m³)',
     'summary-label':   'Executive Summary',
     'compliance-label':'Compliance Framework Mapping',
@@ -2465,7 +2466,6 @@ const I18N = {
     'chart-temp':      'Temp. Média (°C)',
     'chart-precip':    'Precipitação (mm/ano)',
     'chart-solar':     'Solar (kWh/m²/dia)',
-    'chart-et0':       'Evapotranspiração (mm/ano)',
     'chart-soil':      'Humidade do Solo (m³/m³)',
     'summary-label':   'Sumário Executivo',
     'compliance-label':'Mapeamento de Frameworks ESG',
@@ -2488,7 +2488,6 @@ const I18N = {
     'chart-temp':      'Temp. Media (°C)',
     'chart-precip':    'Precipitación (mm/año)',
     'chart-solar':     'Solar (kWh/m²/día)',
-    'chart-et0':       'Evapotranspiración (mm/año)',
     'chart-soil':      'Humedad del Suelo (m³/m³)',
     'summary-label':   'Resumen Ejecutivo',
     'compliance-label':'Mapeo de Marcos ESG',
@@ -2511,7 +2510,6 @@ const I18N = {
     'chart-temp':      'Temp. Moyenne (°C)',
     'chart-precip':    'Précipitations (mm/an)',
     'chart-solar':     'Solaire (kWh/m²/jour)',
-    'chart-et0':       'Évapotranspiration (mm/an)',
     'chart-soil':      'Humidité du Sol (m³/m³)',
     'summary-label':   'Résumé Exécutif',
     'compliance-label':'Cartographie des Cadres ESG',
@@ -2534,7 +2532,6 @@ const I18N = {
     'chart-temp':      'Mittl. Temperatur (°C)',
     'chart-precip':    'Niederschlag (mm/Jahr)',
     'chart-solar':     'Solar (kWh/m²/Tag)',
-    'chart-et0':       'Evapotranspiration (mm/Jahr)',
     'chart-soil':      'Bodenfeuchte (m³/m³)',
     'summary-label':   'Management Summary',
     'compliance-label':'ESG-Rahmenwerk-Mapping',
@@ -3124,7 +3121,7 @@ function renderResults(data) {
 
   /* charts */
   // Reset optional chart cards so a fresh analysis always starts visible
-  ['chart-solar-card', 'chart-et0-card', 'chart-soil-card'].forEach(id => {
+  ['chart-solar-card', 'chart-soil-card'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = '';
   });
 
@@ -3134,7 +3131,6 @@ function renderResults(data) {
     const temps    = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
     const precips  = annual.map(r => r.precip_total_mm   ?? 0);
     const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
-    const et0s     = annual.map(r => r.evapotranspiration_mm ?? 0);
     const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
@@ -3142,25 +3138,6 @@ function renderResults(data) {
     const _solarFrom = r => r.solar_mean_kwh_m2 ?? r.solar_kwh_m2 ?? r.solar ?? 0;
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
-
-    // ET0 card — require >= 3 years with realistic ET0 (>100mm/yr)
-    const lastET0    = et0s[et0s.length - 1];
-    const hasRealET0 = et0s.filter(v => v > 100).length >= 3;
-    const et0Card    = document.getElementById('chart-et0-card');
-    if (hasRealET0 && lastET0 > 0) {
-      document.getElementById('chart-et0-val').textContent = lastET0.toFixed(0);
-      const firstET0  = et0s.find(v => v > 0) || lastET0;
-      const et0Change = ((lastET0 - firstET0) / firstET0 * 100).toFixed(1);
-      const et0Delta  = document.getElementById('chart-et0-delta');
-      if (et0Delta) {
-        et0Delta.textContent = `${et0Change > 0 ? '+' : ''}${et0Change}%/decade`;
-        et0Delta.className   = `chart-item-delta ${parseFloat(et0Change) > 0 ? 'up' : 'down'}`;
-      }
-      setTimeout(() => drawBars('canvas-et0', et0s, 'stable'), 100);
-      if (et0Card) et0Card.style.display = '';
-    } else {
-      if (et0Card) et0Card.style.display = 'none';
-    }
 
     // Soil moisture value + risk color
     const lastSoil = last.soil_moisture_m3m3 ?? 0;
@@ -4113,13 +4090,6 @@ const GLOSSARY_TERMS = [
     es: 'Dataset climático global del ECMWF que combina observaciones históricas con modelos meteorológicos. Proporciona datos desde 1940 hasta el presente.',
     fr: 'Jeu de données climatiques mondial de l\'ECMWF combinant observations historiques et sorties de modèles météorologiques. Données disponibles de 1940 à aujourd\'hui.',
     de: 'Globaler Klimadatensatz des ECMWF, der historische Beobachtungen mit Wettermodellausgaben kombiniert. Klimadaten von 1940 bis heute.'
-  }},
-  { id: 'et0', title: 'Evapotranspiration (ET0)', translations: {
-    en: 'Combined water loss through soil evaporation and plant transpiration. When ET0 exceeds precipitation, a region is in water deficit — a key drought indicator.',
-    pt: 'Perda combinada de água por evaporação do solo e transpiração das plantas. Quando ET0 supera a precipitação, a região está em déficit hídrico.',
-    es: 'Pérdida combinada de agua por evaporación del suelo y transpiración de plantas. Cuando ET0 supera la precipitación, la región está en déficit hídrico.',
-    fr: 'Perte d\'eau combinée par évaporation du sol et transpiration des plantes. Quand ET0 dépasse les précipitations, la région est en déficit hydrique.',
-    de: 'Kombinierter Wasserverlust durch Bodenverdunstung und Pflanzentranspiration. Wenn ET0 den Niederschlag übersteigt, befindet sich die Region im Wasserdefizit.'
   }},
   { id: 'water_stress', title: 'Water Stress', translations: {
     en: 'Condition where water demand exceeds available supply. Measured by the ratio of water withdrawals to renewable freshwater resources.',
