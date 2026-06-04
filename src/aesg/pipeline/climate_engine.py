@@ -52,8 +52,12 @@ def calculate_climate_risk(annual_records: list) -> dict:
     # ET0 water deficit
     avg_et0    = sum(et0s[-3:]) / 3    if et0s and len(et0s) >= 3 else (et0s[-1] if et0s else 0)
     avg_precip = sum(precips[-3:]) / 3 if len(precips) >= 3       else r_precip
-    et0_ratio  = avg_et0 / avg_precip if avg_precip > 0 else 0
-    water_deficit = et0_ratio > 1.3
+    if avg_et0 < 1:
+        water_deficit = False
+        et0_ratio = 0
+    else:
+        et0_ratio  = avg_et0 / avg_precip if avg_precip > 0 else 0
+        water_deficit = et0_ratio > 1.3
 
     # Risk scores (0-100)
     drought_score = min(100, max(0,

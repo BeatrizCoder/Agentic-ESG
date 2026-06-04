@@ -2793,9 +2793,10 @@ function renderResults(data) {
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
-    // ET0 card — computed directly from annual data
+    // ET0 card — hide when data is unavailable (< 10mm signals missing/zero fill)
+    const hasET0 = et0s.some(v => v > 10);
     const et0Card = document.getElementById('chart-et0-card');
-    if (et0s.some(v => v > 0) && et0Card) {
+    if (hasET0 && et0Card) {
       const lastET0  = et0s[et0s.length - 1];
       document.getElementById('chart-et0-val').textContent = lastET0.toFixed(0);
       const firstET0 = et0s.find(v => v > 0) || 0;
