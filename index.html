@@ -3898,16 +3898,12 @@ function downloadBatchTemplate() {
   const csv = `region,latitude,longitude,sector,scenario
 Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5
 São Paulo Brazil,-23.5505,-46.6333,Real Estate,SSP2-4.5
-Manaus Brazil,-3.1190,-60.0217,Agriculture & Food,SSP5-8.5
-Fortaleza Brazil,-3.7172,-38.5248,Infrastructure,SSP2-4.5
-Porto Alegre Brazil,-30.0346,-51.2177,General,SSP1-2.6
 Berlin Germany,52.5200,13.4050,Finance & Banking,SSP1-2.6
-London UK,51.5074,-0.1278,Finance & Banking,SSP1-2.6
 Helsinki Finland,60.1699,24.9384,General,SSP1-2.6
-Amsterdam Netherlands,52.3676,4.9041,Finance & Banking,SSP1-2.6
-Buenos Aires Argentina,-34.6037,-58.3816,Agriculture & Food,SSP2-4.5`;
+Amsterdam Netherlands,52.3676,4.9041,Finance & Banking,SSP1-2.6`;
 
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const BOM = '﻿';
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -3969,6 +3965,7 @@ async function runBatchAnalysis() {
             clearInterval(pollInterval);
             _batchResults = job;
             _renderBatchResults(job);
+            if (COOKIES_ACCEPTED && SESSION_ID) setTimeout(() => loadHistory(), 2000);
             resolve();
           }
         } catch (e) {
@@ -4017,7 +4014,7 @@ function _renderBatchResults(data) {
       : `<span class="risk-badge ${r.risk_level}" style="font-size:.62rem;padding:.12rem .4rem">${r.risk_level.toUpperCase()}</span>`;
 
     const viewHtml = (!isErr && r.analysis_id)
-      ? `<button class="batch-view-btn" onclick="viewBatchReport('${r.analysis_id}')">View Full Report</button>`
+      ? `<button class="batch-view-btn" onclick="viewBatchAnalysis('${r.analysis_id}')">View Full Report</button>`
       : '';
 
     tr.innerHTML = `
@@ -4061,18 +4058,9 @@ async function exportBatchExcel() {
   }
 }
 
-async function viewBatchReport(analysisId) {
+function viewBatchAnalysis(analysisId) {
   closeBatchModal();
-  try {
-    const resp = await fetch(`${API_BASE}/api/analyses/${analysisId}`);
-    if (!resp.ok) throw new Error('Analysis not found');
-    const data = await resp.json();
-    _currentId = data.analysis_id;
-    renderResults(data);
-    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-  } catch (err) {
-    alert('Failed to load report: ' + err.message);
-  }
+  viewAnalysis(analysisId);
 }
 </script>
 
@@ -4259,7 +4247,7 @@ async function viewBatchReport(analysisId) {
 
       <!-- Notices -->
       <p style="font-size:.72rem;color:var(--muted)">
-        ⚠ Max 10 regions · Max 1 MB · Each region takes ~2 min · Results appear as they complete
+        ⚠ Max 5 regions · ~2 min each · ~10 min total · Results appear as they complete
       </p>
       <p style="font-size:.72rem;color:var(--text2)">
         Required columns: <strong>region · latitude · longitude</strong>

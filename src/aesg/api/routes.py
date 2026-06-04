@@ -219,7 +219,7 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
     )
 
 
-_BATCH_MAX_ROWS = 10
+_BATCH_MAX_ROWS = 5
 _BATCH_MAX_FILE_BYTES = 1_000_000  # 1 MB
 _BATCH_REQUIRED_COLS = {"region", "latitude", "longitude"}
 _BATCH_TEMPLATE_CSV = (
@@ -264,7 +264,10 @@ async def start_batch(
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded")
+        try:
+            text = content.decode("latin-1")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="CSV must be UTF-8 or Latin-1 encoded")
 
     reader = csv.DictReader(io.StringIO(text))
     try:
