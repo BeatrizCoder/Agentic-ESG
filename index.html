@@ -2735,6 +2735,7 @@ function renderResults(data) {
   const badge  = (RISK_LABELS[_lang] || RISK_LABELS.en)[level] || data.risk_badge_label || level.toUpperCase() + ' RISK';
   const km     = data.key_metrics || {};
   const annual = data.annual_records || [];
+  console.log('[ET0 debug] first record:', annual[0]);
   const comp   = data.compliance_mapping || {};
   const cf     = data.climate_findings  || {};
 
@@ -2790,6 +2791,7 @@ function renderResults(data) {
     const precips  = annual.map(r => r.precip_total_mm   ?? 0);
     const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
     const et0s     = annual.map(r => r.evapotranspiration_mm ?? r.et0_fao_mm ?? r.et0_mm ?? 0);
+    console.log('[ET0 debug] raw values:', annual.map(r => ({ year: r.year, et0: r.evapotranspiration_mm, et0_fao: r.et0_fao_mm, et0_raw: r.et0 })));
     const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
@@ -2798,12 +2800,9 @@ function renderResults(data) {
     const solarVal = _solarFrom(last) || [...annual].reverse().reduce((v, r) => v || _solarFrom(r), 0);
     document.getElementById('chart-solar-val').textContent  = solarVal > 0 ? solarVal.toFixed(2) : '—';
 
-    // ET0 card — require at least 3 years with valid readings (> 10mm)
-    const hasValidET0 = et0s.filter(v => v > 10).length >= 3;
-    const hasET0 = hasValidET0;
-    const et0Card = document.getElementById('chart-et0-card');
-    if (hasET0 && et0Card) {
-      const lastET0  = et0s[et0s.length - 1];
+    // ET0 content — populate whenever values are present; visibility set at end
+    const lastET0 = et0s[et0s.length - 1] || 0;
+    if (lastET0 > 0) {
       document.getElementById('chart-et0-val').textContent = lastET0.toFixed(0);
       const firstET0 = et0s.find(v => v > 0) || 0;
       const trend    = lastET0 > firstET0 ? 'up' : 'down';
@@ -2812,9 +2811,6 @@ function renderResults(data) {
       deltaEl.textContent = `${pct > 0 ? '+' : ''}${pct}%/decade`;
       deltaEl.className   = `chart-item-delta ${trend}`;
       setTimeout(() => drawBars('canvas-et0', et0s, 'stable'), 50);
-      et0Card.style.display = '';
-    } else if (et0Card) {
-      et0Card.style.display = 'none';
     }
 
     // Soil moisture value + risk color
@@ -2874,6 +2870,15 @@ function renderResults(data) {
 
   /* reasoning tab */
   renderReasoningTab(data);
+
+  /* ET0 card — final visibility gate, runs after all rendering and drawBars calls */
+  const et0Card = document.getElementById('chart-et0-card');
+  if (et0Card) {
+    const allET0 = (data.annual_records || []).map(r => r.evapotranspiration_mm || r.et0_fao_mm || 0);
+    const hasRealET0 = allET0.some(v => v > 10);
+    console.log('[ET0 debug] hasRealET0:', hasRealET0, 'values:', allET0);
+    et0Card.style.display = hasRealET0 ? '' : 'none';
+  }
 
   /* show panels — always land on Overview */
   switchTab('overview');
