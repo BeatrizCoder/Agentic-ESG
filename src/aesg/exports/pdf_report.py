@@ -99,6 +99,40 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
+def _analysis_period_table(analysis: dict, width: float, styles: dict) -> Table | None:
+    pm = analysis.get("pipeline_metadata", {}) or {}
+    if analysis.get("period_1") and analysis.get("period_2"):
+        p1 = analysis["period_1"]
+        p2 = analysis["period_2"]
+        rows = [
+            [Paragraph("Comparison Period 1", styles["cell_bold"]),
+             Paragraph(f"{p1.get('start_year','—')} – {p1.get('end_year','—')}", styles["cell"])],
+            [Paragraph("Comparison Period 2", styles["cell_bold"]),
+             Paragraph(f"{p2.get('start_year','—')} – {p2.get('end_year','—')}", styles["cell"])],
+        ]
+    elif pm.get("nasa_start_year") is not None or pm.get("nasa_end_year") is not None:
+        start = pm.get("nasa_start_year", "—")
+        end = pm.get("nasa_end_year", "—")
+        rows = [[
+            Paragraph("Analysis Period", styles["cell_bold"]),
+            Paragraph(f"{start} – {end}", styles["cell"]),
+        ]]
+    else:
+        return None
+
+    table = Table(rows, colWidths=[width * .28, width * .72])
+    table.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), ROW_ALT),
+        ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#d4d0c8")),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    return table
+
+
 def _mini_bar_chart(values: list, width: float = 160, height: float = 36) -> Drawing:
     """Reportlab Drawing with simple rectangular bars."""
     d = Drawing(width, height)
@@ -193,7 +227,13 @@ def generate_pdf(analysis: dict) -> BytesIO:
         ("LEFTPADDING",   (0, 0), (-1, -1), 8),
     ]))
     story.append(meta)
-    story.append(Spacer(1, 12))
+    period_table = _analysis_period_table(analysis, w_full, S)
+    if period_table:
+        story.append(Spacer(1, 6))
+        story.append(period_table)
+        story.append(Spacer(1, 12))
+    else:
+        story.append(Spacer(1, 12))
 
     # ── Risk score + badge + investment status ────────────────────────────────
     story.append(Paragraph("CLIMATE RISK SCORE", S["h2"]))

@@ -133,4 +133,57 @@ def test_cors_headers():
     assert "access-control-allow-origin" in response.headers
     assert "access-control-allow-methods" in response.headers
 
+
+@pytest.mark.asyncio
+async def test_process_batch_comparison_mode(monkeypatch):
+    from src.aesg.api import routes
+
+    job_id = "job-comparison"
+    routes._batch_jobs[job_id] = {
+        "status": "running",
+        "total": 1,
+        "completed": 0,
+        "failed": 0,
+        "results": [],
+    }
+
+    async def mock_run_comparison_pipeline(latitude, longitude, region_label, sector, start_year, end_year):
+        return {
+            "label": f"{start_year}–{end_year}",
+            "risk_score": 0,
+            "risk_level": "medium",
+            "temp_mean": 1.0,
+            "temp_trend": 0.1,
+            "precip_trend": 2.0,
+            "drought_score": 40.0,
+            "heat_stress_score": 0.0,
+        }
+
+    monkeypatch.setattr(routes, "run_comparison_pipeline", mock_run_comparison_pipeline)
+
+    rows = [
+        {
+            "region": "Test Region",
+            "latitude": "-23.55",
+            "longitude": "-46.63",
+            "start_year": "2011",
+            "end_year": "2021",
+            "compare_start_year": "2000",
+            "compare_end_year": "2010",
+            "sector": "General",
+            "scenario": "SSP2-4.5",
+        }
+    ]
+
+    await routes._process_batch(job_id, rows, None)
+    result_row = routes._batch_jobs[job_id]["results"][0]
+
+    assert result_row["comparison_mode"] is True
+    assert result_row["period_1"]["label"] == "2000–2010"
+    assert result_row["period_2"]["label"] == "2011–2021"
+    assert isinstance(result_row["delta"], dict)
+    assert result_row["risk_score"] == result_row["period_2"]["risk_score"]
+
+    del routes._batch_jobs[job_id]
+
 # Made with Bob

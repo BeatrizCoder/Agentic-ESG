@@ -47,6 +47,23 @@ def _autofit(ws, min_w: int = 10, max_w: int = 60) -> None:
         ws.column_dimensions[letter].width = min(max(max_len + 2, min_w), max_w)
 
 
+def _analysis_period_rows(analysis: dict) -> list[tuple[str, str]]:
+    pm = analysis.get("pipeline_metadata", {}) or {}
+    if analysis.get("period_1") and analysis.get("period_2"):
+        p1 = analysis["period_1"]
+        p2 = analysis["period_2"]
+        return [
+            ("Comparison Period 1", f"{p1.get('start_year','—')}–{p1.get('end_year','—')}"),
+            ("Comparison Period 2", f"{p2.get('start_year','—')}–{p2.get('end_year','—')}"),
+        ]
+    if pm.get("nasa_start_year") is not None or pm.get("nasa_end_year") is not None:
+        return [
+            ("Analysis Period Start", pm.get("nasa_start_year", "—")),
+            ("Analysis Period End",   pm.get("nasa_end_year",   "—")),
+        ]
+    return []
+
+
 def _inv_status(score: int) -> str:
     if score <= 40:  return "Investment Approved"
     if score <= 70:  return "Investment Conditioned"
@@ -74,13 +91,15 @@ def _sheet_summary(wb: Workbook, analysis: dict) -> None:
     score = analysis.get("risk_score", 0)
     conf  = analysis.get("confidence_score", 0)
 
-    rows = [
+    base_rows = [
         ("Region",            analysis.get("region_label", "—")),
         ("Latitude",          analysis.get("latitude", 0)),
         ("Longitude",         analysis.get("longitude", 0)),
         ("Analysis ID",       analysis.get("analysis_id", "—")),
         ("Date",              analysis.get("created_at", "")[:10]),
         ("Sector",            analysis.get("sector", "—")),
+    ]
+    rows = base_rows + _analysis_period_rows(analysis) + [
         ("Risk Score",        f"{score}/100"),
         ("Risk Level",        analysis.get("risk_level", "—").upper()),
         ("Risk Badge",        analysis.get("risk_badge_label", "—")),
