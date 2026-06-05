@@ -3245,20 +3245,24 @@ function renderResults(data) {
     }
     setDelta('chart-soil-delta',   cf.soil_moisture_trend_m3m3_per_decade,  'm³/m³·decade',   'up',   'down');
 
-    // Drought Score
+    // Drought Score (UI label only — visual classification)
     const droughtScore = cf.drought_score || 0;
     if (droughtScore > 0) {
       document.getElementById('chart-drought-val')
         .textContent = droughtScore.toFixed(0);
-      
+
       const droughtEl = document.getElementById('chart-drought-delta');
       if (droughtEl) {
-        const level = droughtScore > 70 ? 'HIGH'
-          : droughtScore > 40 ? 'MEDIUM' : 'LOW';
+        // Visual classification thresholds (display-only):
+        // LOW: 0-30, MEDIUM: 31-50, HIGH: 51-70, CRITICAL: 71-100
+        const level = droughtScore >= 71 ? 'CRITICAL'
+          : droughtScore >= 51 ? 'HIGH'
+          : droughtScore >= 31 ? 'MEDIUM' : 'LOW';
         droughtEl.textContent = level;
         droughtEl.className = `chart-item-delta ${
-          droughtScore > 70 ? 'up' :
-          droughtScore > 40 ? 'warn' : 'down'
+          droughtScore >= 71 ? 'up' :
+          droughtScore >= 51 ? 'warn' :
+          droughtScore >= 31 ? 'warn' : 'down'
         }`;
       }
       
