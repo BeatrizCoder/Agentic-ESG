@@ -239,6 +239,29 @@
     .search-section { margin-bottom: 1rem; max-width: 900px; margin-left: auto; margin-right: auto; }
 
     .search-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; }
+    .sector-scenario-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      align-items: flex-end;
+      flex: 1 1 380px;
+      min-width: 280px;
+    }
+    .sector-scenario-panel .field-group {
+      min-width: 220px;
+      flex: 1;
+    }
+    .sector-scenario-panel .field-group:first-child {
+      flex: 1;
+      min-width: 220px;
+    }
+    .action-row {
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      flex-shrink: 0;
+      margin-top: auto;
+    }
 
     .field-group { display: flex; flex-direction: column; gap: .3rem; min-width: 100px; flex: 1; }
     .field-group:first-child { flex: 2; min-width: 160px; }
@@ -1389,8 +1412,8 @@
     }
     .history-item {
       display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: .75rem;
+      grid-template-columns: 1fr auto auto auto;
+      gap: .5rem;
       align-items: center;
       background: var(--bg3);
       border: 1px solid var(--border);
@@ -1437,6 +1460,22 @@
       transition: background .15s;
     }
     .history-view-btn:hover { background: var(--green2); }
+    .history-remove-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      transition: color .15s, background .15s;
+    }
+    .history-remove-btn:hover {
+      color: var(--risk-critical);
+      background: rgba(196, 42, 42, 0.1);
+    }
     .dm-impacts { display: flex; flex-direction: column; gap: .3rem; }
     .dm-impact-item {
       display: flex; align-items: flex-start; gap: .4rem;
@@ -1884,48 +1923,52 @@
           <option value="2050">2050 ✦</option>
         </select>
       </div>
-      <div class="field-group">
-        <label id="t-sector">Sector
-          <span class="tooltip-trigger"
-            data-tooltip-en="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk."
-            data-tooltip-pt="Seu setor de atividade. Cada setor tem diferentes limiares de risco climático e prioridades de compliance ESG. Agricultura é mais sensível à seca. Finanças foca em portfólio e ativos encalhados. Imóveis prioriza risco de inundação e ativos físicos."
-            data-tooltip-es="Su sector industrial. Cada sector tiene diferentes umbrales de riesgo climático y prioridades de cumplimiento ESG. La agricultura es más sensible a la sequía. Las finanzas se centran en carteras y activos varados. Los bienes raíces priorizan el riesgo de inundaciones y activos físicos."
-            data-tooltip-fr="Votre secteur d'activité. Chaque secteur a des seuils de risque climatique et des priorités de conformité ESG différents. L'agriculture est plus sensible à la sécheresse. La finance se concentre sur les portefeuilles et les actifs échoués. L'immobilier priorise les risques d'inondation et d'actifs physiques."
-            data-tooltip-de="Ihr Industriesektor. Jeder Sektor hat unterschiedliche Klimarisikoschwellen und ESG-Compliance-Prioritäten. Die Landwirtschaft ist empfindlicher gegenüber Dürre. Finanzen konzentrieren sich auf Portfolios und gestrandete Vermögenswerte. Immobilien priorisieren Überschwemmungs- und physische Vermögensrisiken."
-            data-tooltip="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk.">?</span>
-        </label>
-        <div class="sector-field-row">
-          <select id="inp-sector">
-            <option value="General" selected>General</option>
-            <option value="Real Estate">Real Estate</option>
-            <option value="Agriculture & Food">Agriculture &amp; Food</option>
-            <option value="Infrastructure">Infrastructure</option>
-            <option value="Manufacturing">Manufacturing</option>
-            <option value="Finance & Banking">Finance &amp; Banking</option>
-            <option value="Energy & Utilities">Energy &amp; Utilities</option>
-            <option value="Retail & Logistics">Retail &amp; Logistics</option>
+      <div class="sector-scenario-panel">
+        <div class="field-group">
+          <label id="t-sector">Sector
+            <span class="tooltip-trigger"
+              data-tooltip-en="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk."
+              data-tooltip-pt="Seu setor de atividade. Cada setor tem diferentes limiares de risco climático e prioridades de compliance ESG. Agricultura é mais sensível à seca. Finanças foca em portfólio e ativos encalhados. Imóveis prioriza risco de inundação e ativos físicos."
+              data-tooltip-es="Su sector industrial. Cada sector tiene diferentes umbrales de riesgo climático y prioridades de cumplimiento ESG. La agricultura es más sensible a la sequía. Las finanzas se centran en carteras y activos varados. Los bienes raíces priorizan el riesgo de inundaciones y activos físicos."
+              data-tooltip-fr="Votre secteur d'activité. Chaque secteur a des seuils de risque climatique et des priorités de conformité ESG différents. L'agriculture est plus sensible à la sécheresse. La finance se concentre sur les portefeuilles et les actifs échoués. L'immobilier priorise les risques d'inondation et d'actifs physiques."
+              data-tooltip-de="Ihr Industriesektor. Jeder Sektor hat unterschiedliche Klimarisikoschwellen und ESG-Compliance-Prioritäten. Die Landwirtschaft ist empfindlicher gegenüber Dürre. Finanzen konzentrieren sich auf Portfolios und gestrandete Vermögenswerte. Immobilien priorisieren Überschwemmungs- und physische Vermögensrisiken."
+              data-tooltip="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk.">?</span>
+          </label>
+          <div class="sector-field-row">
+            <select id="inp-sector">
+              <option value="General" selected>General</option>
+              <option value="Agriculture & Food">Agriculture &amp; Food</option>
+              <option value="Finance & Banking">Finance &amp; Banking</option>
+              <option value="Real Estate">Real Estate</option>
+              <option value="Infrastructure">Infrastructure</option>
+              <option value="Manufacturing">Manufacturing</option>
+              <option value="Energy & Utilities">Energy &amp; Utilities</option>
+              <option value="Retail & Logistics">Retail &amp; Logistics</option>
+            </select>
+            <span id="sector-warning" class="sector-warning tooltip-trigger" title="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-en="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-pt="O setor 'General' usa limites padrão. Selecione Agricultura, Finanças, etc. para recomendações ESG mais precisas." data-tooltip-es="El sector 'General' usa umbrales predeterminados. Seleccione Agricultura, Finanzas, etc. para recomendaciones ESG más precisas." data-tooltip-fr="Le secteur 'General' utilise des seuils par défaut. Sélectionnez Agriculture, Finance, etc. pour des recommandations ESG plus précises." data-tooltip-de="Der Sektor 'General' verwendet Standardgrenzwerte. Wählen Sie Landwirtschaft, Finanzen, etc. für genauere ESG-Empfehlungen.">⚠️</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <label id="t-scenario">Scenario
+            <span class="tooltip-trigger"
+              data-tooltip-en="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)"
+              data-tooltip-pt="Cenário de emissões IPCC para projeções futuras:&#10;SSP1-2.6: Otimista (forte ação climática, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas atuais, ~2–3°C)&#10;SSP5-8.5: Pessimista (altas emissões, ~4–5°C)"
+              data-tooltip-es="Escenario de emisiones IPCC para proyecciones futuras:&#10;SSP1-2.6: Optimista (acción climática fuerte, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas actuales, ~2–3°C)&#10;SSP5-8.5: Pesimista (altas emisiones, ~4–5°C)"
+              data-tooltip-fr="Scénario d'émissions du GIEC pour les projections futures:&#10;SSP1-2.6: Optimiste (action climatique forte, ~1,5°C)&#10;SSP2-4.5: Modéré (politiques actuelles, ~2–3°C)&#10;SSP5-8.5: Pessimiste (émissions élevées, ~4–5°C)"
+              data-tooltip-de="IPCC-Emissionsszenario für zukünftige Projektionen:&#10;SSP1-2.6: Optimistisch (starke Klimaschutzmaßnahmen, ~1,5°C)&#10;SSP2-4.5: Moderat (aktuelle Richtlinien, ~2–3°C)&#10;SSP5-8.5: Pessimistisch (hohe Emissionen, ~4–5°C)"
+              data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">?</span>
+          </label>
+          <select id="inp-scenario">
+            <option value="SSP1-2.6">🟢 SSP1-2.6 · Optimistic</option>
+            <option value="SSP2-4.5" selected>🟡 SSP2-4.5 · Moderate</option>
+            <option value="SSP5-8.5">🔴 SSP5-8.5 · High emissions</option>
           </select>
-          <span id="sector-warning" class="sector-warning tooltip-trigger" title="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-en="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-pt="O setor 'General' usa limites padrão. Selecione Agricultura, Finanças, etc. para recomendações ESG mais precisas." data-tooltip-es="El sector 'General' usa umbrales predeterminados. Seleccione Agricultura, Finanzas, etc. para recomendaciones ESG más precisas." data-tooltip-fr="Le secteur 'General' utilise des seuils par défaut. Sélectionnez Agriculture, Finance, etc. pour des recommandations ESG plus précises." data-tooltip-de="Der Sektor 'General' verwendet Standardgrenzwerte. Wählen Sie Landwirtschaft, Finanzen, etc. für genauere ESG-Empfehlungen.">⚠️</span>
+        </div>
+        <div class="action-row">
+          <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
+          <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
         </div>
       </div>
-      <div class="field-group">
-        <label id="t-scenario">Scenario
-          <span class="tooltip-trigger"
-            data-tooltip-en="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)"
-            data-tooltip-pt="Cenário de emissões IPCC para projeções futuras:&#10;SSP1-2.6: Otimista (forte ação climática, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas atuais, ~2–3°C)&#10;SSP5-8.5: Pessimista (altas emissões, ~4–5°C)"
-            data-tooltip-es="Escenario de emisiones IPCC para proyecciones futuras:&#10;SSP1-2.6: Optimista (acción climática fuerte, ~1,5°C)&#10;SSP2-4.5: Moderado (políticas actuales, ~2–3°C)&#10;SSP5-8.5: Pesimista (altas emisiones, ~4–5°C)"
-            data-tooltip-fr="Scénario d'émissions du GIEC pour les projections futures:&#10;SSP1-2.6: Optimiste (action climatique forte, ~1,5°C)&#10;SSP2-4.5: Modéré (politiques actuelles, ~2–3°C)&#10;SSP5-8.5: Pessimiste (émissions élevées, ~4–5°C)"
-            data-tooltip-de="IPCC-Emissionsszenario für zukünftige Projektionen:&#10;SSP1-2.6: Optimistisch (starke Klimaschutzmaßnahmen, ~1,5°C)&#10;SSP2-4.5: Moderat (aktuelle Richtlinien, ~2–3°C)&#10;SSP5-8.5: Pessimistisch (hohe Emissionen, ~4–5°C)"
-            data-tooltip="IPCC emissions scenario for future projections:&#10;SSP1-2.6: Optimistic (strong climate action, ~1.5°C)&#10;SSP2-4.5: Moderate (current policies, ~2–3°C)&#10;SSP5-8.5: Pessimistic (high emissions, ~4–5°C)">?</span>
-        </label>
-        <select id="inp-scenario">
-          <option value="SSP1-2.6">🟢 SSP1-2.6 · Optimistic</option>
-          <option value="SSP2-4.5" selected>🟡 SSP2-4.5 · Moderate</option>
-          <option value="SSP5-8.5">🔴 SSP5-8.5 · High emissions</option>
-        </select>
-      </div>
-      <button class="refresh-btn" onclick="resetForm()" title="Reset form / Limpar formulário">↺</button>
-      <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
     </div>
     <div class="presets">
       <button class="preset-btn" onclick="setPreset(-15.7801,-47.9292,'Brasília, Brazil')">Brasília</button>
@@ -2434,7 +2477,84 @@ function checkCookieConsent() {
 }
 
 /* ── History Management ──────────────────────────────────────────────────── */
+const RECENT_ANALYSES_STORAGE_KEY = 'agentic_esg_recent_analyses';
+
+function getRecentAnalysesFromStorage() {
+  try {
+    const raw = localStorage.getItem(RECENT_ANALYSES_STORAGE_KEY);
+    const items = raw ? JSON.parse(raw) : [];
+    return Array.isArray(items) ? items : [];
+  } catch (err) {
+    console.warn('Failed to parse recent analyses from localStorage', err);
+    return [];
+  }
+}
+
+function saveRecentAnalysesToStorage(items) {
+  try {
+    localStorage.setItem(RECENT_ANALYSES_STORAGE_KEY, JSON.stringify(items.slice(0, 10)));
+  } catch (err) {
+    console.warn('Failed to save recent analyses to localStorage', err);
+  }
+}
+
+function renderHistoryList(items) {
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+
+  const normalized = (items || [])
+    .slice()
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  if (normalized.length === 0) {
+    historyList.innerHTML = '';
+    document.getElementById('history-section').classList.remove('visible');
+    return;
+  }
+
+  historyList.innerHTML = normalized.map(item => {
+    const date = formatAnalysisTimestamp(item.timestamp);
+    const riskClass = mapRiskClass(item.riskLevel);
+    return `
+      <div class="history-item" data-analysis-id="${item.analysisId}">
+        <div class="history-info">
+          <div class="history-region">${item.location || 'Unknown'}</div>
+          <div class="history-meta">Score: ${item.score}/100 · ${date}</div>
+        </div>
+        <div class="history-risk ${riskClass}">${item.riskLevel?.toUpperCase() || 'LOW'}</div>
+        <button class="history-view-btn" onclick="viewAnalysis('${item.analysisId}')">View</button>
+        <button class="history-remove-btn" onclick="removeRecentAnalysisFromStorage('${item.analysisId}')">✕</button>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('history-section').classList.add('visible');
+}
+
+function addRecentAnalysisToStorage(item) {
+  if (!item?.analysisId) return;
+  const existing = getRecentAnalysesFromStorage().filter(i => i.analysisId !== item.analysisId);
+  existing.unshift(item);
+  saveRecentAnalysesToStorage(existing);
+  renderHistoryList(existing);
+}
+
+function removeRecentAnalysisFromStorage(analysisId) {
+  const filtered = getRecentAnalysesFromStorage().filter(item => item.analysisId !== analysisId);
+  saveRecentAnalysesToStorage(filtered);
+  renderHistoryList(filtered);
+}
+
+function formatAnalysisTimestamp(timestamp) {
+  return new Date(timestamp).toLocaleString();
+}
+
+function mapRiskClass(level) {
+  return (level || 'low').toLowerCase();
+}
+
 async function loadHistory() {
+  renderHistoryList(getRecentAnalysesFromStorage());
   if (!COOKIES_ACCEPTED || !SESSION_ID) return;
   
   try {
@@ -2445,25 +2565,28 @@ async function loadHistory() {
     if (!response.ok) return;
     
     const analyses = await response.json();
-    if (analyses.length === 0) return;
-    
-    const historyList = document.getElementById('history-list');
-    historyList.innerHTML = analyses.map(a => {
-      const date = new Date(a.created_at).toLocaleString();
-      const riskClass = a.risk_level.toLowerCase();
-      return `
-        <div class="history-item">
-          <div class="history-info">
-            <div class="history-region">${a.region_label || 'Unknown'}</div>
-            <div class="history-meta">Score: ${a.risk_score}/100 · ${date}</div>
-          </div>
-          <div class="history-risk ${riskClass}">${a.risk_level.toUpperCase()}</div>
-          <button class="history-view-btn" onclick="viewAnalysis('${a.analysis_id}')">View</button>
-        </div>
-      `;
-    }).join('');
-    
-    document.getElementById('history-section').classList.add('visible');
+    if (!analyses || analyses.length === 0) return;
+
+    const serverItems = analyses.map(a => ({
+      analysisId: a.analysis_id,
+      location: a.region_label || 'Unknown',
+      score: a.risk_score || 0,
+      riskLevel: a.risk_level || 'low',
+      timestamp: a.created_at || new Date().toISOString()
+    }));
+
+    const localItems = getRecentAnalysesFromStorage();
+    const merged = [...serverItems, ...localItems];
+    const unique = [];
+    const seen = new Set();
+    merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(entry => {
+      if (!seen.has(entry.analysisId)) {
+        seen.add(entry.analysisId);
+        unique.push(entry);
+      }
+    });
+
+    renderHistoryList(unique.slice(0, 10));
   } catch (err) {
     console.error('Failed to load history:', err);
   }
@@ -3019,7 +3142,15 @@ async function runAnalysis() {
     const data = await res.json();
     _currentId = data.analysis_id;
     renderResults(data);
-    
+
+    addRecentAnalysisToStorage({
+      analysisId: data.analysis_id,
+      location: data.region_label || label || 'Unknown',
+      score: data.risk_score || 0,
+      riskLevel: data.risk_level || 'low',
+      timestamp: data.created_at || new Date().toISOString()
+    });
+
     // Reload history after successful analysis
     if (COOKIES_ACCEPTED && SESSION_ID) {
       setTimeout(() => loadHistory(), 1000);
@@ -3984,6 +4115,7 @@ function _updateScoreCardRiskClass() {
 
 /* Initialize gate on page load — cookie consent deferred until gate passes */
 window.addEventListener('DOMContentLoaded', () => {
+  renderHistoryList(getRecentAnalysesFromStorage());
   initGate();
 });
 
