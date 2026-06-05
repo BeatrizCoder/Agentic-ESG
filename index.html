@@ -433,15 +433,30 @@
     #comparison-results { display: none; max-width: 860px; margin: 1rem auto; padding: 0 1rem; }
 
     /* ── Sector hint ──────────────────────────────────────────────────────── */
+    .sector-field-row {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    .sector-field-row select {
+      min-width: 220px;
+      flex: 1;
+    }
     .sector-hint {
-      font-size: .68rem;
+      display: inline-flex;
+      align-items: center;
+      font-size: .74rem;
       color: var(--muted);
-      font-style: italic;
-      margin-top: .25rem;
-      padding: .3rem .5rem;
+      padding: .6rem .8rem;
       background: var(--bg3);
-      border-radius: 6px;
-      border-left: 2px solid var(--terra);
+      border-radius: 10px;
+      border-left: 3px solid var(--terra);
+      max-width: 280px;
+      line-height: 1.4;
+    }
+    .sector-hint span {
+      display: inline;
     }
 
     /* ── Batch modal ──────────────────────────────────────────────────────── */
@@ -1857,19 +1872,21 @@
             data-tooltip-de="Ihr Industriesektor. Jeder Sektor hat unterschiedliche Klimarisikoschwellen und ESG-Compliance-Prioritäten. Die Landwirtschaft ist empfindlicher gegenüber Dürre. Finanzen konzentrieren sich auf Portfolios und gestrandete Vermögenswerte. Immobilien priorisieren Überschwemmungs- und physische Vermögensrisiken."
             data-tooltip="Your industry sector. Each sector has different climate risk thresholds and ESG compliance priorities. Agriculture is more sensitive to drought. Finance focuses on portfolio and stranded assets. Real Estate prioritizes flood and physical asset risk.">?</span>
         </label>
-        <select id="inp-sector">
-          <option value="General" selected>General</option>
-          <option value="Real Estate">Real Estate</option>
-          <option value="Agriculture & Food">Agriculture &amp; Food</option>
-          <option value="Infrastructure">Infrastructure</option>
-          <option value="Manufacturing">Manufacturing</option>
-          <option value="Finance & Banking">Finance &amp; Banking</option>
-          <option value="Energy & Utilities">Energy &amp; Utilities</option>
-          <option value="Retail & Logistics">Retail &amp; Logistics</option>
-        </select>
-        <div id="sector-hint" class="sector-hint" style="display:none">
-          <span id="sector-hint-en">💡 General analysis — select your industry sector for more precise ESG recommendations</span>
-          <span id="sector-hint-pt" style="display:none">💡 Análise generalista — selecione seu setor para recomendações ESG mais precisas</span>
+        <div class="sector-field-row">
+          <select id="inp-sector">
+            <option value="General" selected>General</option>
+            <option value="Real Estate">Real Estate</option>
+            <option value="Agriculture & Food">Agriculture &amp; Food</option>
+            <option value="Infrastructure">Infrastructure</option>
+            <option value="Manufacturing">Manufacturing</option>
+            <option value="Finance & Banking">Finance &amp; Banking</option>
+            <option value="Energy & Utilities">Energy &amp; Utilities</option>
+            <option value="Retail & Logistics">Retail &amp; Logistics</option>
+          </select>
+          <div id="sector-hint" class="sector-hint" style="display:none">
+            <span id="sector-hint-en">💡 General mode selected. Choose your sector for more precise, sector-specific ESG recommendations.</span>
+            <span id="sector-hint-pt" style="display:none">💡 Modo geral selecionado. Escolha seu setor para recomendações ESG mais precisas e específicas.</span>
+          </div>
         </div>
       </div>
       <div class="field-group">
