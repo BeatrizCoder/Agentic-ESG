@@ -109,8 +109,8 @@
 <text x="402" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">EU AI Act Art. 13</text>
 
 <rect x="480" y="666" width="124" height="52" rx="8" fill="rgb(234,243,222)" stroke="rgb(59,109,17)" stroke-width="0.5"/>
-<text x="542" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Batch upload</text>
-<text x="542" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">CSV · 20 regions</text>
+<text x="542" y="688" text-anchor="middle" style="fill:rgb(39,80,10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Batch upload / CSV</text>
+<text x="542" y="706" text-anchor="middle" style="fill:rgb(59,109,17);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">CSV import · 20 regions</text>
 
 <!-- ── LEGEND ── -->
 <line x1="40" y1="760" x2="640" y2="760" stroke="rgba(31,30,29,0.15)" stroke-width="0.5"/>
