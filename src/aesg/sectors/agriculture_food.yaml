@@ -20,4 +20,12 @@ focus_articles:
   - "ISSB S2 paragraph 10b (physical risks)"
 recommendation_tone: "agricultural operations"
 
+# Drought severity bands (sector-specific)
+drought_thresholds:
+  low: "0-25"      # mais sensível à seca
+  medium: "26-45"
+  high: "46-65"
+  critical: "66-100"
+  regulatory_basis: "ESRS E3-4 water materiality"
+
 # Made with Bob
