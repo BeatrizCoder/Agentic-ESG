@@ -3253,17 +3253,20 @@ function renderResults(data) {
 
       const droughtEl = document.getElementById('chart-drought-delta');
       if (droughtEl) {
-        // Visual classification thresholds (display-only):
-        // LOW: 0-30, MEDIUM: 31-55, HIGH: 56-75, CRITICAL: 76-100
-        const level = droughtScore > 75 ? 'CRITICAL'
-          : droughtScore > 55 ? 'HIGH'
-          : droughtScore > 30 ? 'MEDIUM' : 'LOW';
+        const sectorName = (data.sector || document.getElementById('inp-sector')?.value || '').trim().toLowerCase();
+        const isAgriculture = sectorName === 'agriculture & food';
+        const level = isAgriculture
+          ? (droughtScore > 65 ? 'CRITICAL'
+            : droughtScore > 45 ? 'HIGH'
+            : droughtScore > 25 ? 'MEDIUM' : 'LOW')
+          : (droughtScore > 75 ? 'CRITICAL'
+            : droughtScore > 55 ? 'HIGH'
+            : droughtScore > 30 ? 'MEDIUM' : 'LOW');
         droughtEl.textContent = level;
-        // class mapping: CRITICAL -> up critical, HIGH -> up high, MEDIUM -> warn medium, LOW -> down low
         droughtEl.className = `chart-item-delta ${
-          droughtScore > 75 ? 'up critical' :
-          droughtScore > 55 ? 'up high' :
-          droughtScore > 30 ? 'warn medium' : 'down low'
+          isAgriculture
+            ? (droughtScore > 65 ? 'up critical' : droughtScore > 45 ? 'up high' : droughtScore > 25 ? 'warn medium' : 'down low')
+            : (droughtScore > 75 ? 'up critical' : droughtScore > 55 ? 'up high' : droughtScore > 30 ? 'warn medium' : 'down low')
         }`;
       }
       

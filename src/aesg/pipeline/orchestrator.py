@@ -480,7 +480,7 @@ async def run_analysis(
         logger.warning("Could not load sector profile for %r: %s. Using default thresholds.", sector, e)
         sector_thresholds = None
     
-    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds)
+    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds, sector)
     logger.info(
         "Step 2a/5 — Climate Engine: drought=%.1f heat_stress=%.1f flood=%.1f urgency=%s",
         climate_metrics.get("drought_score", 0),
@@ -764,7 +764,7 @@ async def run_comparison_pipeline(
     except Exception:
         sector_thresholds = None
     
-    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds)
+    climate_metrics = calculate_climate_risk(unified_records, sector_thresholds, sector)
 
     from ..agents.crews import run_climate_analysis_crew
     climate_task_input = json.dumps({

@@ -1,7 +1,7 @@
 """Deterministic climate risk engine. No LLM — pure arithmetic."""
 
 
-def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None = None) -> dict:
+def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None = None, sector: str = "General") -> dict:
     """
     Deterministic climate risk calculation. No LLM.
     
@@ -9,6 +9,7 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         annual_records: List of annual climate records
         sector_thresholds: Optional dict with drought_critical, heat_critical, flood_critical
                           If None, uses default thresholds (45, 50, 40)
+        sector: Optional sector name used for drought urgency classification.
     
     Returns:
         Dictionary with climate risk metrics and scores
@@ -135,16 +136,29 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         flood_score > thresholds["flood_critical"]
     )
     
-    # Map urgency using platform drought bands (display/labels):
-    # LOW: 0-30, MEDIUM: 31-55, HIGH: 56-75, CRITICAL: 76-100
-    if is_critical or max_score > 75:
+    platform_sector = (sector or "").strip().lower()
+    const_agriculture = platform_sector == "agriculture & food" or platform_sector == "agriculture"
+
+    if is_critical:
         urgency = "CRITICAL"
-    elif max_score > 55:
-        urgency = "HIGH"
-    elif max_score > 30:
-        urgency = "MEDIUM"
+    elif const_agriculture:
+        if drought_score > 65:
+            urgency = "CRITICAL"
+        elif drought_score > 45:
+            urgency = "HIGH"
+        elif drought_score > 25:
+            urgency = "MEDIUM"
+        else:
+            urgency = "LOW"
     else:
-        urgency = "LOW"
+        if drought_score > 75:
+            urgency = "CRITICAL"
+        elif drought_score > 55:
+            urgency = "HIGH"
+        elif drought_score > 30:
+            urgency = "MEDIUM"
+        else:
+            urgency = "LOW"
 
     return {
         # Trends
