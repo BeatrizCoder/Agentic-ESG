@@ -482,26 +482,21 @@
       display: inline;
     }
     .sector-warning {
-      color: #e67e22; /* orange */
-      font-size: 1.2rem;
-      margin-left: 8px;
-      vertical-align: middle;
       cursor: help;
       display: none;
       position: relative;
     }
-    .sector-warning:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: 150%;
-      left: 0;
-      background: #333;
-      color: #fff;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      white-space: nowrap;
-      z-index: 1000;
+    /* Override tooltip-trigger badge styles — warning is an emoji, not a badge */
+    #sector-warning {
+      width: auto;
+      height: auto;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      color: #e67e22;
+      font-size: 1.1rem;
+      margin-left: 0;
+      vertical-align: middle;
     }
 
     /* ── Batch modal ──────────────────────────────────────────────────────── */
@@ -1945,7 +1940,7 @@
               <option value="Energy & Utilities">Energy &amp; Utilities</option>
               <option value="Retail & Logistics">Retail &amp; Logistics</option>
             </select>
-            <span id="sector-warning" class="sector-warning tooltip-trigger" title="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-en="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-pt="O setor 'General' usa limites padrão. Selecione Agricultura, Finanças, etc. para recomendações ESG mais precisas." data-tooltip-es="El sector 'General' usa umbrales predeterminados. Seleccione Agricultura, Finanzas, etc. para recomendaciones ESG más precisas." data-tooltip-fr="Le secteur 'General' utilise des seuils par défaut. Sélectionnez Agriculture, Finance, etc. pour des recommandations ESG plus précises." data-tooltip-de="Der Sektor 'General' verwendet Standardgrenzwerte. Wählen Sie Landwirtschaft, Finanzen, etc. für genauere ESG-Empfehlungen.">⚠️</span>
+            <span id="sector-warning" class="sector-warning tooltip-trigger" data-tooltip="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-en="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations." data-tooltip-pt="O setor 'General' usa limites padrão. Selecione Agricultura, Finanças, etc. para recomendações ESG mais precisas." data-tooltip-es="El sector 'General' usa umbrales predeterminados. Seleccione Agricultura, Finanzas, etc. para recomendaciones ESG más precisas." data-tooltip-fr="Le secteur 'General' utilise des seuils par défaut. Sélectionnez Agriculture, Finance, etc. pour des recommandations ESG plus précises." data-tooltip-de="Der Sektor 'General' verwendet Standardgrenzwerte. Wählen Sie Landwirtschaft, Finanzen, etc. für genauere ESG-Empfehlungen.">⚠️</span>
           </div>
         </div>
         <div class="field-group">
