@@ -80,10 +80,10 @@ Location Input (lat/lon)
 └───────────────────────────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────────────────────────┐
-│ Agent 2: Climate Analyst (Claude Haiku 4.5)              │
-│   • Detects trends: warming rate, precipitation shifts   │
+│ Agent 2: Climate Interpreter (Claude Haiku 4.5)           │
+│   • Synthesises climate metrics into executive language  │
 │   • Identifies anomalies: extreme years, heat stress     │
-│   • Calculates risks: drought, flood, heat stress        │
+│   • Highlights drought, flood, and heat risk context     │
 └───────────────────────────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────────────────────────┐

@@ -45,9 +45,9 @@
 <text x="56" y="288" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">AI agent pipeline · CrewAI · Sequential</text>
 
 <rect x="60" y="298" width="168" height="56" rx="8" fill="rgb(238,237,254)" stroke="rgb(83,74,183)" stroke-width="0.5"/>
-<text x="144" y="320" text-anchor="middle" style="fill:rgb(60,52,137);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Climate Analyst</text>
+<text x="144" y="320" text-anchor="middle" style="fill:rgb(60,52,137);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:500">Climate Interpreter</text>
 <text x="144" y="338" text-anchor="middle" style="fill:rgb(83,74,183);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Agent 2 · Haiku 4.5</text>
-<text x="144" y="366" text-anchor="middle" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">Trends · anomalies · drought</text>
+<text x="144" y="366" text-anchor="middle" style="fill:rgb(61,61,58);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px">2-3 sentence synthesis · risks</text>
 
 <line x1="228" y1="326" x2="248" y2="326" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
 
