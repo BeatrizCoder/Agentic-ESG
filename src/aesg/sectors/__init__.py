@@ -109,9 +109,13 @@ def get_sector_context(sector: str) -> str:
     
     thresholds = config.get("risk_thresholds", {})
     if thresholds:
-        context_parts.append(f"- Drought becomes CRITICAL when score > {thresholds.get('drought_critical', 45)}")
-        context_parts.append(f"- Heat stress becomes CRITICAL when score > {thresholds.get('heat_critical', 50)}")
-        context_parts.append(f"- Flood becomes CRITICAL when score > {thresholds.get('flood_critical', 40)}")
+        # Provide the frontend visual classification bands as the authoritative
+        # labels for reports (display-only). Agents should use these bands when
+        # producing human-facing labels and badge text. Sector-specific numeric
+        # thresholds are used internally for urgency calculations only and
+        # should NOT be printed as 'critical threshold = X' in reports.
+        context_parts.append("- Visual classification bands for Drought Score (display-only): LOW: 0-30, MEDIUM: 31-50, HIGH: 51-70, CRITICAL: 71-100")
+        context_parts.append("- Use sector-specific numeric thresholds for internal urgency logic only (do not include these numbers in the report text).")
     
     context_parts.append("")
     context_parts.append("PRIMARY FRAMEWORKS FOR THIS SECTOR:")

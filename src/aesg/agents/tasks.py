@@ -130,7 +130,7 @@ MAPPING RULES:
 - flood_risk → ESRS E1 and EU Taxonomy climate change adaptation
 - ISSB S2 chronic = temperature/precipitation trends; acute = anomaly years
 - compliance_urgency must be at least "high" if drought_risk or heat_stress_risk is high/critical
-- Use the sector-specific risk thresholds above to determine when risks become CRITICAL
+- Use the frontend visual classification bands (LOW: 0-30, MEDIUM: 31-50, HIGH: 51-70, CRITICAL: 71-100) when assigning `risk_level` and `risk_badge_label` in the report. Do NOT print internal sector numeric thresholds (they are for internal urgency logic only).
 - Prioritize the primary frameworks listed for this sector
 - Focus on the key sector-specific risks when mapping compliance obligations
 
