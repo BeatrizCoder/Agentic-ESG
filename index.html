@@ -458,6 +458,14 @@
     .sector-hint span {
       display: inline;
     }
+    .sector-warning {
+      color: #e67e22; /* orange */
+      font-size: 1.2rem;
+      margin-left: 8px;
+      vertical-align: middle;
+      cursor: help;
+      display: none;
+    }
 
     /* ── Batch modal ──────────────────────────────────────────────────────── */
     .modal-box-wide { max-width: 780px !important; }
@@ -1883,10 +1891,7 @@
             <option value="Energy & Utilities">Energy &amp; Utilities</option>
             <option value="Retail & Logistics">Retail &amp; Logistics</option>
           </select>
-          <div id="sector-hint" class="sector-hint" style="display:none">
-            <span id="sector-hint-en">💡 General mode selected. Choose your sector for more precise, sector-specific ESG recommendations.</span>
-            <span id="sector-hint-pt" style="display:none">💡 Modo geral selecionado. Escolha seu setor para recomendações ESG mais precisas e específicas.</span>
-          </div>
+          <span id="sector-warning" class="sector-warning" title="General sector uses default thresholds. Select Agriculture, Finance, etc. for more precise ESG recommendations.">⚠️</span>
         </div>
       </div>
       <div class="field-group">
@@ -2694,18 +2699,7 @@ function setLang(l) {
     if (tt) el.setAttribute('data-tooltip', tt);
   });
 
-  // Update sector hint language
-  const sectorHintEn = document.getElementById('sector-hint-en');
-  const sectorHintPt = document.getElementById('sector-hint-pt');
-  if (sectorHintEn && sectorHintPt) {
-    if (l === 'pt') {
-      sectorHintEn.style.display = 'none';
-      sectorHintPt.style.display = 'inline';
-    } else {
-      sectorHintEn.style.display = 'inline';
-      sectorHintPt.style.display = 'none';
-    }
-  }
+  // sector hint replaced by a compact warning icon; no language toggle needed
 
   setGlossaryLang(l);
 }
@@ -2736,35 +2730,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inp-lat-manual').addEventListener('input', _syncManualCoords);
   document.getElementById('inp-lon-manual').addEventListener('input', _syncManualCoords);
 
-  // Sector hint visibility logic
+  // Sector warning visibility logic (compact icon with native tooltip)
   const sectorSelect = document.getElementById('inp-sector');
-  const sectorHint = document.getElementById('sector-hint');
-  const sectorHintEn = document.getElementById('sector-hint-en');
-  const sectorHintPt = document.getElementById('sector-hint-pt');
+  const sectorWarning = document.getElementById('sector-warning');
   
-  function updateSectorHint() {
-    if (sectorSelect && sectorHint) {
-      const isGeneral = sectorSelect.value === 'General';
-      sectorHint.style.display = isGeneral ? 'block' : 'none';
-      
-      // Update hint text based on current language
-      const currentLang = document.documentElement.lang || 'en';
-      if (sectorHintEn && sectorHintPt) {
-        if (currentLang === 'pt') {
-          sectorHintEn.style.display = 'none';
-          sectorHintPt.style.display = 'inline';
-        } else {
-          sectorHintEn.style.display = 'inline';
-          sectorHintPt.style.display = 'none';
-        }
-      }
-    }
+  function updateSectorWarning() {
+    if (!sectorSelect || !sectorWarning) return;
+    const isGeneral = sectorSelect.value === 'General';
+    sectorWarning.style.display = isGeneral ? 'inline-block' : 'none';
   }
-  
+
   if (sectorSelect) {
-    sectorSelect.addEventListener('change', updateSectorHint);
-    // Show hint on page load if General is selected
-    updateSectorHint();
+    sectorSelect.addEventListener('change', updateSectorWarning);
+    // Show warning on page load if General is selected
+    updateSectorWarning();
   }
 });
 
