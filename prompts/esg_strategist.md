@@ -48,3 +48,9 @@ Rules:
 - If soil_moisture_mean_m3m3 < 0.20 or soil_moisture_trend is negative → add ESRS E4-6 (soil degradation / biodiversity) to csrd_articles
 - If both high ET0 and low soil moisture → add EU Taxonomy Do No Significant Harm (DNSH) water stress screening criteria to eu_taxonomy_criteria
 - lgpd_note is always the fixed string above — this analysis uses only aggregated climate data
+
+Platform thresholds (IMPORTANT):
+
+- Use these drought severity thresholds explicitly when mapping drought scores to labels:
+  - LOW 0-30, MEDIUM 31-55, HIGH 56-75, CRITICAL 76-100.
+- These are the platform's standard thresholds. Do not invent different threshold numbers.

@@ -18,7 +18,7 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
     
     # Default thresholds (General sector)
     thresholds = {
-        "drought_critical": 45,
+        "drought_critical": 75,
         "heat_critical": 50,
         "flood_critical": 40,
     }
@@ -135,11 +135,13 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         flood_score > thresholds["flood_critical"]
     )
     
-    if is_critical or max_score > 70:
+    # Map urgency using platform drought bands (display/labels):
+    # LOW: 0-30, MEDIUM: 31-55, HIGH: 56-75, CRITICAL: 76-100
+    if is_critical or max_score > 75:
         urgency = "CRITICAL"
-    elif max_score > 45:
+    elif max_score > 55:
         urgency = "HIGH"
-    elif max_score > 25:
+    elif max_score > 30:
         urgency = "MEDIUM"
     else:
         urgency = "LOW"
