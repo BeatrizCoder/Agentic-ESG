@@ -14,7 +14,7 @@ from ..core.config import limiter
 from ..db.mongo import delete_analysis as _db_delete
 from ..db.mongo import get_analysis as _db_get
 from ..db.mongo import get_recent_analyses, get_session_history, save_analysis
-from ..pipeline.orchestrator import run_analysis
+from ..pipeline.orchestrator import run_analysis, run_comparison_pipeline
 from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult, CompareRequest
 
 logger = logging.getLogger(__name__)
@@ -243,17 +243,17 @@ _BATCH_MAX_ROWS = 5
 _BATCH_MAX_FILE_BYTES = 1_000_000  # 1 MB
 _BATCH_REQUIRED_COLS = {"region", "latitude", "longitude"}
 _BATCH_TEMPLATE_CSV = (
-    "region,latitude,longitude,sector,scenario\n"
-    "São Paulo Brazil,-23.5505,-46.6333,General,SSP2-4.5\n"
-    "Brasília Brazil,-15.7801,-47.9292,General,SSP2-4.5\n"
-    "Berlin Germany,52.5200,13.4050,General,SSP1-2.6\n"
-    "Amsterdam Netherlands,52.3676,4.9041,General,SSP1-2.6\n"
-    "Lagos Nigeria,6.5244,3.3792,General,SSP5-8.5\n"
-    "Mumbai India,19.0760,72.8777,General,SSP2-4.5\n"
-    "Sydney Australia,-33.8688,151.2093,General,SSP1-2.6\n"
-    "Buenos Aires Argentina,-34.6037,-58.3816,General,SSP2-4.5\n"
-    "Helsinki Finland,60.1699,24.9384,General,SSP1-2.6\n"
-    "Dubai UAE,25.2048,55.2708,General,SSP5-8.5\n"
+    "region,latitude,longitude,start_year,end_year,compare_start_year,compare_end_year,sector,scenario\n"
+    "São Paulo Brazil,-23.5505,-46.6333,2014,2025,,,General,SSP2-4.5\n"
+    "Brasília Brazil,-15.7801,-47.9292,2014,2025,,,General,SSP2-4.5\n"
+    "Berlin Germany,52.5200,13.4050,2014,2025,,,General,SSP1-2.6\n"
+    "Amsterdam Netherlands,52.3676,4.9041,2014,2025,,,General,SSP1-2.6\n"
+    "Lagos Nigeria,6.5244,3.3792,2014,2025,,,General,SSP5-8.5\n"
+    "Mumbai India,19.0760,72.8777,2014,2025,,,General,SSP2-4.5\n"
+    "Sydney Australia,-33.8688,151.2093,2014,2025,,,General,SSP1-2.6\n"
+    "Buenos Aires Argentina,-34.6037,-58.3816,2014,2025,,,General,SSP2-4.5\n"
+    "Helsinki Finland,60.1699,24.9384,2014,2025,,,General,SSP1-2.6\n"
+    "Dubai UAE,25.2048,55.2708,2014,2025,,,General,SSP5-8.5\n"
 )
 
 # In-memory job store for async batch processing.
@@ -444,35 +444,109 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
             job["completed"] = i + 1
             continue
 
+        compare_start = (row.get("compare_start_year") or "").strip()
+        compare_end   = (row.get("compare_end_year") or "").strip()
+        compare_mode = False
+        compare_start_year = None
+        compare_end_year = None
+        if compare_start and compare_end:
+            try:
+                compare_start_year = int(compare_start)
+                compare_end_year = int(compare_end)
+                if compare_end_year > compare_start_year:
+                    compare_mode = True
+            except (ValueError, TypeError):
+                compare_mode = False
+
         if i > 0:
             await asyncio.sleep(2)  # avoid NASA POWER rate limiting
 
         try:
-            result = await asyncio.wait_for(
-                run_analysis(
-                    latitude=lat, longitude=lon, region_label=region,
-                    start_year=start_year, end_year=end_year,
-                    sector=sector, scenario=scenario,
-                ),
-                timeout=120,
-            )
-            logger.info(f"Saving batch analysis for session: {session_id}")
-            try:
-                await save_analysis(result, session_id=session_id, source="batch")
-                logger.info("Batch analysis saved to history: %s (session=%s)", result.analysis_id, session_id)
-            except Exception as save_exc:
-                logger.warning("Batch save error: %s (analysis=%s session=%s)", save_exc, result.analysis_id, session_id)
+            if compare_mode:
+                p1 = await asyncio.wait_for(
+                    run_comparison_pipeline(
+                        latitude=lat, longitude=lon, region_label=region,
+                        sector=sector,
+                        start_year=compare_start_year, end_year=compare_end_year,
+                    ),
+                    timeout=120,
+                )
+                await asyncio.sleep(2)
+                p2 = await asyncio.wait_for(
+                    run_comparison_pipeline(
+                        latitude=lat, longitude=lon, region_label=region,
+                        sector=sector,
+                        start_year=start_year, end_year=end_year,
+                    ),
+                    timeout=120,
+                )
+                p1["risk_score"] = _extract_comparison_score(p1) or 0
+                p2["risk_score"] = _extract_comparison_score(p2) or 0
+                s1 = p1["risk_score"]
+                s2 = p2["risk_score"]
+                delta = {
+                    "risk_score": s1 - s2,
+                    "temp_mean": round((p1.get("temp_mean") or 0) - (p2.get("temp_mean") or 0), 2),
+                    "temp_trend": round((p1.get("temp_trend") or 0) - (p2.get("temp_trend") or 0), 3),
+                    "precip_trend": (
+                        round((p1.get("precip_trend") or 0) - (p2.get("precip_trend") or 0), 1)
+                        if p1.get("precip_trend") is not None and p2.get("precip_trend") is not None
+                        else None
+                    ),
+                    "drought_score": round((p1.get("drought_score") or 0) - (p2.get("drought_score") or 0), 1),
+                }
+                result = {"period_1": p1, "period_2": p2, "delta": delta}
+            else:
+                result = await asyncio.wait_for(
+                    run_analysis(
+                        latitude=lat, longitude=lon, region_label=region,
+                        start_year=start_year, end_year=end_year,
+                        sector=sector, scenario=scenario,
+                    ),
+                    timeout=120,
+                )
 
-            job["results"].append({
-                "region": region, "latitude": lat, "longitude": lon,
-                "sector": sector, "scenario": scenario,
-                "risk_score": result.risk_score, "risk_level": result.risk_level,
-                "investment_status": _inv_label(result.risk_score),
-                "confidence_score": result.confidence_score,
-                "analysis_id": result.analysis_id,
-                "status": "completed", "error": "",
-            })
-            logger.info("Batch %s row %d/%d done: %r score=%d", job_id, i + 1, job["total"], region, result.risk_score)
+            if compare_mode:
+                p2 = result.get("period_2", {})
+                risk_score = p2.get("risk_score", 0) or 0
+                risk_level = p2.get("risk_level", "")
+                investment_status = _inv_label(risk_score)
+                job["results"].append({
+                    "region": region, "latitude": lat, "longitude": lon,
+                    "sector": sector, "scenario": scenario,
+                    "risk_score": risk_score, "risk_level": risk_level,
+                    "investment_status": investment_status,
+                    "confidence_score": 0,
+                    "analysis_id": "",
+                    "comparison_mode": True,
+                    "period_1": result.get("period_1"),
+                    "period_2": result.get("period_2"),
+                    "delta": result.get("delta"),
+                    "status": "completed", "error": "",
+                })
+                logger.info("Batch %s row %d/%d done: %r comparison mode", job_id, i + 1, job["total"], region)
+            else:
+                logger.info(f"Saving batch analysis for session: {session_id}")
+                try:
+                    await save_analysis(result, session_id=session_id, source="batch")
+                    logger.info("Batch analysis saved to history: %s (session=%s)", result.analysis_id, session_id)
+                except Exception as save_exc:
+                    logger.warning("Batch save error: %s (analysis=%s session=%s)", save_exc, result.analysis_id, session_id)
+
+                job["results"].append({
+                    "region": region, "latitude": lat, "longitude": lon,
+                    "sector": sector, "scenario": scenario,
+                    "risk_score": result.risk_score, "risk_level": result.risk_level,
+                    "investment_status": _inv_label(result.risk_score),
+                    "confidence_score": result.confidence_score,
+                    "analysis_id": result.analysis_id,
+                    "comparison_mode": False,
+                    "period_1": None,
+                    "period_2": None,
+                    "delta": None,
+                    "status": "completed", "error": "",
+                })
+                logger.info("Batch %s row %d/%d done: %r score=%d", job_id, i + 1, job["total"], region, result.risk_score)
 
         except Exception as exc:
             logger.warning("Batch %s row %d/%d failed: %r error=%s", job_id, i + 1, job["total"], region, exc)
@@ -481,6 +555,10 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                 "sector": sector, "scenario": scenario,
                 "risk_score": 0, "risk_level": "", "investment_status": "",
                 "confidence_score": 0, "analysis_id": "",
+                "comparison_mode": False,
+                "period_1": None,
+                "period_2": None,
+                "delta": None,
                 "status": "error", "error": str(exc)[:200],
             })
             job["failed"] += 1

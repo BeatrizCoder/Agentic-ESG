@@ -147,6 +147,10 @@ class BatchRowResult(BaseModel):
     investment_status: str = ""
     confidence_score: int = 0
     analysis_id: str = ""
+    comparison_mode: bool = False
+    period_1: dict[str, Any] | None = None
+    period_2: dict[str, Any] | None = None
+    delta: dict[str, Any] | None = None
     error: str = ""
     status: str = "completed"  # "completed" | "error"
 

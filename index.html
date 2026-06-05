@@ -4473,12 +4473,17 @@ function _renderBatchResults(data) {
       ? `<span style="color:var(--muted);font-size:.7rem">${(r.error || '').substring(0, 45)}</span>`
       : `<span class="risk-badge ${r.risk_level}" style="font-size:.62rem;padding:.12rem .4rem">${r.risk_level.toUpperCase()}</span>`;
 
+    const modeHtml = r.comparison_mode
+      ? `<span style="display:inline-block;padding:.2rem .45rem;border-radius:999px;background:rgba(58,107,53,.12);color:#3a6b35;font-size:.65rem;font-weight:600;">Comparison Mode</span>`
+      : '';
+
     const viewHtml = (!isErr && r.analysis_id)
       ? `<button class="batch-view-btn" onclick="viewBatchAnalysis('${r.analysis_id}')">View Full Report</button>`
       : '';
 
     tr.innerHTML = `
       <td style="font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.region}">${r.region || '—'}</td>
+      <td style="text-align:center">${modeHtml}</td>
       <td style="text-align:center">${scoreHtml}</td>
       <td>${levelHtml}</td>
       <td style="font-size:.72rem;color:var(--text2)">${isErr ? '—' : (r.investment_status || '—')}</td>
@@ -4731,7 +4736,7 @@ function viewBatchAnalysis(analysisId) {
         <table class="batch-table">
           <thead>
             <tr>
-              <th>Region</th><th>Score</th><th>Risk Level</th>
+              <th>Region</th><th>Mode</th><th>Score</th><th>Risk Level</th>
               <th>Investment Status</th><th>Conf.</th><th></th>
             </tr>
           </thead>
