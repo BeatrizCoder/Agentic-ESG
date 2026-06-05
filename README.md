@@ -25,11 +25,23 @@
 
 ## Overview
 
-Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and EU Taxonomy. Traditional climate risk assessments cost $5,000–$50,000 and take weeks. Agentic ESG delivers executive-ready climate risk intelligence in under 30 seconds for ~$0.04 per location — powered by real NASA satellite data, ERA5 reanalysis, and IPCC projections to 2050.
+Organizations face mounting regulatory pressure to assess and disclose physical climate risks under CSRD, ISSB S2, and the EU Taxonomy.
 
-> **Maps physical climate risk to CSRD ESRS E1, ISSB S2, and EU Taxonomy — translating satellite data into compliance-ready business intelligence.**
+**Agentic ESG** provides a fast, data-driven starting point for climate risk intelligence. It combines NASA satellite observations, ERA5 climate reanalysis, and IPCC climate projections through a multi-agent AI architecture to deliver executive-ready climate risk assessments in under 30 seconds.
 
-**Built for:** ESG analysts, sustainability officers, investment managers, and compliance teams who need fast, data-driven climate risk intelligence.
+> ⚠️ **Important Disclaimer** **Agentic ESG** is a **decision-support system**, not a substitute for professional climate risk advisory, legal interpretation, or regulatory reporting. All outputs include a confidence score and should be reviewed by qualified subject matter experts before being used in investment decisions, sustainability disclosures, or regulatory filings.
+
+Agentic ESG maps physical climate risks to:
+
+- **CSRD (ESRS E1)**
+- **ISSB S2**
+- **EU Taxonomy**
+
+By translating climate observations and projections into compliance-aware business intelligence, the platform helps ESG analysts, sustainability teams, risk managers, and investment professionals accelerate climate risk screening, double-materiality assessments, and early-stage compliance evaluations.
+
+### ESG Glossary
+
+- Bilingual EN/PT glossary of key ESG and climate terms, now supporting English, Portuguese, German, French, and Spanish in a multilingual glossary.
 
 ---
 
