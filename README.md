@@ -549,15 +549,15 @@ limitations under the License.
 - ✅ Terms of Use and Privacy Policy (scroll-to-accept)
 - ✅ PDF and Excel export
 - ✅ Session history with 30-day TTL (LGPD compliant)
+- ✅ Historical comparison mode — compare climate risk between two time periods for the same location
+- ✅ Custom sector risk profiles (agriculture, real estate, energy)
 
 **Near-term:**
 - [ ] API key authentication for enterprise use
-- ✅ Historical comparison mode — compare climate risk between two time periods for the same location
 - [ ] Batch analysis expanded to 20 regions
 
 **Medium-term:**
 - [ ] Vector database for regulation knowledge base (ChromaDB)
-- [ ] Custom sector risk profiles (agriculture, real estate, energy)
 - [ ] Integration with GIS platforms (ArcGIS, QGIS)
 
 **Long-term:**
