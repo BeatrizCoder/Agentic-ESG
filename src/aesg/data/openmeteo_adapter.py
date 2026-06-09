@@ -332,6 +332,11 @@ async def _fetch_projections(
     precip = daily.get("precipitation_sum",          [])
     et0    = daily.get("et0_fao_evapotranspiration", [])
 
+    logger.info(
+        "Raw projected temp sample (temperature_2m_mean): %s",
+        [t for t in temps[:3] if t is not None],
+    )
+
     # Aggregate to annual means/totals
     annual_temps:   dict[int, list[float]] = {}
     annual_precips: dict[int, list[float]] = {}
@@ -351,12 +356,30 @@ async def _fetch_projections(
     records = [
         ProjectionRecord(
             year=year,
+            # Only compute mean when the year has actual temperature data;
+            # years with only precipitation data must not default to 0°C as
+            # that would artificially depress the projected annual mean.
             temp_mean_c=round(
-                sum(annual_temps.get(year, [0])) / max(len(annual_temps.get(year, [1])), 1), 3
-            ),
+                sum(annual_temps[year]) / len(annual_temps[year]), 3
+            ) if year in annual_temps else 0.0,
             precip_total_mm=round(sum(annual_precips.get(year, [0])), 1),
             evapotranspiration_mm=round(sum(annual_et0.get(year, [0])), 1),
         )
         for year in sorted(set(annual_temps) | set(annual_precips))
     ]
+
+    if records:
+        sample = [(r.year, r.temp_mean_c) for r in records[:3]]
+        logger.info("Aggregated projected temp_mean_c sample: %s", sample)
+        valid_temps = [r.temp_mean_c for r in records if r.temp_mean_c != 0.0]
+        if valid_temps:
+            mean_t = sum(valid_temps) / len(valid_temps)
+            if mean_t < 5.0:
+                logger.warning(
+                    "Projected mean temperature %.2f°C looks low — "
+                    "verify temperature_2m_mean is returned by model %s "
+                    "(lat=%.4f lon=%.4f). Check for fill values or unit issues.",
+                    mean_t, model, latitude, longitude,
+                )
+
     return records, url

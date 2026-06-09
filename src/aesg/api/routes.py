@@ -321,22 +321,25 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
     from ..pipeline.orchestrator import run_comparison_pipeline
 
     try:
-        # Run sequentially with a gap to avoid NASA POWER rate-limiting
-        # concurrent requests from the same coordinates (same pattern as batch)
-        p1 = await asyncio.wait_for(
-            run_comparison_pipeline(
-                latitude=body.latitude, longitude=body.longitude,
-                region_label=body.region_label, sector=body.sector,
-                start_year=body.period_1.start_year, end_year=body.period_1.end_year,
-            ),
-            timeout=90,
-        )
-        await asyncio.sleep(2)
+        # Run historical period (period_2) first so its temp_mean can serve as
+        # the fixed reference baseline for scoring period_1 (recent).  This
+        # ensures both periods are scored against the same absolute anchor
+        # rather than each period's own internal first-3-year baseline.
         p2 = await asyncio.wait_for(
             run_comparison_pipeline(
                 latitude=body.latitude, longitude=body.longitude,
                 region_label=body.region_label, sector=body.sector,
                 start_year=body.period_2.start_year, end_year=body.period_2.end_year,
+            ),
+            timeout=90,
+        )
+        await asyncio.sleep(2)
+        p1 = await asyncio.wait_for(
+            run_comparison_pipeline(
+                latitude=body.latitude, longitude=body.longitude,
+                region_label=body.region_label, sector=body.sector,
+                start_year=body.period_1.start_year, end_year=body.period_1.end_year,
+                reference_temp_mean=p2.get("temp_mean"),
             ),
             timeout=90,
         )
@@ -356,6 +359,12 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
 
     s1 = p1["risk_score"] or 0
     s2 = p2["risk_score"] or 0
+
+    if s1 < s2:
+        logger.warning(
+            "Comparison scores seem inverted: recent=%d < historical=%d for %r",
+            s1, s2, body.region_label,
+        )
     score_delta  = s1 - s2
     temp_delta   = round((p1["temp_mean"] or 0) - (p2["temp_mean"] or 0), 2)
     trend_delta  = round((p1["temp_trend"] or 0) - (p2["temp_trend"] or 0), 3)

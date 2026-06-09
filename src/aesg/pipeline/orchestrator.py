@@ -716,6 +716,7 @@ async def run_comparison_pipeline(
     start_year: int,
     end_year: int,
     sector: str = "General",
+    reference_temp_mean: float | None = None,
 ) -> dict:
     """Lightweight pipeline for comparison mode: Data Collector + Climate Engine + Haiku only.
     Skips ESG Strategist, Report Writer, and Quality Judge for speed (~30s per period).
@@ -798,6 +799,20 @@ async def run_comparison_pipeline(
     elif fl > 45: score += 15
     if tt > 0.5:  score += 5
     if pt < -10:  score += 5
+
+    # When a fixed reference baseline is provided (i.e. the historical period's
+    # mean), add an absolute temperature component so both periods are scored
+    # against the SAME reference rather than each period's own first-3-year
+    # baseline.  Each 1°C above the reference adds up to 8 points of risk.
+    if reference_temp_mean is not None:
+        temp_above_ref = temp_mean - reference_temp_mean
+        absolute_component = int(min(25, max(-15, temp_above_ref * 8)))
+        score += absolute_component
+        logger.info(
+            "Fixed-baseline adjustment: ref_mean=%.2f period_mean=%.2f delta=%.2f component=%+d",
+            reference_temp_mean, temp_mean, temp_above_ref, absolute_component,
+        )
+
     risk_score = min(100, max(0, score))
 
     logger.info(
