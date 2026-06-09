@@ -45,8 +45,9 @@ def validate_annual_record(record: dict, region: str) -> bool:
     return True
 
 
-def validate_final_result(result: dict, region: str) -> dict:
-    issues = []
+def validate_final_result(result: dict, region: str, annual_records: list | None = None) -> dict:
+    issues: list[str] = []
+    warnings: list[str] = []
 
     score = result.get("risk_score", 0)
     if score == 0:
@@ -60,15 +61,20 @@ def validate_final_result(result: dict, region: str) -> dict:
     if len(recs) == 0:
         issues.append("No recommendations generated")
 
-    if issues:
-        logger.warning("validate_final_result %r: %s", region, issues)
-        result["data_quality_issues"] = issues
-        result["confidence_score"] = max(
-            0,
-            min(result.get("confidence_score", 100) - 20 * len(issues), 40),
-        )
-        result["hitl_required"] = True
-        result["hitl_reasons"]  = issues
+    if annual_records is not None:
+        nasa_count = sum(1 for r in annual_records if (r.get("source") if isinstance(r, dict) else getattr(r, "source", "")) == "nasa")
+        if nasa_count < 5:
+            warnings.append(f"Limited NASA data: only {nasa_count} years available — results may be less reliable")
+
+    if issues or warnings:
+        logger.warning("validate_final_result %r issues=%s warnings=%s", region, issues, warnings)
+        if issues:
+            result["data_quality_issues"] = issues
+        penalty = len(issues) * 20 + len(warnings) * 5
+        current_confidence = result.get("confidence_score", 100)
+        result["confidence_score"] = max(current_confidence - penalty, 30)
+        result["hitl_required"] = len(issues) > 0
+        result["hitl_reasons"]  = result.get("hitl_reasons", []) + issues + warnings
 
     return result
 
@@ -763,7 +769,7 @@ async def run_analysis(
         "hitl_required":     hitl_required,
         "hitl_reasons":      hitl_reasons,
     }
-    final = validate_final_result(final, label)
+    final = validate_final_result(final, label, unified_records)
 
     return AnalysisResult(
         analysis_id=analysis_id,

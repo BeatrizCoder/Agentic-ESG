@@ -28,6 +28,46 @@ logger = logging.getLogger(__name__)
 _PARAMETERS = "T2M,PRECTOTCORR,ALLSKY_SFC_SW_DWN,EVPTRNS"
 _FILL_VALUE = -999.0
 
+TEMP_RANGE   = (-5.0, 40.0)
+PRECIP_RANGE = (0.0, 4000.0)
+SOLAR_RANGE  = (0.0, 10.0)
+
+
+def filter_valid_records(records: list, region: str) -> list:
+    """Drop records whose temperature, precipitation, or solar is outside physical bounds."""
+    valid = []
+    discarded = 0
+    total = len(records)
+    for r in records:
+        temp   = float(getattr(r, "temp_mean_celsius", 0) or 0)
+        precip = float(getattr(r, "precip_total_mm",   0) or 0)
+        solar  = float(getattr(r, "solar_mean_kwh_m2", 0) or 0)
+        if temp != 0.0 and not (TEMP_RANGE[0] <= temp <= TEMP_RANGE[1]):
+            logger.warning(
+                "Discarded NASA record for %r year=%s: temp=%.2f°C out of range %s",
+                region, getattr(r, "year", "?"), temp, TEMP_RANGE,
+            )
+            discarded += 1
+            continue
+        if precip != 0.0 and not (PRECIP_RANGE[0] <= precip <= PRECIP_RANGE[1]):
+            logger.warning(
+                "Discarded NASA record for %r year=%s: precip=%.1fmm out of range %s",
+                region, getattr(r, "year", "?"), precip, PRECIP_RANGE,
+            )
+            discarded += 1
+            continue
+        if solar != 0.0 and not (SOLAR_RANGE[0] <= solar <= SOLAR_RANGE[1]):
+            logger.warning(
+                "Discarded NASA record for %r year=%s: solar=%.2f kWh/m² out of range %s",
+                region, getattr(r, "year", "?"), solar, SOLAR_RANGE,
+            )
+            discarded += 1
+            continue
+        valid.append(r)
+    if discarded:
+        logger.warning("%d/%d NASA records discarded for %r due to invalid values", discarded, total, region)
+    return valid
+
 
 @dataclass
 class AnnualClimateRecord:
@@ -135,6 +175,7 @@ async def fetch_climate_data(
 
     raw_parameters = payload["properties"]["parameter"]
     annual_records = _aggregate_by_year(raw_parameters, latitude, longitude)
+    annual_records = filter_valid_records(annual_records, region_label or f"{latitude:.4f},{longitude:.4f}")
 
     total_daily_datapoints = sum(
         len([v for v in raw_parameters.get(p, {}).values() if v != _FILL_VALUE])

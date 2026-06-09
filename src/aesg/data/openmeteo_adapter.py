@@ -18,6 +18,38 @@ _ERA5_URL        = "https://archive-api.open-meteo.com/v1/archive"
 _FORECAST_URL    = "https://api.open-meteo.com/v1/forecast"
 _PROJECTION_URL  = "https://climate-api.open-meteo.com/v1/climate"
 _PROJECTION_MODEL = "EC_Earth3P_HR"  # Default: SSP2-4.5
+
+TEMP_RANGE   = (-5.0, 40.0)
+PRECIP_RANGE = (0.0, 4000.0)
+SOLAR_RANGE  = (0.0, 10.0)
+
+
+def filter_valid_records(records: list, region: str) -> list:
+    """Drop records whose temperature or precipitation is outside physical bounds."""
+    valid = []
+    discarded = 0
+    total = len(records)
+    for r in records:
+        temp   = getattr(r, "temp_mean_c", None) or getattr(r, "temp_mean_celsius", None) or 0.0
+        precip = getattr(r, "precip_total_mm", None) or 0.0
+        if temp != 0.0 and not (TEMP_RANGE[0] <= temp <= TEMP_RANGE[1]):
+            logger.warning(
+                "Discarded record for %r year=%s: temp=%.2f°C out of range %s",
+                region, getattr(r, "year", "?"), temp, TEMP_RANGE,
+            )
+            discarded += 1
+            continue
+        if precip != 0.0 and not (PRECIP_RANGE[0] <= precip <= PRECIP_RANGE[1]):
+            logger.warning(
+                "Discarded record for %r year=%s: precip=%.1fmm out of range %s",
+                region, getattr(r, "year", "?"), precip, PRECIP_RANGE,
+            )
+            discarded += 1
+            continue
+        valid.append(r)
+    if discarded:
+        logger.warning("%d/%d records discarded for %r due to invalid values", discarded, total, region)
+    return valid
 _FILL = -999.0
 
 # IPCC Shared Socioeconomic Pathways (SSP) scenario mapping
@@ -170,6 +202,7 @@ async def fetch_era5_recent(
             for year in sorted(set(annual_temps) | set(annual_precips))
         ]
 
+        records = filter_valid_records(records, f"era5:{latitude:.4f},{longitude:.4f}")
         logger.info(
             "ERA5 fetch: lat=%.4f lon=%.4f period=%s–%s records=%d",
             latitude, longitude, start_date, end_date, len(records),
@@ -384,4 +417,5 @@ async def _fetch_projections(
                     mean_t, model, latitude, longitude,
                 )
 
+    records = filter_valid_records(records, f"projection:{latitude:.4f},{longitude:.4f}")
     return records, url

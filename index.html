@@ -1112,6 +1112,38 @@
       margin-top: .3rem;
     }
 
+    .data-quality-notice {
+      display: flex;
+      gap: .75rem;
+      background: rgba(30,120,180,0.10);
+      border: 1px solid rgba(30,120,180,0.35);
+      border-left: 3px solid #1e78b4;
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      margin-top: .75rem;
+      margin-bottom: 1rem;
+    }
+    .dq-icon { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
+    .dq-title {
+      font-size: .8rem;
+      font-weight: 600;
+      color: #1e78b4;
+      margin-bottom: .2rem;
+    }
+    .dq-desc {
+      font-size: .72rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .dq-list {
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      color: var(--text2);
+      margin: .3rem 0 0 1rem;
+      padding: 0;
+    }
+    .dq-list li { margin-bottom: .15rem; }
+
     .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .5rem; }
     .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .65rem .75rem; min-height: 80px; }
     .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
@@ -2066,6 +2098,14 @@
             <div class="hitl-reason" id="hitl-reason">—</div>
           </div>
         </div>
+        <div class="data-quality-notice" id="data-quality-notice" style="display:none">
+          <span class="dq-icon">🔍</span>
+          <div>
+            <div class="dq-title">Data Quality Notice</div>
+            <div class="dq-desc">Some data quality checks flagged issues. Results may be less reliable than usual.</div>
+            <ul class="dq-list" id="quality-issues-list"></ul>
+          </div>
+        </div>
         <div class="score-meta-grid">
           <div class="score-meta-item">
             <div class="score-meta-label" id="t-temp-delta">Temperature Change</div>
@@ -2970,6 +3010,8 @@ function resetForm() {
   if (cr) cr.style.display = 'none';
   const cn = document.getElementById('comp-note');
   if (cn) cn.style.display = 'none';
+  const dqn = document.getElementById('data-quality-notice');
+  if (dqn) dqn.style.display = 'none';
 }
 
 /* ── Map ─────────────────────────────────────────────────────────────────── */
@@ -3473,6 +3515,15 @@ function renderResults(data) {
 
   /* HITL flag */
   renderHitlFlag(data.hitl_required, data.hitl_reasons);
+
+  /* Data quality notice */
+  const qualityNotice = document.getElementById('data-quality-notice');
+  const qualityList   = document.getElementById('quality-issues-list');
+  const qualityIssues = data.data_quality_issues || [];
+  if (qualityNotice && qualityList) {
+    qualityList.innerHTML = qualityIssues.map(i => `<li>${i}</li>`).join('');
+    qualityNotice.style.display = qualityIssues.length > 0 ? 'flex' : 'none';
+  }
 
   /* offset targets */
   renderOffsetTargets(data.offset_targets);

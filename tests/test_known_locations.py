@@ -219,17 +219,21 @@ def test_validate_final_result_clean():
 
 
 def test_validate_final_result_zero_score():
+    # 1 issue → penalty=20, confidence = max(80-20, 30) = 60
     result = validate_final_result(_good_result(risk_score=0), "Test")
     assert result["hitl_required"] is True
     assert any("zero" in i for i in result["data_quality_issues"])
-    assert result["confidence_score"] <= 40
+    assert result["confidence_score"] < 80   # penalised
+    assert result["confidence_score"] >= 30  # never below floor
 
 
 def test_validate_final_result_short_summary():
+    # 1 issue → penalty=20, confidence = max(80-20, 30) = 60
     result = validate_final_result(_good_result(executive_summary="Too short."), "Test")
     assert result["hitl_required"] is True
     assert any("summary" in i for i in result["data_quality_issues"])
-    assert result["confidence_score"] <= 40
+    assert result["confidence_score"] < 80
+    assert result["confidence_score"] >= 30
 
 
 def test_validate_final_result_no_recs():
@@ -239,31 +243,42 @@ def test_validate_final_result_no_recs():
 
 
 def test_validate_final_result_multiple_issues_caps_confidence():
+    # 3 issues → penalty=60, confidence = max(80-60, 30) = 30
     result = validate_final_result(
         _good_result(risk_score=0, executive_summary="Short.", recommendations=[]),
         "Test",
     )
     assert len(result["data_quality_issues"]) == 3
-    assert result["confidence_score"] <= 40
-    assert result["confidence_score"] >= 0
+    assert result["confidence_score"] == 30
 
 
 def test_validate_final_result_preserves_hitl_from_prior_step():
-    # If hitl was already True from _compute_hitl_flag, reasons are replaced by new issues
+    # Existing hitl_reasons are preserved and new issues appended
     result = validate_final_result(
         _good_result(risk_score=0, hitl_required=True, hitl_reasons=["existing reason"]),
         "Test",
     )
     assert result["hitl_required"] is True
+    assert any("existing reason" in r for r in result["hitl_reasons"])
     assert any("zero" in r for r in result["hitl_reasons"])
 
 
-def test_validate_final_result_confidence_never_negative():
+def test_validate_final_result_confidence_floor():
+    # Even with zero starting confidence and 3 issues, floor is 30
     result = validate_final_result(
         _good_result(risk_score=0, executive_summary="x", recommendations=[], confidence_score=0),
         "Test",
     )
-    assert result["confidence_score"] >= 0
+    assert result["confidence_score"] == 30
+
+
+def test_validate_final_result_limited_nasa_warning():
+    # < 5 NASA records triggers a warning but not HITL
+    records = [{"year": y, "source": "nasa"} for y in range(2020, 2023)]  # 3 records
+    result = validate_final_result(_good_result(), "Test", annual_records=records)
+    assert result["hitl_required"] is False
+    assert result["confidence_score"] < 80  # warning penalty applied
+    assert any("Limited NASA" in r for r in result["hitl_reasons"])
 
 
 # ── IMPOSSIBLE_VALUES coverage ────────────────────────────────────────────────
