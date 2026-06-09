@@ -453,6 +453,15 @@
       line-height: 1.6;
       border-left: 3px solid var(--green);
     }
+    .comp-note {
+      font-size: .68rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: .5rem;
+      padding: .5rem;
+      background: var(--bg3, var(--bg2));
+      border-radius: 6px;
+    }
     #comparison-results { display: none; max-width: 860px; margin: 1rem auto; padding: 0 1rem; }
 
     /* ── Sector hint ──────────────────────────────────────────────────────── */
@@ -2270,6 +2279,10 @@
           <div class="comp-delta" id="comp-drought-delta">—</div>
         </div>
         <div class="comp-interpretation" id="comp-interpretation"></div>
+        <div class="comp-note" id="comp-note" style="display:none">
+          ⓘ Each period's score is calculated against its own historical baseline.
+          Use delta values for trend analysis.
+        </div>
       </div>
     </div>
     </div><!-- #tab-overview -->
@@ -2955,6 +2968,8 @@ function resetForm() {
   _comparisonData = null;
   const cr = document.getElementById('comparison-results');
   if (cr) cr.style.display = 'none';
+  const cn = document.getElementById('comp-note');
+  if (cn) cn.style.display = 'none';
 }
 
 /* ── Map ─────────────────────────────────────────────────────────────────── */
@@ -3279,6 +3294,8 @@ function renderComparison(data) {
   setCompDelta('comp-drought-delta', d.drought_score, true);
 
   document.getElementById('comp-interpretation').textContent = d.interpretation || p1.key_finding || '';
+  const compNote = document.getElementById('comp-note');
+  if (compNote) compNote.style.display = 'block';
 
   _comparisonData = data;
 

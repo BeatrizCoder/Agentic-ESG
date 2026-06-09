@@ -27,7 +27,7 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         thresholds.update(sector_thresholds)
 
     nasa_records = [r for r in annual_records if r.get("source") == "nasa"]
-    calc_records = nasa_records if nasa_records else annual_records
+    calc_records = nasa_records if len(nasa_records) >= 3 else annual_records
 
     temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in calc_records]
     precips = [r.get("precip_total_mm") or 0 for r in calc_records]

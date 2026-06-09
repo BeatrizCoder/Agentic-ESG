@@ -394,6 +394,11 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
             "drought_score": drought_delta,
             "interpretation": interp,
         },
+        "comparison_note": (
+            "Scores calculated independently per period against each period's own baseline. "
+            "Higher score = higher risk relative to that period. "
+            "Use delta values for trend analysis."
+        ),
     }
 
 

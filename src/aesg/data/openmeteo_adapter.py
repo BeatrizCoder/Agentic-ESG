@@ -327,6 +327,8 @@ async def _fetch_projections(
         payload = resp.json()
 
     daily = payload.get("daily", {})
+    logger.info("OpenMeteo fields: %s", list(daily.keys()))
+
     dates  = daily.get("time", [])
     temps  = daily.get("temperature_2m_mean",        [])
     precip = daily.get("precipitation_sum",          [])

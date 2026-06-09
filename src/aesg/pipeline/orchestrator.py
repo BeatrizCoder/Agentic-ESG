@@ -18,6 +18,48 @@ from .climate_engine import calculate_climate_risk
 
 logger = logging.getLogger(__name__)
 
+# ── Data quality ──────────────────────────────────────────────────────────────
+
+IMPOSSIBLE_VALUES: dict[str, tuple[float, float]] = {
+    "temp_mean_celsius":           (-5,   40),
+    "precip_total_mm":             (0,  4000),
+    "solar_mean_kwh_m2":           (0,    10),
+    "temp_trend_c_per_decade":     (-1.5, 1.5),
+    "precip_trend_pct_per_decade": (-40,  40),
+}
+
+
+def validate_annual_record(record: dict, region: str) -> bool:
+    temp   = float(record.get("temp_mean_celsius") or record.get("temp_mean_c") or 0)
+    precip = float(record.get("precip_total_mm") or 0)
+
+    issues = []
+    if temp != 0 and not (-5 <= temp <= 40):
+        issues.append(f"temp={temp}°C impossible")
+    if precip != 0 and not (0 <= precip <= 4000):
+        issues.append(f"precip={precip}mm impossible")
+
+    if issues:
+        logger.error("Invalid data for %r year=%s: %s", region, record.get("year"), issues)
+        return False
+    return True
+
+
+def global_sanity_check(climate_metrics: dict, region: str) -> dict:
+    flags: list[str] = []
+    for field_name, (min_v, max_v) in IMPOSSIBLE_VALUES.items():
+        val = climate_metrics.get(field_name)
+        if val is not None and not (min_v <= val <= max_v):
+            msg = f"{field_name}={val} outside [{min_v}, {max_v}]"
+            flags.append(msg)
+            logger.error("SANITY FAIL %r: %s", region, msg)
+
+    if flags:
+        climate_metrics["sanity_flags"]       = flags
+        climate_metrics["confidence_penalty"] = len(flags) * 15
+
+    return climate_metrics
+
 
 def _climate_summary_for_agents(findings: dict) -> str:
     """Extract the compact key-value fields that downstream agents need."""
@@ -462,6 +504,14 @@ async def run_analysis(
         len(unified_records),
     )
 
+    before = len(unified_records)
+    unified_records = [r for r in unified_records if validate_annual_record(r, label)]
+    if len(unified_records) < before:
+        logger.warning(
+            "Filtered %d impossible records for %r (%d remaining)",
+            before - len(unified_records), label, len(unified_records),
+        )
+
     # ── Step 2a: Deterministic climate engine (no LLM) ────────────────────────
     # Load sector-specific risk thresholds
     from ..sectors import load_sector_profile
@@ -481,6 +531,7 @@ async def run_analysis(
         sector_thresholds = None
     
     climate_metrics = calculate_climate_risk(unified_records, sector_thresholds, sector)
+    climate_metrics = global_sanity_check(climate_metrics, label)
     logger.info(
         "Step 2a/5 — Climate Engine: drought=%.1f heat_stress=%.1f flood=%.1f urgency=%s",
         climate_metrics.get("drought_score", 0),
@@ -580,6 +631,13 @@ async def run_analysis(
         report_summary=report_summary_for_judge,
     )
     confidence_score = int(quality_evaluation.get("confidence_score", 0))
+    sanity_penalty = climate_metrics.get("confidence_penalty", 0)
+    if sanity_penalty:
+        confidence_score = max(0, confidence_score - sanity_penalty)
+        logger.warning(
+            "Confidence reduced by %d (sanity failures) → final=%d for %r",
+            sanity_penalty, confidence_score, label,
+        )
     logger.info(
         "Step 5/5 complete: confidence=%s verdict=%s tokens=%s",
         confidence_score,
@@ -756,16 +814,34 @@ async def run_comparison_pipeline(
             "key_finding":   "No climate data available for this period.",
         }
 
+    before = len(unified_records)
+    unified_records = [r for r in unified_records if validate_annual_record(r, label)]
+    if len(unified_records) < before:
+        logger.warning(
+            "Comparison: filtered %d impossible records for %r (%d remaining)",
+            before - len(unified_records), label, len(unified_records),
+        )
+
+    if not unified_records:
+        return {
+            "label":         f"{start_year}–{end_year}",
+            "risk_score":    0, "risk_level": "low",
+            "temp_mean":     0.0, "temp_trend": 0.0,
+            "precip_trend":  None, "drought_score": 0.0,
+            "key_finding":   "All records failed quality validation.",
+        }
+
     # Load sector-specific risk thresholds
     from ..sectors import load_sector_profile
-    
+
     try:
         sector_config = load_sector_profile(sector)
         sector_thresholds = sector_config.get("risk_thresholds", {})
     except Exception:
         sector_thresholds = None
-    
+
     climate_metrics = calculate_climate_risk(unified_records, sector_thresholds, sector)
+    climate_metrics = global_sanity_check(climate_metrics, label)
 
     from ..agents.crews import run_climate_analysis_crew
     climate_task_input = json.dumps({
