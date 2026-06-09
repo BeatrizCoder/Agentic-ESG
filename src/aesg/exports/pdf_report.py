@@ -16,6 +16,12 @@ from reportlab.platypus import (
 
 logger = logging.getLogger(__name__)
 
+SCENARIO_LABELS = {
+    "SSP1-2.6": "SSP1-2.6 · Optimistic (1.5°C)",
+    "SSP2-4.5": "SSP2-4.5 · Moderate (2-3°C)",
+    "SSP5-8.5": "SSP5-8.5 · High emissions (4-5°C)",
+}
+
 # ── Brand palette ─────────────────────────────────────────────────────────────
 GREEN    = colors.HexColor("#3a6b35")
 GREEN_LT = colors.HexColor("#4d8c45")
@@ -231,9 +237,33 @@ def generate_pdf(analysis: dict, comparison_data: dict | None = None) -> BytesIO
     if period_table:
         story.append(Spacer(1, 6))
         story.append(period_table)
-        story.append(Spacer(1, 12))
-    else:
-        story.append(Spacer(1, 12))
+
+    sector   = analysis.get("sector", "General") or "General"
+    scenario_key = (
+        analysis.get("scenario")
+        or analysis.get("pipeline_metadata", {}).get("scenario", "SSP2-4.5")
+        or "SSP2-4.5"
+    )
+    scenario_label = SCENARIO_LABELS.get(scenario_key, scenario_key)
+    sector_table = Table(
+        [
+            [Paragraph("Sector",           S["cell_bold"]), Paragraph(sector,         S["cell"])],
+            [Paragraph("Climate Scenario", S["cell_bold"]), Paragraph(scenario_label, S["cell"])],
+        ],
+        colWidths=[w_full * .28, w_full * .72],
+    )
+    sector_table.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), ROW_ALT),
+        ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#d4d0c8")),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(Spacer(1, 4))
+    story.append(sector_table)
+    story.append(Spacer(1, 12))
 
     # ── Risk score + badge + investment status ────────────────────────────────
     story.append(Paragraph("CLIMATE RISK SCORE", S["h2"]))

@@ -132,6 +132,7 @@ async def analyze(
         openmeteo_data=result.openmeteo_data,
         offset_targets=result.offset_targets,
         sector=result.sector,
+        scenario=result.scenario,
         pipeline_duration_sec=result.pipeline_duration_sec,
         created_at=result.created_at,
         error=result.error,

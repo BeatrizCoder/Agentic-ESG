@@ -10,6 +10,12 @@ from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
+_SCENARIO_LABELS = {
+    "SSP1-2.6": "SSP1-2.6 · Optimistic (1.5°C)",
+    "SSP2-4.5": "SSP2-4.5 · Moderate (2-3°C)",
+    "SSP5-8.5": "SSP5-8.5 · High emissions (4-5°C)",
+}
+
 # ── Palette ───────────────────────────────────────────────────────────────────
 _GREEN_HEX   = "3A6B35"
 _HDR_FILL    = PatternFill("solid", fgColor=_GREEN_HEX)
@@ -91,6 +97,11 @@ def _sheet_summary(wb: Workbook, analysis: dict) -> None:
     score = analysis.get("risk_score", 0)
     conf  = analysis.get("confidence_score", 0)
 
+    scenario_key = (
+        analysis.get("scenario")
+        or (analysis.get("pipeline_metadata") or {}).get("scenario", "SSP2-4.5")
+        or "SSP2-4.5"
+    )
     base_rows = [
         ("Region",            analysis.get("region_label", "—")),
         ("Latitude",          analysis.get("latitude", 0)),
@@ -98,6 +109,7 @@ def _sheet_summary(wb: Workbook, analysis: dict) -> None:
         ("Analysis ID",       analysis.get("analysis_id", "—")),
         ("Date",              analysis.get("created_at", "")[:10]),
         ("Sector",            analysis.get("sector", "—")),
+        ("Climate Scenario",  _SCENARIO_LABELS.get(scenario_key, scenario_key)),
     ]
     rows = base_rows + _analysis_period_rows(analysis) + [
         ("Risk Score",        f"{score}/100"),

@@ -1144,6 +1144,21 @@
     }
     .dq-list li { margin-bottom: .15rem; }
 
+    .comparison-status {
+      font-size: .78rem;
+      color: var(--green);
+      padding: .5rem .75rem;
+      background: var(--green-lt);
+      border-radius: 8px;
+      margin-top: .5rem;
+      border-left: 3px solid var(--green);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
     .score-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .5rem; }
     .score-meta-item { background: var(--bg3); border-radius: 6px; padding: .65rem .75rem; min-height: 80px; }
     .score-meta-label { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .2rem; }
@@ -2277,6 +2292,7 @@
         <button onclick="runComparison()" class="analyze-btn" style="align-self:flex-end;padding:.5rem 1rem">Run Comparison →</button>
         <span style="font-size:.65rem;color:var(--muted);align-self:center;font-style:italic">Historical only (2000–2025)</span>
       </div>
+      <div id="comparison-status" style="display:none" class="comparison-status"></div>
 
     </div><!-- .results-grid -->
 
@@ -2656,6 +2672,8 @@ async function viewAnalysis(analysisId) {
     }
     if (data.latitude  != null) { const el = document.getElementById('inp-lat'); if (el) el.value = data.latitude;  }
     if (data.longitude != null) { const el = document.getElementById('inp-lon'); if (el) el.value = data.longitude; }
+    if (data.sector)   { const el = document.getElementById('inp-sector');   if (el) el.value = data.sector;   }
+    if (data.scenario) { const el = document.getElementById('inp-scenario'); if (el) el.value = data.scenario; }
 
     renderResults(data);
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
@@ -3245,13 +3263,14 @@ async function runComparison() {
 
   if (isNaN(lat) || isNaN(lon)) { alert('Please select a valid location.'); return; }
 
-  const btn        = document.getElementById('analyze-btn');
-  const statusBar  = document.getElementById('status-bar');
-  const statusText = document.getElementById('status-text');
-  btn.disabled = true;
-  btn.textContent = 'Comparing…';
-  statusText.textContent = 'Running comparison analysis for two periods…';
-  statusBar.classList.add('visible');
+  const btn      = document.querySelector('[onclick="runComparison()"]');
+  const statusEl = document.getElementById('comparison-status');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Comparing… ⏳'; }
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Running comparison analysis for two periods... This may take 1-2 minutes.';
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/analyze/compare`, {
@@ -3272,9 +3291,8 @@ async function runComparison() {
   } catch (err) {
     alert('Comparison failed: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = ANALYZE_BTN_LABELS[_lang] || 'Analyze →';
-    statusBar.classList.remove('visible');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Comparison →'; }
+    if (statusEl) statusEl.style.display = 'none';
   }
 }
 

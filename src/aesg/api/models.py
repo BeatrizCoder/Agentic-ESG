@@ -116,6 +116,7 @@ class AnalysisResponse(BaseModel):
     openmeteo_data: dict[str, Any] = {}
     offset_targets: list[dict[str, Any]] = []
     sector: str = "General"
+    scenario: str = "SSP2-4.5"
     pipeline_duration_sec: float
     created_at: str
     error: str = ""

@@ -145,6 +145,7 @@ class AnalysisResult:
     openmeteo_data: dict[str, Any] = field(default_factory=dict)
     offset_targets: list[dict[str, Any]] = field(default_factory=list)
     sector: str = "General"
+    scenario: str = "SSP2-4.5"
     error: str = ""
     hitl_required: bool = False
     hitl_reasons: list[str] = field(default_factory=list)
@@ -792,6 +793,7 @@ async def run_analysis(
         quality_evaluation=quality_evaluation,
         offset_targets=report.get("offset_targets", []),
         sector=sector,
+        scenario=scenario,
         hitl_required=final["hitl_required"],
         hitl_reasons=final["hitl_reasons"],
         transparency=transparency,
