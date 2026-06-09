@@ -327,6 +327,50 @@ Agents run **sequentially** (not in parallel) because each depends on the previo
 
 ---
 
+## Data Quality & Validation
+
+Agentic ESG implements a three-layer data quality protection system to ensure reliable outputs across all global locations:
+
+### Layer 1 — Input Validation
+All raw data from NASA POWER and OpenMeteo is validated before entering the pipeline:
+- Temperature: must be between -5°C and 40°C (annual mean)
+- Precipitation: must be between 0 and 4,000mm/year
+- Solar radiation: must be between 0 and 10 kWh/m²/day
+- Invalid records are discarded and logged automatically
+
+### Layer 2 — Output Validation
+Before returning results to the user, the system validates:
+- Risk score must be greater than zero
+- Executive summary must be substantive (>100 characters)
+- At least one recommendation must be generated
+- Minimum 5 years of NASA historical data required
+- Failed validations automatically reduce confidence score and trigger Human-in-the-Loop (HITL) flag
+
+### Layer 3 — User Notification
+When data quality issues are detected:
+- A "Data Quality Notice" card appears in the dashboard
+- Lists specific issues found
+- Confidence score is reduced proportionally
+- Human expert review is strongly recommended
+
+### Known Limitations
+- NASA POWER data available from 1981 to 2025
+- OpenMeteo IPCC projections available from 2026 to 2050
+- Spatial resolution: ~0.5° × 0.5° (~55km at equator)
+- Some remote locations may have sparse satellite coverage
+- Mountain regions above 2,000m altitude may show reduced data quality due to topographic effects
+
+### Sanity Check Thresholds
+| Parameter | Valid Range | Action if Outside |
+|-----------|------------|-------------------|
+| Temperature mean | -5°C to 40°C | Discard record |
+| Annual precipitation | 0 to 4,000mm | Discard record |
+| Temp trend | -1.5 to +1.5°C/decade | Flag warning |
+| Precip trend | -40% to +40%/decade | Flag warning |
+| Risk score | 1 to 100 | Trigger HITL |
+
+---
+
 ## Limitations
 
 ### Projection Methodology
@@ -340,6 +384,7 @@ Agents run **sequentially** (not in parallel) because each depends on the previo
 - **Missing values:** Handled via -999.0 fill value detection and exclusion
 - **Spatial resolution:** 0.5° × 0.5° grid (~55km at equator) — not building-level precision
 - **Temporal gaps:** Occasional missing days in NASA data (excluded from annual aggregates)
+- Data quality validation is automatic but not infallible. Always validate findings with qualified ESG consultants before regulatory filings — especially for high-altitude regions, small islands, and areas with sparse satellite coverage.
 
 ### System Limitations
 - **No user authentication:** Current version uses session-based storage only (LGPD compliant)
@@ -551,6 +596,7 @@ limitations under the License.
 - ✅ Session history with 30-day TTL (LGPD compliant)
 - ✅ Historical comparison mode — compare climate risk between two time periods for the same location
 - ✅ Custom sector risk profiles (agriculture, real estate, energy)
+- ✅ Three-layer data quality validation system — input filtering, output validation, and user notification for unreliable results
 
 **Near-term:**
 - [ ] API key authentication for enterprise use
