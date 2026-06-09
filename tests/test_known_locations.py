@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import pytest
 from aesg.pipeline.climate_engine import calculate_climate_risk
-from aesg.pipeline.orchestrator import validate_annual_record, global_sanity_check, IMPOSSIBLE_VALUES
+from aesg.pipeline.orchestrator import (
+    validate_annual_record, global_sanity_check, validate_final_result, IMPOSSIBLE_VALUES,
+)
 
 
 # ── Reference locations ───────────────────────────────────────────────────────
@@ -192,6 +194,76 @@ def test_global_sanity_check_multiple_flags():
     }
     result = global_sanity_check(metrics, "Test")
     assert result["confidence_penalty"] == len(result["sanity_flags"]) * 15
+
+
+# ── validate_final_result ─────────────────────────────────────────────────────
+
+def _good_result(**overrides):
+    base = {
+        "risk_score":        65,
+        "executive_summary": "A" * 120,
+        "recommendations":   [{"rank": 1, "action": "Reduce emissions"}],
+        "confidence_score":  80,
+        "hitl_required":     False,
+        "hitl_reasons":      [],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_validate_final_result_clean():
+    result = validate_final_result(_good_result(), "Test")
+    assert "data_quality_issues" not in result
+    assert result["hitl_required"] is False
+    assert result["confidence_score"] == 80
+
+
+def test_validate_final_result_zero_score():
+    result = validate_final_result(_good_result(risk_score=0), "Test")
+    assert result["hitl_required"] is True
+    assert any("zero" in i for i in result["data_quality_issues"])
+    assert result["confidence_score"] <= 40
+
+
+def test_validate_final_result_short_summary():
+    result = validate_final_result(_good_result(executive_summary="Too short."), "Test")
+    assert result["hitl_required"] is True
+    assert any("summary" in i for i in result["data_quality_issues"])
+    assert result["confidence_score"] <= 40
+
+
+def test_validate_final_result_no_recs():
+    result = validate_final_result(_good_result(recommendations=[]), "Test")
+    assert result["hitl_required"] is True
+    assert any("recommendation" in i for i in result["data_quality_issues"])
+
+
+def test_validate_final_result_multiple_issues_caps_confidence():
+    result = validate_final_result(
+        _good_result(risk_score=0, executive_summary="Short.", recommendations=[]),
+        "Test",
+    )
+    assert len(result["data_quality_issues"]) == 3
+    assert result["confidence_score"] <= 40
+    assert result["confidence_score"] >= 0
+
+
+def test_validate_final_result_preserves_hitl_from_prior_step():
+    # If hitl was already True from _compute_hitl_flag, reasons are replaced by new issues
+    result = validate_final_result(
+        _good_result(risk_score=0, hitl_required=True, hitl_reasons=["existing reason"]),
+        "Test",
+    )
+    assert result["hitl_required"] is True
+    assert any("zero" in r for r in result["hitl_reasons"])
+
+
+def test_validate_final_result_confidence_never_negative():
+    result = validate_final_result(
+        _good_result(risk_score=0, executive_summary="x", recommendations=[], confidence_score=0),
+        "Test",
+    )
+    assert result["confidence_score"] >= 0
 
 
 # ── IMPOSSIBLE_VALUES coverage ────────────────────────────────────────────────

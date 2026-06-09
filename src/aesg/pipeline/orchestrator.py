@@ -45,6 +45,34 @@ def validate_annual_record(record: dict, region: str) -> bool:
     return True
 
 
+def validate_final_result(result: dict, region: str) -> dict:
+    issues = []
+
+    score = result.get("risk_score", 0)
+    if score == 0:
+        issues.append("Risk score is zero — pipeline may have failed")
+
+    summary = result.get("executive_summary", "")
+    if len(summary) < 100:
+        issues.append("Executive summary too short — generation may have failed")
+
+    recs = result.get("recommendations", [])
+    if len(recs) == 0:
+        issues.append("No recommendations generated")
+
+    if issues:
+        logger.warning("validate_final_result %r: %s", region, issues)
+        result["data_quality_issues"] = issues
+        result["confidence_score"] = max(
+            0,
+            min(result.get("confidence_score", 100) - 20 * len(issues), 40),
+        )
+        result["hitl_required"] = True
+        result["hitl_reasons"]  = issues
+
+    return result
+
+
 def global_sanity_check(climate_metrics: dict, region: str) -> dict:
     flags: list[str] = []
     for field_name, (min_v, max_v) in IMPOSSIBLE_VALUES.items():
@@ -726,16 +754,27 @@ async def run_analysis(
         ],
     }
 
+    # ── Final validation ───────────────────────────────────────────────────────
+    final = {
+        "risk_score":        report.get("risk_score", 0),
+        "executive_summary": report.get("executive_summary", ""),
+        "recommendations":   report.get("recommendations", []),
+        "confidence_score":  confidence_score,
+        "hitl_required":     hitl_required,
+        "hitl_reasons":      hitl_reasons,
+    }
+    final = validate_final_result(final, label)
+
     return AnalysisResult(
         analysis_id=analysis_id,
         region_label=label,
         latitude=latitude,
         longitude=longitude,
-        risk_score=report.get("risk_score", 0),
+        risk_score=final["risk_score"],
         risk_level=report.get("risk_level", "unknown"),
         risk_badge_label=report.get("risk_badge_label", ""),
-        executive_summary=report.get("executive_summary", ""),
-        recommendations=report.get("recommendations", []),
+        executive_summary=final["executive_summary"],
+        recommendations=final["recommendations"],
         key_metrics=report.get("key_metrics", {}),
         climate_findings=climate_findings,
         compliance_mapping=compliance_mapping,
@@ -743,12 +782,12 @@ async def run_analysis(
         created_at=datetime.utcnow().isoformat() + "Z",
         pipeline_duration_sec=pipeline_duration,
         pipeline_metadata=pipeline_metadata,
-        confidence_score=confidence_score,
+        confidence_score=final["confidence_score"],
         quality_evaluation=quality_evaluation,
         offset_targets=report.get("offset_targets", []),
         sector=sector,
-        hitl_required=hitl_required,
-        hitl_reasons=hitl_reasons,
+        hitl_required=final["hitl_required"],
+        hitl_reasons=final["hitl_reasons"],
         transparency=transparency,
         openmeteo_data={
             "era5_used":          needs_era5,
