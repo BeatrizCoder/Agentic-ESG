@@ -2952,6 +2952,9 @@ function resetForm() {
   document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
   document.getElementById('results').classList.remove('visible');
   document.getElementById('export-row').classList.remove('visible');
+  _comparisonData = null;
+  const cr = document.getElementById('comparison-results');
+  if (cr) cr.style.display = 'none';
 }
 
 /* ── Map ─────────────────────────────────────────────────────────────────── */
@@ -3071,6 +3074,7 @@ function renderRecs(recs) {
 
 /* ── Main analysis ───────────────────────────────────────────────────────── */
 let _currentId = null;
+let _comparisonData = null;
 
 function highlightStep(idx) {
   document.querySelectorAll('.step-dot').forEach((dot, i) => {
@@ -3093,6 +3097,8 @@ async function runAnalysis() {
   const sector   = document.getElementById('inp-sector').value;
   const scenario = document.getElementById('inp-scenario').value;
   if (isNaN(lat) || isNaN(lon)) { alert(_lang === 'pt' ? 'Selecione uma localização válida.' : 'Please select a valid location.'); return; }
+
+  _comparisonData = null;
 
   const btn = document.getElementById('analyze-btn');
   btn.disabled = true;
@@ -3274,9 +3280,16 @@ function renderComparison(data) {
 
   document.getElementById('comp-interpretation').textContent = d.interpretation || p1.key_finding || '';
 
+  _comparisonData = data;
+
   const panel = document.getElementById('comparison-results');
   panel.style.display = 'block';
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const pdfBtn   = document.getElementById('t-export-pdf');
+  const xlsxBtn  = document.querySelector('.export-btn[onclick="exportExcel()"]');
+  if (pdfBtn)  pdfBtn.textContent  = 'Export Full Report PDF ↓';
+  if (xlsxBtn) xlsxBtn.textContent = 'Export Full Report Excel ↓';
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
@@ -3458,8 +3471,12 @@ function renderResults(data) {
   /* reasoning tab */
   renderReasoningTab(data);
 
-  /* show export row */
+  /* show export row — reset button labels (comparison cleared at analysis start) */
   document.getElementById('export-row').classList.add('visible');
+  const pdfBtn  = document.getElementById('t-export-pdf');
+  const xlsxBtn = document.querySelector('.export-btn[onclick="exportExcel()"]');
+  if (pdfBtn)  pdfBtn.textContent  = 'Export PDF ↓';
+  if (xlsxBtn) xlsxBtn.textContent = 'Export Excel ↓';
 
   /* show comparison invite below exports; reset comparison panel to collapsed */
   const inviteEl = document.getElementById('comparison-invite');
@@ -3482,7 +3499,11 @@ async function exportPdf() {
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
 
   try {
-    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/pdf`);
+    const fetchOpts = _comparisonData
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comparison_data: _comparisonData }) }
+      : {};
+    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/pdf`, fetchOpts);
     if (!res.ok) throw new Error(`Server error ${res.status}: ${await res.text()}`);
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
@@ -3507,7 +3528,11 @@ async function exportExcel() {
   const origText = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
   try {
-    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/excel`);
+    const fetchOpts = _comparisonData
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comparison_data: _comparisonData }) }
+      : {};
+    const res = await fetch(`${API_BASE}/api/analyses/${_currentId}/export/excel`, fetchOpts);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);

@@ -15,7 +15,7 @@ from ..db.mongo import delete_analysis as _db_delete
 from ..db.mongo import get_analysis as _db_get
 from ..db.mongo import get_recent_analyses, get_session_history, save_analysis
 from ..pipeline.orchestrator import run_analysis, run_comparison_pipeline
-from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult, CompareRequest
+from .models import AnalysisResponse, AnalysisSummary, AnalyzeRequest, BatchAnalysisResponse, BatchRowResult, CompareRequest, ExportWithComparisonRequest
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +221,39 @@ async def export_pdf(request: Request, analysis_id: str) -> StreamingResponse:
     try:
         from ..exports.pdf_report import generate_pdf
         buffer = generate_pdf(row)
+    except ImportError:
+        raise HTTPException(status_code=503, detail="PDF export not available — install reportlab")
+    except Exception as exc:
+        logger.exception("PDF generation failed for %s", analysis_id)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
+
+    filename = f"cs_report_{analysis_id}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
+@router.post("/api/analyses/{analysis_id}/export/pdf")
+@limiter.limit("5/minute")
+async def export_pdf_with_comparison(
+    request: Request,
+    analysis_id: str,
+    body: ExportWithComparisonRequest,
+) -> StreamingResponse:
+    """Generate a PDF report optionally including a historical comparison section."""
+    row = await _db_get(analysis_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Analysis '{analysis_id}' not found")
+
+    try:
+        from ..exports.pdf_report import generate_pdf
+        buffer = generate_pdf(row, comparison_data=body.comparison_data)
     except ImportError:
         raise HTTPException(status_code=503, detail="PDF export not available — install reportlab")
     except Exception as exc:
@@ -617,6 +650,39 @@ async def export_excel(request: Request, analysis_id: str) -> StreamingResponse:
     try:
         from ..exports.excel_report import generate_excel
         buffer = generate_excel(row)
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Excel export not available — install openpyxl")
+    except Exception as exc:
+        logger.exception("Excel generation failed for %s", analysis_id)
+        raise HTTPException(status_code=500, detail=f"Excel generation failed: {exc}")
+
+    filename = f"cs_report_{analysis_id}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
+@router.post("/api/analyses/{analysis_id}/export/excel")
+@limiter.limit("5/minute")
+async def export_excel_with_comparison(
+    request: Request,
+    analysis_id: str,
+    body: ExportWithComparisonRequest,
+) -> StreamingResponse:
+    """Generate an Excel report optionally including a historical comparison sheet."""
+    row = await _db_get(analysis_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Analysis '{analysis_id}' not found")
+
+    try:
+        from ..exports.excel_report import generate_excel
+        buffer = generate_excel(row, comparison_data=body.comparison_data)
     except ImportError:
         raise HTTPException(status_code=503, detail="Excel export not available — install openpyxl")
     except Exception as exc:

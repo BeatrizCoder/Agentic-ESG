@@ -160,7 +160,7 @@ def _section_rule(canvas, x1, y, x2):
     canvas.line(x1, y, x2, y)
 
 
-def generate_pdf(analysis: dict) -> BytesIO:
+def generate_pdf(analysis: dict, comparison_data: dict | None = None) -> BytesIO:
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -436,6 +436,75 @@ def generate_pdf(analysis: dict) -> BytesIO:
             ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ]))
         story.append(rec_table)
+
+    # ── Historical comparison ─────────────────────────────────────────────────
+    if comparison_data:
+        p1   = comparison_data.get("period_1", {})
+        p2   = comparison_data.get("period_2", {})
+        d    = comparison_data.get("delta", {})
+
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("HISTORICAL COMPARISON", S["h2"]))
+
+        def _fmt(val, digits=2, suffix=""):
+            if val is None:
+                return "N/A"
+            return f"{float(val):.{digits}f}{suffix}"
+
+        def _delta_str(val):
+            if val is None:
+                return "N/A"
+            v = float(val)
+            return f"+{v:.2f}" if v > 0 else f"{v:.2f}"
+
+        comp_rows = [
+            [Paragraph("<b>Metric</b>",                      S["cell_bold"]),
+             Paragraph(f"<b>{p1.get('label','Period 1')}</b>", S["cell_bold"]),
+             Paragraph(f"<b>{p2.get('label','Period 2')}</b>", S["cell_bold"]),
+             Paragraph("<b>Change</b>",                      S["cell_bold"])],
+            [Paragraph("Risk Score",    S["cell"]),
+             Paragraph(str(p1.get("risk_score") or "N/A"), S["cell"]),
+             Paragraph(str(p2.get("risk_score") or "N/A"), S["cell"]),
+             Paragraph(_delta_str(d.get("risk_score")), S["cell"])],
+            [Paragraph("Temp Mean (°C)", S["cell"]),
+             Paragraph(_fmt(p1.get("temp_mean"), 1, "°C"), S["cell"]),
+             Paragraph(_fmt(p2.get("temp_mean"), 1, "°C"), S["cell"]),
+             Paragraph(_delta_str(d.get("temp_mean")), S["cell"])],
+            [Paragraph("Warming Trend", S["cell"]),
+             Paragraph(_fmt(p1.get("temp_trend"), 2, "°C/dec"), S["cell"]),
+             Paragraph(_fmt(p2.get("temp_trend"), 2, "°C/dec"), S["cell"]),
+             Paragraph(_delta_str(d.get("temp_trend")), S["cell"])],
+            [Paragraph("Precip Trend",  S["cell"]),
+             Paragraph(_fmt(p1.get("precip_trend"), 1, "%/dec"), S["cell"]),
+             Paragraph(_fmt(p2.get("precip_trend"), 1, "%/dec"), S["cell"]),
+             Paragraph(_delta_str(d.get("precip_trend")), S["cell"])],
+            [Paragraph("Drought Score", S["cell"]),
+             Paragraph(_fmt(p1.get("drought_score"), 0), S["cell"]),
+             Paragraph(_fmt(p2.get("drought_score"), 0), S["cell"]),
+             Paragraph(_delta_str(d.get("drought_score")), S["cell"])],
+        ]
+
+        comp_table = Table(
+            comp_rows,
+            colWidths=[w_full * .3, w_full * .22, w_full * .22, w_full * .26],
+        )
+        comp_table.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e8f0e4")),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [ROW_ALT, colors.white]),
+            ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#d4d0c8")),
+            ("INNERGRID",     (0, 0), (-1, -1), 0.2, colors.HexColor("#d4d0c8")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN",         (1, 1), (-1, -1), "CENTER"),
+        ]))
+        story.append(comp_table)
+
+        interpretation = d.get("interpretation", "")
+        if interpretation:
+            story.append(Spacer(1, 6))
+            story.append(Paragraph(interpretation, S["body"]))
 
     # ── Privacy note ──────────────────────────────────────────────────────────
     story.append(Spacer(1, 16))

@@ -246,6 +246,93 @@ def _sheet_recs(wb: Workbook, analysis: dict) -> None:
     _autofit(ws, min_w=10, max_w=70)
 
 
+def _sheet_comparison(wb: Workbook, comparison_data: dict) -> None:
+    ws = wb.create_sheet("Historical Comparison")
+
+    p1 = comparison_data.get("period_1", {})
+    p2 = comparison_data.get("period_2", {})
+    d  = comparison_data.get("delta", {})
+
+    # Header
+    ws["A1"] = "Climate Risk Comparison"
+    ws["A1"].font = _BOLD_GRN
+    ws.merge_cells("A1:D1")
+    ws.row_dimensions[1].height = 22
+
+    sub = f"{p1.get('label', 'Period 1')} vs {p2.get('label', 'Period 2')}"
+    ws["A2"] = sub
+    ws["A2"].font = Font(name="Calibri", italic=True, color="888888", size=8)
+    ws.merge_cells("A2:D2")
+
+    _set_header(ws, 4, ["Metric", p1.get("label", "Period 1"), p2.get("label", "Period 2"), "Change"])
+
+    _WORSE_FILL  = PatternFill("solid", fgColor="FDECEA")
+    _BETTER_FILL = PatternFill("solid", fgColor="EDF7F0")
+
+    def _fmt(val, digits=2, suffix=""):
+        if val is None:
+            return "N/A"
+        return f"{float(val):.{digits}f}{suffix}"
+
+    def _delta_str(val):
+        if val is None:
+            return "N/A"
+        v = float(val)
+        return f"+{v:.2f}" if v > 0 else f"{v:.2f}"
+
+    def _delta_fill(val, higher_is_bad=True):
+        if val is None:
+            return None
+        v = float(val)
+        if v == 0:
+            return None
+        worse = v > 0 if higher_is_bad else v < 0
+        return _WORSE_FILL if worse else _BETTER_FILL
+
+    rows = [
+        ("Risk Score",     str(p1.get("risk_score") or "N/A"), str(p2.get("risk_score") or "N/A"),
+         _delta_str(d.get("risk_score")), _delta_fill(d.get("risk_score"), higher_is_bad=True)),
+        ("Temp Mean (°C)", _fmt(p1.get("temp_mean"), 1), _fmt(p2.get("temp_mean"), 1),
+         _delta_str(d.get("temp_mean")), _delta_fill(d.get("temp_mean"), higher_is_bad=True)),
+        ("Warming Trend",  _fmt(p1.get("temp_trend"), 2), _fmt(p2.get("temp_trend"), 2),
+         _delta_str(d.get("temp_trend")), _delta_fill(d.get("temp_trend"), higher_is_bad=True)),
+        ("Precip Trend",   _fmt(p1.get("precip_trend"), 1), _fmt(p2.get("precip_trend"), 1),
+         _delta_str(d.get("precip_trend")), _delta_fill(d.get("precip_trend"), higher_is_bad=False)),
+        ("Drought Score",  _fmt(p1.get("drought_score"), 0), _fmt(p2.get("drought_score"), 0),
+         _delta_str(d.get("drought_score")), _delta_fill(d.get("drought_score"), higher_is_bad=True)),
+    ]
+
+    for i, (metric, v1, v2, delta, delta_fill) in enumerate(rows):
+        row_num = i + 5
+        row_fill = _ALT_FILL if i % 2 == 0 else None
+        for col, val in enumerate([metric, v1, v2, delta], 1):
+            c = ws.cell(row=row_num, column=col, value=val)
+            c.font      = _BOLD if col == 1 else _NORMAL
+            c.border    = _border()
+            c.alignment = _CENTER if col > 1 else _WRAP_TOP
+            if col == 4 and delta_fill:
+                c.fill = delta_fill
+            elif row_fill:
+                c.fill = row_fill
+
+    interpretation = d.get("interpretation", "")
+    if interpretation:
+        interp_row = len(rows) + 6
+        ws.cell(row=interp_row, column=1, value=interpretation).font = Font(
+            name="Calibri", italic=True, size=9
+        )
+        ws.merge_cells(f"A{interp_row}:D{interp_row}")
+        ws.row_dimensions[interp_row].height = 36
+        ws.cell(row=interp_row, column=1).alignment = Alignment(
+            horizontal="left", vertical="top", wrap_text=True
+        )
+
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["C"].width = 18
+    ws.column_dimensions["D"].width = 14
+
+
 # ── Public entry points ───────────────────────────────────────────────────────
 
 def generate_batch_excel(batch_data: dict) -> BytesIO:
@@ -311,12 +398,14 @@ def generate_batch_excel(batch_data: dict) -> BytesIO:
     return buf
 
 
-def generate_excel(analysis: dict) -> BytesIO:
+def generate_excel(analysis: dict, comparison_data: dict | None = None) -> BytesIO:
     wb = Workbook()
     _sheet_summary(wb, analysis)
     _sheet_annual(wb, analysis)
     _sheet_compliance(wb, analysis)
     _sheet_recs(wb, analysis)
+    if comparison_data:
+        _sheet_comparison(wb, comparison_data)
 
     buf = BytesIO()
     wb.save(buf)

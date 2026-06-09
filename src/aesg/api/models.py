@@ -181,3 +181,7 @@ class CompareRequest(BaseModel):
     scenario: str = Field("SSP2-4.5", pattern="^(SSP1-2\\.6|SSP2-4\\.5|SSP5-8\\.5)$")
     period_1: ComparisonPeriod
     period_2: ComparisonPeriod
+
+
+class ExportWithComparisonRequest(BaseModel):
+    comparison_data: Optional[dict[str, Any]] = None
