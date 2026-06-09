@@ -2013,48 +2013,6 @@
     <span id="status-text">Running pipeline…</span>
   </div>
 
-  <!-- Comparison Results -->
-  <div id="comparison-results">
-    <div class="comparison-card">
-      <div class="comp-header">
-        <h3>Climate Risk Comparison</h3>
-        <span class="comp-region" id="comp-region">—</span>
-      </div>
-      <div class="comp-grid">
-        <div class="comp-label">Metric</div>
-        <div class="comp-period" id="comp-period-1-label">Period 1</div>
-        <div class="comp-period" id="comp-period-2-label">Period 2</div>
-        <div class="comp-delta-label">Change</div>
-
-        <div class="comp-metric">Risk Score</div>
-        <div class="comp-val" id="comp-score-1">—</div>
-        <div class="comp-val" id="comp-score-2">—</div>
-        <div class="comp-delta" id="comp-score-delta">—</div>
-
-        <div class="comp-metric">Temp Mean (°C)</div>
-        <div class="comp-val" id="comp-temp-1">—</div>
-        <div class="comp-val" id="comp-temp-2">—</div>
-        <div class="comp-delta" id="comp-temp-delta">—</div>
-
-        <div class="comp-metric">Warming Trend</div>
-        <div class="comp-val" id="comp-trend-1">—</div>
-        <div class="comp-val" id="comp-trend-2">—</div>
-        <div class="comp-delta" id="comp-trend-delta">—</div>
-
-        <div class="comp-metric">Precip Trend</div>
-        <div class="comp-val" id="comp-precip-1">—</div>
-        <div class="comp-val" id="comp-precip-2">—</div>
-        <div class="comp-delta" id="comp-precip-delta">—</div>
-
-        <div class="comp-metric">Drought Score</div>
-        <div class="comp-val" id="comp-drought-1">—</div>
-        <div class="comp-val" id="comp-drought-2">—</div>
-        <div class="comp-delta" id="comp-drought-delta">—</div>
-      </div>
-      <div class="comp-interpretation" id="comp-interpretation"></div>
-    </div>
-  </div>
-
   <!-- Results -->
   <div id="results">
 
@@ -2213,6 +2171,12 @@
         <div class="offset-grid" id="offset-grid"></div>
       </div>
 
+      <!-- Export -->
+      <div class="export-row" id="export-row">
+        <button class="export-btn" onclick="exportPdf()" id="t-export-pdf">Export PDF ↓</button>
+        <button class="export-btn" onclick="exportExcel()">Export Excel ↓</button>
+      </div>
+
       <!-- Comparison invite — full-width grid row, shown after analysis -->
       <div id="comparison-invite" class="comparison-invite-card" style="display:none">
         <span style="font-size:1.2rem;flex-shrink:0">⚖️</span>
@@ -2265,13 +2229,49 @@
         <span style="font-size:.65rem;color:var(--muted);align-self:center;font-style:italic">Historical only (2000–2025)</span>
       </div>
 
-      <!-- Export -->
-      <div class="export-row" id="export-row">
-        <button class="export-btn" onclick="exportPdf()" id="t-export-pdf">Export PDF ↓</button>
-        <button class="export-btn" onclick="exportExcel()">Export Excel ↓</button>
-      </div>
-
     </div><!-- .results-grid -->
+
+    <!-- Comparison Results — shown inline after comparison runs -->
+    <div id="comparison-results">
+      <div class="comparison-card">
+        <div class="comp-header">
+          <h3>Climate Risk Comparison</h3>
+          <span class="comp-region" id="comp-region">—</span>
+        </div>
+        <div class="comp-grid">
+          <div class="comp-label">Metric</div>
+          <div class="comp-period" id="comp-period-1-label">Period 1</div>
+          <div class="comp-period" id="comp-period-2-label">Period 2</div>
+          <div class="comp-delta-label">Change</div>
+
+          <div class="comp-metric">Risk Score</div>
+          <div class="comp-val" id="comp-score-1">—</div>
+          <div class="comp-val" id="comp-score-2">—</div>
+          <div class="comp-delta" id="comp-score-delta">—</div>
+
+          <div class="comp-metric">Temp Mean (°C)</div>
+          <div class="comp-val" id="comp-temp-1">—</div>
+          <div class="comp-val" id="comp-temp-2">—</div>
+          <div class="comp-delta" id="comp-temp-delta">—</div>
+
+          <div class="comp-metric">Warming Trend</div>
+          <div class="comp-val" id="comp-trend-1">—</div>
+          <div class="comp-val" id="comp-trend-2">—</div>
+          <div class="comp-delta" id="comp-trend-delta">—</div>
+
+          <div class="comp-metric">Precip Trend</div>
+          <div class="comp-val" id="comp-precip-1">—</div>
+          <div class="comp-val" id="comp-precip-2">—</div>
+          <div class="comp-delta" id="comp-precip-delta">—</div>
+
+          <div class="comp-metric">Drought Score</div>
+          <div class="comp-val" id="comp-drought-1">—</div>
+          <div class="comp-val" id="comp-drought-2">—</div>
+          <div class="comp-delta" id="comp-drought-delta">—</div>
+        </div>
+        <div class="comp-interpretation" id="comp-interpretation"></div>
+      </div>
+    </div>
     </div><!-- #tab-overview -->
 
     <!-- Tab: Data Sources -->
@@ -3276,7 +3276,7 @@ function renderComparison(data) {
 
   const panel = document.getElementById('comparison-results');
   panel.style.display = 'block';
-  panel.scrollIntoView({ behavior: 'smooth' });
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
@@ -3458,19 +3458,18 @@ function renderResults(data) {
   /* reasoning tab */
   renderReasoningTab(data);
 
-  /* show invite card; reset comparison panel to collapsed */
+  /* show export row */
+  document.getElementById('export-row').classList.add('visible');
+
+  /* show comparison invite below exports; reset comparison panel to collapsed */
   const inviteEl = document.getElementById('comparison-invite');
-  if (inviteEl) {
-    inviteEl.style.display = 'flex';
-    setTimeout(() => inviteEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 400);
-  }
+  if (inviteEl) inviteEl.style.display = 'flex';
   const compPanel = document.getElementById('comparison-period');
   if (compPanel) compPanel.style.display = 'none';
 
   /* show panels — always land on Overview */
   switchTab('overview');
   document.getElementById('results').classList.add('visible');
-  document.getElementById('export-row').classList.add('visible');
   document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
