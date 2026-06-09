@@ -2662,15 +2662,35 @@ async function viewAnalysis(analysisId) {
 
     const data = await response.json();
 
-    // Restore form fields so renderResults() picks up the correct region name
-    if (data.region_label) {
-      const locationInput = document.getElementById('inp-location');
-      const labelInput    = document.getElementById('inp-label');
-      if (locationInput) locationInput.value = data.region_label;
-      if (labelInput)    labelInput.value    = data.region_label;
+    // Restore form fields so renderResults() picks up the correct region name.
+    // Detect if this analysis was done in coords mode (label looks like "lat°, lon°")
+    const isCoordLabel = /^-?\d+(\.\d+)?°,\s*-?\d+(\.\d+)?°$/.test(
+      (data.region_label || '').trim()
+    );
+
+    if (data.latitude  != null) {
+      document.getElementById('inp-lat').value          = data.latitude;
+      document.getElementById('inp-lat-manual').value   = parseFloat(data.latitude).toFixed(4);
     }
-    if (data.latitude  != null) { const el = document.getElementById('inp-lat'); if (el) el.value = data.latitude;  }
-    if (data.longitude != null) { const el = document.getElementById('inp-lon'); if (el) el.value = data.longitude; }
+    if (data.longitude != null) {
+      document.getElementById('inp-lon').value          = data.longitude;
+      document.getElementById('inp-lon-manual').value   = parseFloat(data.longitude).toFixed(4);
+    }
+
+    if (isCoordLabel) {
+      // Reactivate coords mode so the loaded label is correctly shown and the
+      // location text field is disabled (prevents accidental geocode overwrite).
+      if (!_coordsModeActive) toggleCoords(null);
+      document.getElementById('inp-label').value = data.region_label;
+    } else {
+      // Normal geocoded analysis — make sure coords mode is off
+      if (_coordsModeActive) toggleCoords(null);
+      if (data.region_label) {
+        document.getElementById('inp-location').value = data.region_label;
+        document.getElementById('inp-label').value    = data.region_label;
+      }
+    }
+
     if (data.sector)   { const el = document.getElementById('inp-sector');   if (el) el.value = data.sector;   }
     if (data.scenario) { const el = document.getElementById('inp-scenario'); if (el) el.value = data.scenario; }
 
@@ -2918,6 +2938,7 @@ function setPreset(lat, lon, label) {
 
 /* ── Geocoding ───────────────────────────────────────────────────────────── */
 let _geoTimer = null;
+let _coordsModeActive = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   const locInput = document.getElementById('inp-location');
@@ -2990,24 +3011,59 @@ function _syncManualCoords() {
   const lon = document.getElementById('inp-lon-manual').value;
   if (lat) document.getElementById('inp-lat').value = lat;
   if (lon) document.getElementById('inp-lon').value = lon;
+  if (_coordsModeActive) _applyCoordLabel();
+}
+
+function _applyCoordLabel() {
+  const lat = parseFloat(document.getElementById('inp-lat-manual').value);
+  const lon = parseFloat(document.getElementById('inp-lon-manual').value);
+  if (!isNaN(lat) && !isNaN(lon)) {
+    const label = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    document.getElementById('inp-label').value = label;
+  }
 }
 
 function toggleCoords(e) {
   e && e.preventDefault();
-  const mc     = document.getElementById('manual-coords');
-  const toggle = document.getElementById('coords-toggle');
-  if (mc.classList.contains('visible')) {
+  const mc       = document.getElementById('manual-coords');
+  const toggle   = document.getElementById('coords-toggle');
+  const locInput = document.getElementById('inp-location');
+
+  if (_coordsModeActive) {
+    // Deactivate — restore text search
+    _coordsModeActive = false;
     mc.classList.remove('visible');
     toggle.textContent = '📍 Use coordinates instead';
+    locInput.disabled = false;
+    locInput.style.opacity = '';
+    // Restore label from the location text field (may be empty if user never searched)
+    const loc = locInput.value.trim();
+    document.getElementById('inp-label').value = loc;
   } else {
+    // Activate — switch to manual coordinate entry
+    _coordsModeActive = true;
     document.getElementById('inp-lat-manual').value = document.getElementById('inp-lat').value;
     document.getElementById('inp-lon-manual').value = document.getElementById('inp-lon').value;
     mc.classList.add('visible');
-    toggle.textContent = '✕ Hide coordinates';
+    toggle.textContent = '✕ Use location search instead';
+    locInput.disabled = true;
+    locInput.style.opacity = '0.4';
+    _hideGeoDrop();
+    _applyCoordLabel();
   }
 }
 
 function resetForm() {
+  // Deactivate coords mode if it was on
+  if (_coordsModeActive) {
+    _coordsModeActive = false;
+    const mc = document.getElementById('manual-coords');
+    if (mc) mc.classList.remove('visible');
+    const toggle = document.getElementById('coords-toggle');
+    if (toggle) toggle.textContent = '📍 Use coordinates instead';
+    const locInput = document.getElementById('inp-location');
+    if (locInput) { locInput.disabled = false; locInput.style.opacity = ''; }
+  }
   document.getElementById('inp-location').value   = 'Brasília, Brazil';
   document.getElementById('inp-lat').value         = '-15.7801';
   document.getElementById('inp-lon').value         = '-47.9292';
@@ -3165,12 +3221,17 @@ async function runAnalysis() {
 
   const lat      = parseFloat(document.getElementById('inp-lat').value);
   const lon      = parseFloat(document.getElementById('inp-lon').value);
-  const label    = document.getElementById('inp-label').value.trim();
   const start    = parseInt(document.getElementById('inp-start').value);
   const end      = parseInt(document.getElementById('inp-end').value);
   const sector   = document.getElementById('inp-sector').value;
   const scenario = document.getElementById('inp-scenario').value;
   if (isNaN(lat) || isNaN(lon)) { alert(_lang === 'pt' ? 'Selecione uma localização válida.' : 'Please select a valid location.'); return; }
+
+  // In coords mode always derive label from the actual coordinates being submitted,
+  // ignoring whatever stale geocoded name may be sitting in inp-label.
+  const label = _coordsModeActive
+    ? `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`
+    : document.getElementById('inp-label').value.trim();
 
   _comparisonData = null;
 
