@@ -1147,10 +1147,9 @@
     .comparison-status {
       font-size: .78rem;
       color: var(--green);
-      padding: .5rem .75rem;
+      padding: .65rem 1rem;
       background: var(--green-lt);
       border-radius: 8px;
-      margin-top: .5rem;
       border-left: 3px solid var(--green);
       animation: pulse 1.5s ease-in-out infinite;
     }
@@ -2289,10 +2288,10 @@
             <option value="2025">2025</option>
           </select>
         </div>
-        <button onclick="runComparison()" class="analyze-btn" style="align-self:flex-end;padding:.5rem 1rem">Run Comparison →</button>
+        <button id="run-comparison-btn" onclick="runComparison()" class="analyze-btn" style="align-self:flex-end;padding:.5rem 1rem">Run Comparison →</button>
         <span style="font-size:.65rem;color:var(--muted);align-self:center;font-style:italic">Historical only (2000–2025)</span>
       </div>
-      <div id="comparison-status" style="display:none" class="comparison-status"></div>
+      <div id="comparison-status" style="display:none;margin-top:.5rem" class="comparison-status"></div>
 
     </div><!-- .results-grid -->
 
@@ -3263,13 +3262,18 @@ async function runComparison() {
 
   if (isNaN(lat) || isNaN(lon)) { alert('Please select a valid location.'); return; }
 
-  const btn      = document.querySelector('[onclick="runComparison()"]');
+  const btn      = document.getElementById('run-comparison-btn');
   const statusEl = document.getElementById('comparison-status');
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Comparing… ⏳'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Comparing periods...';
+    btn.style.opacity = '0.7';
+  }
   if (statusEl) {
     statusEl.style.display = 'block';
-    statusEl.textContent = 'Running comparison analysis for two periods... This may take 1-2 minutes.';
+    statusEl.textContent = '⏳ Running comparison for two periods... ~1-2 minutes';
+    statusEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   try {
@@ -3289,10 +3293,19 @@ async function runComparison() {
     }
     renderComparison(await res.json());
   } catch (err) {
-    alert('Comparison failed: ' + err.message);
+    if (statusEl) {
+      statusEl.textContent = '❌ Comparison failed: ' + err.message;
+      setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+    }
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Comparison →'; }
-    if (statusEl) statusEl.style.display = 'none';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Run Comparison →';
+      btn.style.opacity = '1';
+    }
+    if (!statusEl?.textContent.startsWith('❌')) {
+      if (statusEl) statusEl.style.display = 'none';
+    }
   }
 }
 

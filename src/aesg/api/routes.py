@@ -321,11 +321,19 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
     """Lightweight dual-period comparison: Data Collector + Climate Engine + Haiku only."""
     from ..pipeline.orchestrator import run_comparison_pipeline
 
+    logger.info(
+        "compare_periods start: region=%r lat=%.4f lon=%.4f "
+        "period_1=%d-%d period_2=%d-%d sector=%r",
+        body.region_label, body.latitude, body.longitude,
+        body.period_1.start_year, body.period_1.end_year,
+        body.period_2.start_year, body.period_2.end_year,
+        body.sector,
+    )
     try:
         # Run historical period (period_2) first so its temp_mean can serve as
-        # the fixed reference baseline for scoring period_1 (recent).  This
-        # ensures both periods are scored against the same absolute anchor
-        # rather than each period's own internal first-3-year baseline.
+        # the fixed reference baseline for scoring period_1 (recent).
+        logger.info("compare_periods: starting period_2 pipeline (%d-%d)",
+                    body.period_2.start_year, body.period_2.end_year)
         p2 = await asyncio.wait_for(
             run_comparison_pipeline(
                 latitude=body.latitude, longitude=body.longitude,
@@ -334,7 +342,11 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
             ),
             timeout=90,
         )
+        logger.info("compare_periods: period_2 done — score=%s temp_mean=%s records=%s",
+                    p2.get("risk_score"), p2.get("temp_mean"), p2.get("record_count"))
         await asyncio.sleep(2)
+        logger.info("compare_periods: starting period_1 pipeline (%d-%d)",
+                    body.period_1.start_year, body.period_1.end_year)
         p1 = await asyncio.wait_for(
             run_comparison_pipeline(
                 latitude=body.latitude, longitude=body.longitude,
@@ -344,11 +356,13 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
             ),
             timeout=90,
         )
+        logger.info("compare_periods: period_1 done — score=%s temp_mean=%s records=%s",
+                    p1.get("risk_score"), p1.get("temp_mean"), p1.get("record_count"))
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Comparison timed out. Please try again.")
     except Exception as exc:
-        logger.exception("Comparison pipeline failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Comparison failed: {exc}")
+        logger.exception("compare_periods FAILED: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {type(exc).__name__}: {exc}")
 
     logger.info("compare_periods period_1 raw: %s", p1)
     logger.info("compare_periods period_2 raw: %s", p2)
