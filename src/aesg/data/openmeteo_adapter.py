@@ -2,7 +2,10 @@
 
 import asyncio
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import date, timedelta
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 from tenacity import (
@@ -61,18 +64,18 @@ _FILL = -999.0
 
 
 def aggregate_daily_to_annual(
-    dates: list[str],
-    values: list,
+    dates: List[str],
+    values: List[Optional[float]],
     method: str = "mean",
-) -> dict[int, float]:
+) -> Dict[int, float]:
     """Group daily values by year and reduce to annual mean or sum."""
-    yearly: dict[int, list[float]] = {}
-    for date, val in zip(dates, values):
-        if val is None or float(val) == _FILL:
+    yearly: Dict[int, List[float]] = defaultdict(list)
+    for date_str, val in zip(dates, values):
+        if val is None:
             continue
-        year = int(date[:4])
-        yearly.setdefault(year, []).append(float(val))
-    result: dict[int, float] = {}
+        year = int(date_str[:4])
+        yearly[year].append(float(val))
+    result: Dict[int, float] = {}
     for year, vals in yearly.items():
         if not vals:
             continue
@@ -141,6 +144,15 @@ class OpenMeteoResult:
     error: str = ""
 
 
+def get_era5_safe_end_date(end_year: int) -> str:
+    """Return the latest ERA5 date that is safely within the ~7-day processing latency."""
+    today = date.today()
+    max_date = today - timedelta(days=7)
+    requested_end = date(end_year, 12, 31)
+    effective_end = min(requested_end, max_date)
+    return effective_end.strftime("%Y-%m-%d")
+
+
 async def fetch_era5_recent(
     latitude: float,
     longitude: float,
@@ -149,22 +161,18 @@ async def fetch_era5_recent(
 ) -> Era5Result:
     """Fetch real ERA5 reanalysis data from OpenMeteo archive API.
 
-    ERA5 has ~5-day processing latency. Returns observed data labelled
+    ERA5 has ~7-day processing latency. Returns observed data labelled
     source='era5', bridging the gap between the NASA POWER historical
     record (≤ 2025) and IPCC projections (future years).
     """
-    import datetime
-    today    = datetime.date.today()
-    end_date = min(
-        datetime.date(end_year, 12, 31),
-        today - datetime.timedelta(days=5),
-    )
-    start_date = datetime.date(start_year, 1, 1)
+    end_date_str = get_era5_safe_end_date(end_year)
+    end_date   = date.fromisoformat(end_date_str)
+    start_date = date(start_year, 1, 1)
 
     if end_date < start_date:
         logger.info(
-            "ERA5: no data available yet for %d–%d (today=%s, latency=5d)",
-            start_year, end_year, today,
+            "ERA5: no data available yet for %d–%d (latency=7d)",
+            start_year, end_year,
         )
         return Era5Result(latitude=latitude, longitude=longitude,
                           start_year=start_year, end_year=end_year)
@@ -335,6 +343,83 @@ async def _fetch_forecast(
     return records, url
 
 
+async def fetch_ipcc_projections(
+    lat: float,
+    lon: float,
+    start_year: int = 2026,
+    end_year: int = 2050,
+    scenario: str = "SSP2-4.5",
+) -> Tuple[Dict[int, float], Dict[int, float]]:
+    """Fetch IPCC projections and return (annual_temps, annual_precips) dicts.
+
+    Requests the 5-model ensemble. OpenMeteo may return per-model columns
+    (e.g. temperature_2m_mean_CMCC_CM2_VHR4) rather than a single averaged
+    field — this function averages all matching columns explicitly.
+    """
+    params = {
+        "latitude":   lat,
+        "longitude":  lon,
+        "start_date": f"{start_year}-01-01",
+        "end_date":   f"{end_year}-12-31",
+        "models":     _PROJECTION_ENSEMBLE,
+        "daily":      "temperature_2m_mean,precipitation_sum",
+        "timezone":   "UTC",
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(_PROJECTION_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+    daily_data = data.get("daily", {})
+    dates = daily_data.get("time", [])
+    if not dates:
+        logger.warning("OpenMeteo: no dates returned for %.4f,%.4f", lat, lon)
+        return {}, {}
+
+    temp_fields   = [k for k in daily_data if k.startswith("temperature_2m_mean")]
+    precip_fields = [k for k in daily_data if k.startswith("precipitation_sum")]
+
+    logger.info("OpenMeteo ensemble temp fields:   %s", temp_fields)
+    logger.info("OpenMeteo ensemble precip fields: %s", precip_fields)
+
+    n_days = len(dates)
+    daily_temps:  List[Optional[float]] = []
+    daily_precips: List[Optional[float]] = []
+
+    for i in range(n_days):
+        temp_vals = [
+            daily_data[f][i]
+            for f in temp_fields
+            if i < len(daily_data[f]) and daily_data[f][i] is not None and daily_data[f][i] != _FILL
+        ]
+        daily_temps.append(sum(temp_vals) / len(temp_vals) if temp_vals else None)
+
+    for i in range(n_days):
+        prec_vals = [
+            daily_data[f][i]
+            for f in precip_fields
+            if i < len(daily_data[f]) and daily_data[f][i] is not None and daily_data[f][i] != _FILL
+        ]
+        daily_precips.append(sum(prec_vals) / len(prec_vals) if prec_vals else None)
+
+    annual_temps   = aggregate_daily_to_annual(dates, daily_temps,  method="mean")
+    annual_precips = aggregate_daily_to_annual(dates, daily_precips, method="sum")
+
+    unique_temps = set(round(t, 1) for t in annual_temps.values())
+    if len(annual_temps) > 1 and len(unique_temps) < 2:
+        logger.error(
+            "OpenMeteo: projection temperatures still constant %s (lat=%.4f lon=%.4f)",
+            unique_temps, lat, lon,
+        )
+
+    logger.info(
+        "OpenMeteo: %d projection years retrieved (lat=%.4f lon=%.4f scenario=%s)",
+        len(annual_temps), lat, lon, scenario,
+    )
+    return annual_temps, annual_precips
+
+
 async def fetch_projection_range(
     latitude: float,
     longitude: float,
@@ -342,20 +427,30 @@ async def fetch_projection_range(
     end_year: int = 2050,
     scenario: str = "SSP2-4.5",
 ) -> "OpenMeteoResult":
-    """Fetch IPCC projections for an explicit year range with specified scenario."""
+    """Fetch IPCC projections and return an OpenMeteoResult with ProjectionRecords."""
     try:
-        records, url = await _fetch_projections(
-            latitude, longitude, start_year, end_year
+        annual_temps, annual_precips = await fetch_ipcc_projections(
+            latitude, longitude, start_year, end_year, scenario
         )
+        all_years = sorted(set(annual_temps) | set(annual_precips))
+        records = [
+            ProjectionRecord(
+                year=year,
+                temp_mean_c=round(annual_temps[year], 3) if year in annual_temps else 0.0,
+                precip_total_mm=round(annual_precips.get(year, 0.0), 1),
+            )
+            for year in all_years
+        ]
+        records = filter_valid_records(records, f"projection:{latitude:.4f},{longitude:.4f}")
         logger.info(
-            "OpenMeteo projection: lat=%.4f lon=%.4f years=%d-%d scenario=%s ensemble records=%d",
+            "fetch_projection_range: lat=%.4f lon=%.4f years=%d-%d scenario=%s records=%d",
             latitude, longitude, start_year, end_year, scenario, len(records),
         )
         return OpenMeteoResult(
             latitude=latitude,
             longitude=longitude,
             projection_records=records,
-            projection_url=url,
+            projection_url=f"{_PROJECTION_URL}?models={_PROJECTION_ENSEMBLE}",
             model=_PROJECTION_ENSEMBLE,
         )
     except Exception as exc:

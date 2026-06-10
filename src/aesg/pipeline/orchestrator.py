@@ -12,7 +12,8 @@ from typing import Any
 from ..data.nasa_adapter import AnnualClimateRecord, NasaClimateResult, fetch_climate_data
 from ..data.openmeteo_adapter import (
     Era5Result, OpenMeteoResult,
-    fetch_era5_recent, fetch_projection_range, _PROJECTION_MODEL,
+    fetch_era5_recent, fetch_ipcc_projections, fetch_projection_range,
+    _PROJECTION_ENSEMBLE,
 )
 from .climate_engine import calculate_climate_risk
 
@@ -719,7 +720,7 @@ async def run_analysis(
         "era5_error":                era5_result.error or None,
         "openmeteo_used":            needs_projection,
         "openmeteo_projection_url":  om_result.projection_url or None,
-        "openmeteo_model":           _PROJECTION_MODEL if needs_projection else None,
+        "openmeteo_model":           _PROJECTION_ENSEMBLE if needs_projection else None,
         "openmeteo_start_year":      om_start_year if needs_projection else None,
         "openmeteo_end_year":        end_year if needs_projection else None,
         "openmeteo_projection_years": len(om_result.projection_records),
@@ -804,7 +805,7 @@ async def run_analysis(
             "era5_error":         era5_result.error or None,
             "used":               needs_projection,
             "projection_url":     om_result.projection_url,
-            "model":              _PROJECTION_MODEL,
+            "model":              _PROJECTION_ENSEMBLE,
             "start_year":         om_start_year if needs_projection else None,
             "end_year":           end_year if needs_projection else None,
             "projection_records": [asdict(r) for r in om_result.projection_records],
