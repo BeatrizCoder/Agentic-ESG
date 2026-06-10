@@ -144,13 +144,10 @@ class OpenMeteoResult:
     error: str = ""
 
 
-def get_era5_safe_end_date(end_year: int) -> str:
-    """Return the latest ERA5 date that is safely within the ~7-day processing latency."""
-    today = date.today()
-    max_date = today - timedelta(days=7)
-    requested_end = date(end_year, 12, 31)
-    effective_end = min(requested_end, max_date)
-    return effective_end.strftime("%Y-%m-%d")
+def get_era5_safe_end_date() -> str:
+    """Return today minus 7 days — safely within ERA5's ~7-day processing latency."""
+    safe = date.today() - timedelta(days=7)
+    return safe.strftime("%Y-%m-%d")
 
 
 async def fetch_era5_recent(
@@ -165,7 +162,7 @@ async def fetch_era5_recent(
     source='era5', bridging the gap between the NASA POWER historical
     record (≤ 2025) and IPCC projections (future years).
     """
-    end_date_str = get_era5_safe_end_date(end_year)
+    end_date_str = get_era5_safe_end_date()
     end_date   = date.fromisoformat(end_date_str)
     start_date = date(start_year, 1, 1)
 
