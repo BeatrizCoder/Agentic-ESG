@@ -2695,6 +2695,8 @@ async function viewAnalysis(analysisId) {
     if (!response.ok) throw new Error('Analysis not found');
 
     const data = await response.json();
+    window.annualRecords = data.annual_records || [];
+    window._currentAnalysis = data;
 
     // Restore form fields so renderResults() picks up the correct region name.
     // Detect if this analysis was done in coords mode (label looks like "lat°, lon°")
@@ -3352,6 +3354,8 @@ async function runAnalysis() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    window.annualRecords = data.annual_records || [];
+    window._currentAnalysis = data;
     _currentId = data.analysis_id;
     renderResults(data);
 
