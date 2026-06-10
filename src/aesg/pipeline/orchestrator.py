@@ -649,37 +649,53 @@ async def run_analysis(
     )
 
     # ── Step 5: Quality Judge ──────────────────────────────────────────────────
-    from ..agents.crews import run_quality_judge_crew
+    # Skip for projection analyses (end_year > 2025) to avoid timeout — the
+    # pipeline already takes ~120s with projection data fetching.
+    skip_judge = end_year > 2025
 
-    logger.info("Step 5/5 — Quality Judge: validating report")
-    report_summary_for_judge = json.dumps({
-        "risk_score":  report.get("risk_score"),
-        "risk_level":  report.get("risk_level"),
-        "summary_excerpt": report.get("executive_summary", "")[:200],
-        "recs": [
-            {"fw": r.get("framework"), "art": r.get("article")}
-            for r in report.get("recommendations", [])[:5]
-        ],
-    })
-    quality_evaluation, tokens_judge = await run_quality_judge_crew(
-        climate_summary=climate_summary,
-        compliance_summary=compliance_summary,
-        report_summary=report_summary_for_judge,
-    )
-    confidence_score = int(quality_evaluation.get("confidence_score", 0))
-    sanity_penalty = climate_metrics.get("confidence_penalty", 0)
-    if sanity_penalty:
-        confidence_score = max(0, confidence_score - sanity_penalty)
-        logger.warning(
-            "Confidence reduced by %d (sanity failures) → final=%d for %r",
-            sanity_penalty, confidence_score, label,
+    if not skip_judge:
+        from ..agents.crews import run_quality_judge_crew
+
+        logger.info("Step 5/5 — Quality Judge: validating report")
+        report_summary_for_judge = json.dumps({
+            "risk_score":  report.get("risk_score"),
+            "risk_level":  report.get("risk_level"),
+            "summary_excerpt": report.get("executive_summary", "")[:200],
+            "recs": [
+                {"fw": r.get("framework"), "art": r.get("article")}
+                for r in report.get("recommendations", [])[:5]
+            ],
+        })
+        quality_evaluation, tokens_judge = await run_quality_judge_crew(
+            climate_summary=climate_summary,
+            compliance_summary=compliance_summary,
+            report_summary=report_summary_for_judge,
         )
-    logger.info(
-        "Step 5/5 complete: confidence=%s verdict=%s tokens=%s",
-        confidence_score,
-        quality_evaluation.get("verdict"),
-        tokens_judge.get("total_tokens"),
-    )
+        confidence_score = int(quality_evaluation.get("confidence_score", 0))
+        sanity_penalty = climate_metrics.get("confidence_penalty", 0)
+        if sanity_penalty:
+            confidence_score = max(0, confidence_score - sanity_penalty)
+            logger.warning(
+                "Confidence reduced by %d (sanity failures) → final=%d for %r",
+                sanity_penalty, confidence_score, label,
+            )
+        logger.info(
+            "Step 5/5 complete: confidence=%s verdict=%s tokens=%s",
+            confidence_score,
+            quality_evaluation.get("verdict"),
+            tokens_judge.get("total_tokens"),
+        )
+    else:
+        logger.info("Step 5/5 — Quality Judge: skipped (projection analysis, end_year=%d)", end_year)
+        quality_evaluation = {
+            "confidence_score": 65,
+            "verdict": "needs_review",
+        }
+        tokens_judge = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        confidence_score = 65
+        sanity_penalty = climate_metrics.get("confidence_penalty", 0)
+        if sanity_penalty:
+            confidence_score = max(0, confidence_score - sanity_penalty)
 
     hitl_required, hitl_reasons = _compute_hitl_flag(
         confidence_score=confidence_score,
@@ -688,6 +704,9 @@ async def run_analysis(
         annual_records=unified_records,
         climate_findings=climate_findings,
     )
+    if skip_judge:
+        hitl_required = True
+        hitl_reasons = ["Analysis includes climate projections — human expert review recommended"] + hitl_reasons
     logger.info("HITL flag: required=%s reasons=%s", hitl_required, hitl_reasons)
 
     transparency = _build_transparency(

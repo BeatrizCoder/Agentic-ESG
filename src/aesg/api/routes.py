@@ -49,7 +49,7 @@ async def health(request: Request) -> dict:
     }
 
 
-_PIPELINE_TIMEOUT_SEC = 180  # 5-agent pipeline; NASA + 4 LLM calls
+_PIPELINE_TIMEOUT_SEC = 300  # 5-agent pipeline; NASA + 4 LLM calls (projection analyses can take ~3 min)
 
 
 @router.post("/api/analyze", response_model=AnalysisResponse)

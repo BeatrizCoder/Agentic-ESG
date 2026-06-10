@@ -3333,6 +3333,14 @@ async function runAnalysis() {
     highlightStep(stepIdx);
   }, 14000);
 
+  const projectionWarning = end > 2025 ? setTimeout(() => {
+    if (btn.disabled) {
+      statusText.textContent = _lang === 'pt'
+        ? 'Análise inclui projeções climáticas — pode levar até 3 minutos…'
+        : 'Analysis includes climate projections — this may take up to 3 minutes…';
+    }
+  }, 90000) : null;
+
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (COOKIES_ACCEPTED && SESSION_ID) {
@@ -3376,6 +3384,7 @@ async function runAnalysis() {
     setTimeout(() => statusBar.classList.remove('visible'), 5000);
   } finally {
     clearInterval(stepTimer);
+    if (projectionWarning) clearTimeout(projectionWarning);
     document.querySelectorAll('.step-dot').forEach(d => d.classList.remove('active', 'done'));
     document.querySelectorAll('.pipeline-step').forEach(s => s.classList.remove('done'));
     statusBar.classList.remove('visible');
