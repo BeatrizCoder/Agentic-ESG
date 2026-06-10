@@ -1085,19 +1085,31 @@
     .hitl-flag {
       display: flex;
       gap: .75rem;
-      background: rgba(184,134,11,0.15);
-      border: 1px solid rgba(184,134,11,0.4);
-      border-left: 3px solid var(--risk-med);
       border-radius: 8px;
       padding: .75rem 1rem;
       margin-top: .75rem;
       margin-bottom: 1rem;
+      border: 1px solid transparent;
+      border-left-width: 3px;
     }
+    /* Risk-based HITL — amber/yellow */
+    .hitl-flag--risk {
+      background: rgba(184,134,11,0.12);
+      border-color: rgba(184,134,11,0.35);
+      border-left-color: var(--risk-med);
+    }
+    .hitl-flag--risk .hitl-title { color: var(--risk-med); }
+    /* Data quality HITL — orange/red */
+    .hitl-flag--data-quality {
+      background: rgba(196,74,32,0.10);
+      border-color: rgba(196,74,32,0.35);
+      border-left-color: #c44a20;
+    }
+    .hitl-flag--data-quality .hitl-title { color: #c44a20; }
     .hitl-icon { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
     .hitl-title {
       font-size: .8rem;
       font-weight: 600;
-      color: var(--risk-med);
       margin-bottom: .2rem;
     }
     .hitl-desc {
@@ -2105,11 +2117,11 @@
           <span class="confidence-badge" id="confidence-badge">—</span>
         </div>
         <div class="hitl-flag" id="hitl-flag" style="display:none">
-          <span class="hitl-icon">⚠️</span>
+          <span class="hitl-icon" id="hitl-icon">⚠️</span>
           <div>
-            <div class="hitl-title">Human Review Recommended</div>
-            <div class="hitl-desc">This analysis contains indicators that warrant expert validation before use in regulatory filings or investment decisions.</div>
-            <div class="hitl-reason" id="hitl-reason">—</div>
+            <div class="hitl-title" id="hitl-title"></div>
+            <div class="hitl-desc"  id="hitl-desc"></div>
+            <div class="hitl-reason" id="hitl-reason"></div>
           </div>
         </div>
         <div class="data-quality-notice" id="data-quality-notice" style="display:none">
@@ -3606,7 +3618,7 @@ function renderResults(data) {
   renderConfidence(data.confidence_score, data.quality_evaluation);
 
   /* HITL flag */
-  renderHitlFlag(data.hitl_required, data.hitl_reasons);
+  renderHitlFlag(data);
 
   /* Data quality notice */
   const qualityNotice = document.getElementById('data-quality-notice');
@@ -4047,15 +4059,52 @@ function renderConfidence(score, qe) {
 }
 
 /* ── HITL flag ───────────────────────────────────────────────────────────── */
-function renderHitlFlag(required, reasons) {
-  const flag   = document.getElementById('hitl-flag');
-  const reason = document.getElementById('hitl-reason');
-  if (required) {
-    flag.style.display = 'flex';
-    reason.textContent = (reasons && reasons.length) ? reasons.join(' · ') : '';
-  } else {
-    flag.style.display = 'none';
+function _classifyHitl(data) {
+  const reasons    = data.hitl_reasons    || [];
+  const dqIssues   = data.data_quality_issues || [];
+  const confidence = data.confidence_score ?? 100;
+  const records    = data.annual_records   || [];
+
+  // Explicit data-quality signal from backend reasons
+  const dataQualityReason = reasons.some(r =>
+    /data.?quality|insufficient|limited.*data|incomplete|sparse|coverage|nasa|records|short.*summary|no.*recommend/i.test(r)
+  );
+
+  if (dqIssues.length > 0 || dataQualityReason || confidence < 70 || records.length < 5) {
+    return 'data-quality';
   }
+  return 'risk';
+}
+
+function renderHitlFlag(data) {
+  const flag   = document.getElementById('hitl-flag');
+  const icon   = document.getElementById('hitl-icon');
+  const title  = document.getElementById('hitl-title');
+  const desc   = document.getElementById('hitl-desc');
+  const reason = document.getElementById('hitl-reason');
+
+  if (!data.hitl_required) {
+    flag.style.display = 'none';
+    return;
+  }
+
+  const kind = _classifyHitl(data);
+  flag.className = `hitl-flag hitl-flag--${kind}`;
+  flag.style.display = 'flex';
+
+  if (kind === 'data-quality') {
+    icon.textContent  = '⚠️';
+    title.textContent = 'Limited Data Quality';
+    desc.textContent  = 'Limited data quality. Results may be unreliable. Human expert review strongly recommended.';
+  } else {
+    icon.textContent  = '⚠️';
+    title.textContent = 'Human Review Recommended';
+    desc.textContent  = 'Extreme climate event detected. Human review recommended before regulatory use.';
+  }
+
+  reason.textContent = (data.hitl_reasons && data.hitl_reasons.length)
+    ? data.hitl_reasons.join(' · ')
+    : '';
 }
 
 /* ── How the AI Thinks tab ───────────────────────────────────────────────── */
