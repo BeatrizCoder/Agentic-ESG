@@ -1905,7 +1905,7 @@
           <input id="inp-lat-manual" type="number" step="0.0001" min="-90" max="90" value="-15.7801" placeholder="Lat" style="flex:1" />
           <input id="inp-lon-manual" type="number" step="0.0001" min="-180" max="180" value="-47.9292" placeholder="Lon" style="flex:1" />
         </div>
-        <a class="coords-toggle" id="coords-toggle" href="#" onclick="toggleCoords(event)">📍 Use coordinates instead</a>
+        <a class="coords-toggle" id="coords-toggle" href="#" onclick="toggleCoords(event)"><span id="t-coords-toggle">📍 Use coordinates instead</span></a>
       </div>
       <div class="field-group">
         <label id="t-from">From
@@ -2041,18 +2041,18 @@
       <button class="preset-btn" onclick="setPreset(52.5200,13.4050,'Berlin, Germany')">Berlin</button>
       <button class="preset-btn" onclick="setPreset(51.5074,-0.1278,'London, UK')">London</button>
     </div>
-    <p style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
+    <p id="t-ipcc-note" style="font-size:.65rem;color:var(--muted);margin-top:.4rem">
       ✦ Years after 2025 use OpenMeteo IPCC climate projections (model varies by scenario)
     </p>
 
     <!-- Batch — separated below with visual gap -->
     <div class="batch-row">
-      <button class="batch-btn" onclick="openBatchModal()">📊 Batch Analysis — analyze multiple regions at once</button>
+      <button class="batch-btn" id="t-batch-btn" onclick="openBatchModal()">📊 Batch Analysis — analyze multiple regions at once</button>
     </div>
 
     <!-- History Section -->
     <div id="history-section">
-      <div class="history-header">Your Recent Analyses</div>
+      <div class="history-header" id="t-recent-analyses">Your Recent Analyses</div>
       <div class="history-list" id="history-list"></div>
     </div>
   </section>
@@ -2736,6 +2736,11 @@ const I18N = {
     'export-pdf':      'Export PDF ↓',
     'footer':          'Session data stored as temporary cookie only. No personal data collected or retained. · Powered by NASA POWER API & Claude AI (Anthropic)',
     'tab-overview': 'Overview', 'tab-datasources': 'Data & Transparency', 'tab-reasoning': 'How the AI Thinks',
+    'coords-toggle':      '📍 Use coordinates instead',
+    'coords-toggle-hide': '✕ Use location search instead',
+    'ipcc-note':          '✦ Years after 2025 use OpenMeteo IPCC climate projections (model varies by scenario)',
+    'batch-btn':          '📊 Batch Analysis — analyze multiple regions at once',
+    'recent-analyses':    'Your Recent Analyses',
   },
   pt: {
     'headline':        'Análise de Risco Climático Físico',
@@ -2758,6 +2763,11 @@ const I18N = {
     'export-pdf':      'Exportar PDF ↓',
     'footer':          'Dados da sessão armazenados apenas como cookie temporário. Nenhum dado pessoal coletado ou retido. · Powered by NASA POWER API & Claude AI (Anthropic)',
     'tab-overview': 'Resumo', 'tab-datasources': 'Dados &amp; Transparência', 'tab-reasoning': 'Como a IA Pensa',
+    'coords-toggle':      '📍 Usar coordenadas',
+    'coords-toggle-hide': '✕ Usar busca por localização',
+    'ipcc-note':          '✦ Anos após 2025 usam projeções climáticas IPCC do OpenMeteo (modelo varia por cenário)',
+    'batch-btn':          '📊 Análise em Lote — analise múltiplas regiões de uma vez',
+    'recent-analyses':    'Suas Análises Recentes',
   },
   es: {
     'headline':        'Riesgo Climático Físico\nInteligencia.',
@@ -2780,6 +2790,11 @@ const I18N = {
     'export-pdf':      'Exportar PDF ↓',
     'footer':          'Datos de sesión almacenados solo como cookie temporal. No se recopilan datos personales.',
     'tab-overview': 'Resumen', 'tab-datasources': 'Fuentes de Datos', 'tab-reasoning': 'Cómo Piensa la IA',
+    'coords-toggle':      '📍 Usar coordenadas',
+    'coords-toggle-hide': '✕ Usar búsqueda de ubicación',
+    'ipcc-note':          '✦ Los años posteriores a 2025 usan proyecciones IPCC de OpenMeteo (el modelo varía según el escenario)',
+    'batch-btn':          '📊 Análisis por Lotes — analice múltiples regiones a la vez',
+    'recent-analyses':    'Sus Análisis Recientes',
   },
   fr: {
     'headline':        'Risque Climatique Physique\nIntelligence.',
@@ -2802,6 +2817,11 @@ const I18N = {
     'export-pdf':      'Exporter PDF ↓',
     'footer':          'Données de session stockées uniquement comme cookie temporaire. Aucune donnée personnelle collectée.',
     'tab-overview': 'Aperçu', 'tab-datasources': 'Sources de Données', 'tab-reasoning': 'Comment l\'IA Pense',
+    'coords-toggle':      '📍 Utiliser les coordonnées',
+    'coords-toggle-hide': '✕ Utiliser la recherche de lieu',
+    'ipcc-note':          '✦ Les années après 2025 utilisent les projections IPCC d\'OpenMeteo (le modèle varie selon le scénario)',
+    'batch-btn':          '📊 Analyse par Lots — analysez plusieurs régions à la fois',
+    'recent-analyses':    'Vos Analyses Récentes',
   },
   de: {
     'headline':        'Physisches Klimarisiko\nIntelligence.',
@@ -2824,6 +2844,11 @@ const I18N = {
     'export-pdf':      'PDF exportieren ↓',
     'footer':          'Sitzungsdaten werden nur als temporäres Cookie gespeichert. Keine personenbezogenen Daten werden erhoben.',
     'tab-overview': 'Übersicht', 'tab-datasources': 'Datenquellen', 'tab-reasoning': 'Wie die KI Denkt',
+    'coords-toggle':      '📍 Koordinaten verwenden',
+    'coords-toggle-hide': '✕ Ortssuche verwenden',
+    'ipcc-note':          '✦ Jahre nach 2025 verwenden OpenMeteo IPCC-Klimaprojektionen (Modell variiert je nach Szenario)',
+    'batch-btn':          '📊 Stapelanalyse — mehrere Regionen gleichzeitig analysieren',
+    'recent-analyses':    'Ihre letzten Analysen',
   },
 };
 
@@ -2902,6 +2927,20 @@ function setLang(l) {
   for (const [k, v] of Object.entries(d)) {
     const el = document.getElementById('t-' + k);
     if (el) el.textContent = v;
+  }
+
+  // Elements whose text is a full translated value (not label-only)
+  const ipccNote = document.getElementById('t-ipcc-note');
+  if (ipccNote && d['ipcc-note']) ipccNote.textContent = d['ipcc-note'];
+  const batchBtn = document.getElementById('t-batch-btn');
+  if (batchBtn && d['batch-btn']) batchBtn.textContent = d['batch-btn'];
+  const recentEl = document.getElementById('t-recent-analyses');
+  if (recentEl && d['recent-analyses']) recentEl.textContent = d['recent-analyses'];
+  // Coords toggle: update to whichever state is currently active
+  const coordsToggleSpan = document.getElementById('t-coords-toggle');
+  if (coordsToggleSpan) {
+    const key = _coordsModeActive ? 'coords-toggle-hide' : 'coords-toggle';
+    coordsToggleSpan.textContent = d[key] || coordsToggleSpan.textContent;
   }
 
   // Tab buttons use tab-btn-* ids, not t-* ids
@@ -3041,11 +3080,13 @@ function toggleCoords(e) {
   const toggle   = document.getElementById('coords-toggle');
   const locInput = document.getElementById('inp-location');
 
+  const d = I18N[_lang] || I18N.en;
   if (_coordsModeActive) {
     // Deactivate — restore text search
     _coordsModeActive = false;
     mc.classList.remove('visible');
-    toggle.textContent = '📍 Use coordinates instead';
+    const span = document.getElementById('t-coords-toggle');
+    if (span) span.textContent = d['coords-toggle'] || '📍 Use coordinates instead';
     locInput.disabled = false;
     locInput.style.opacity = '';
     // Restore label from the location text field (may be empty if user never searched)
@@ -3057,7 +3098,8 @@ function toggleCoords(e) {
     document.getElementById('inp-lat-manual').value = document.getElementById('inp-lat').value;
     document.getElementById('inp-lon-manual').value = document.getElementById('inp-lon').value;
     mc.classList.add('visible');
-    toggle.textContent = '✕ Use location search instead';
+    const span = document.getElementById('t-coords-toggle');
+    if (span) span.textContent = d['coords-toggle-hide'] || '✕ Use location search instead';
     locInput.disabled = true;
     locInput.style.opacity = '0.4';
     _hideGeoDrop();
@@ -3071,8 +3113,8 @@ function resetForm() {
     _coordsModeActive = false;
     const mc = document.getElementById('manual-coords');
     if (mc) mc.classList.remove('visible');
-    const toggle = document.getElementById('coords-toggle');
-    if (toggle) toggle.textContent = '📍 Use coordinates instead';
+    const toggleSpan = document.getElementById('t-coords-toggle');
+    if (toggleSpan) toggleSpan.textContent = (I18N[_lang] || I18N.en)['coords-toggle'] || '📍 Use coordinates instead';
     const locInput = document.getElementById('inp-location');
     if (locInput) { locInput.disabled = false; locInput.style.opacity = ''; }
   }
