@@ -2559,14 +2559,16 @@ function checkCookieConsent() {
   const banner = document.getElementById('cookie-banner');
   if (!banner) return;
 
-  const consent = getCookie('cs_consent')
-    || getCookie('aesg_consent');
+  const consent =
+    getCookie('aesg_consent') ||
+    getCookie('cs_consent');
   if (!consent) {
     banner.classList.add('visible');
   } else if (consent === 'accepted') {
     COOKIES_ACCEPTED = true;
-    SESSION_ID = getCookie('cs_session_id')
-      || getCookie('aesg_session_id');
+    SESSION_ID =
+      getCookie('aesg_session_id') ||
+      getCookie('cs_session_id');
     if (!SESSION_ID) {
       SESSION_ID = generateSessionId();
       setCookie('aesg_session_id', SESSION_ID, 2592000);
@@ -4439,7 +4441,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
 /* ── Modal scroll-to-accept ──────────────────────────────────────────────── */
 function _termsAccepted() {
-  return getCookie('aesg_terms_accepted') === 'true' && getCookie('aesg_privacy_accepted') === 'true';
+  return (getCookie('aesg_terms_accepted') === 'true' || getCookie('cs_terms_accepted') === 'true') &&
+         (getCookie('aesg_privacy_accepted') === 'true' || getCookie('cs_privacy_accepted') === 'true');
 }
 
 function _setAcceptBtn(btn, state) {
@@ -4499,11 +4502,15 @@ function _hideGate() {
 }
 
 function initGate() {
-  const termsAccepted = getCookie('aesg_terms_accepted');
-  const privacyAccepted = getCookie('aesg_privacy_accepted');
-
   const overlay = document.getElementById('gate-overlay');
   if (!overlay) return;
+
+  const termsAccepted =
+    getCookie('aesg_terms_accepted') ||
+    getCookie('cs_terms_accepted');
+  const privacyAccepted =
+    getCookie('aesg_privacy_accepted') ||
+    getCookie('cs_privacy_accepted');
 
   if (termsAccepted && privacyAccepted) {
     overlay.style.display = 'none';
@@ -4572,6 +4579,7 @@ function acceptModalTerms(modalId) {
 
   if (modalId === 'modal-terms') {
     setCookie('aesg_terms_accepted', 'true', 365 * 86400);
+    setCookie('cs_terms_accepted', 'true', 365 * 86400); // legacy
     closeModal('modal-terms');
     if (gateActive) {
       // Gate flow: advance to Privacy next
@@ -4579,6 +4587,7 @@ function acceptModalTerms(modalId) {
     }
   } else if (modalId === 'modal-privacy') {
     setCookie('aesg_privacy_accepted', 'true', 365 * 86400);
+    setCookie('cs_privacy_accepted', 'true', 365 * 86400); // legacy
     closeModal('modal-privacy');
     if (gateActive && _termsAccepted()) {
       _hideGate();
