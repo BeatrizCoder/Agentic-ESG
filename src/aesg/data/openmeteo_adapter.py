@@ -392,14 +392,33 @@ async def _fetch_projections(
     precip = daily.get("precipitation_sum",          [])
     et0    = daily.get("et0_fao_evapotranspiration", [])
 
+    logger.info("Raw temp values (first 10 days): %s", temps[:10])
     logger.info(
-        "Raw projected temp sample (temperature_2m_mean): %s",
-        [t for t in temps[:3] if t is not None],
+        "Temperature unit check: if values > 200, likely Kelvin. First non-null: %s",
+        next((t for t in temps if t is not None), None),
     )
+
+    # Kelvin → Celsius conversion if the API returns absolute temperature
+    if temps and any(t is not None and t > 200 for t in temps[:10]):
+        temps = [t - 273.15 if t is not None else None for t in temps]
+        logger.info("Converted Kelvin → Celsius (first value now: %s)", temps[0])
+
+    # Count valid daily values per year before reducing — used for debug logging
+    yearly_counts: dict[int, int] = {}
+    for date, val in zip(dates, temps):
+        if val is not None and float(val) != _FILL:
+            year = int(date[:4])
+            yearly_counts[year] = yearly_counts.get(year, 0) + 1
 
     annual_temps   = aggregate_daily_to_annual(dates, temps,  method="mean")
     annual_precips = aggregate_daily_to_annual(dates, precip, method="sum")
     annual_et0     = aggregate_daily_to_annual(dates, et0,    method="sum")
+
+    for year, mean_temp in sorted(annual_temps.items()):
+        logger.info(
+            "Year %d: %d days, mean=%.2f°C",
+            year, yearly_counts.get(year, 0), mean_temp,
+        )
 
     # Sanity check: warn on implausible individual values
     for year, temp in annual_temps.items():
