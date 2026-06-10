@@ -2554,17 +2554,20 @@ function declineCookies() {
 }
 
 function checkCookieConsent() {
-  const consent = getCookie('aesg_consent');
+  const banner = document.getElementById('cookie-banner');
+  if (!banner) return;
+
+  const consent = getCookie('cs_consent')
+    || getCookie('aesg_consent');
   if (!consent) {
-    // First visit - show banner
-    document.getElementById('cookie-banner').classList.add('visible');
+    banner.classList.add('visible');
   } else if (consent === 'accepted') {
     COOKIES_ACCEPTED = true;
-    SESSION_ID = getCookie('aesg_session_id');
+    SESSION_ID = getCookie('cs_session_id')
+      || getCookie('aesg_session_id');
     if (!SESSION_ID) {
-      // Cookie expired, generate new one
       SESSION_ID = generateSessionId();
-      setCookie('aesg_session_id', SESSION_ID, 86400);
+      setCookie('aesg_session_id', SESSION_ID, 2592000);
     }
     loadHistory();
   }
@@ -4470,16 +4473,18 @@ function _hideGate() {
 }
 
 function initGate() {
-  if (_termsAccepted()) {
-    // Return visit — go straight to cookie consent
-    const banner = document.getElementById('terms-gate');
-    if (banner) banner.style.display = 'none';
-    checkCookieConsent();
-    return;
+  const termsAccepted = getCookie('aesg_terms_accepted');
+  const privacyAccepted = getCookie('aesg_privacy_accepted');
+
+  const overlay = document.getElementById('gate-overlay');
+  if (!overlay) return;
+
+  if (termsAccepted && privacyAccepted) {
+    overlay.style.display = 'none';
+  } else {
+    overlay.style.display = 'flex';
+    openModal('modal-terms');
   }
-  _showGate();
-  // Open Terms modal after a brief render delay
-  setTimeout(() => openModal('modal-terms'), 250);
 }
 
 /* ── Modal open / close ──────────────────────────────────────────────────── */
