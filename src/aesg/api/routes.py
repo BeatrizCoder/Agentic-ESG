@@ -315,6 +315,23 @@ def _extract_comparison_score(result: dict) -> int | None:
     return None
 
 
+def _safe_extract_period(result: dict, label: str) -> dict:
+    """Return a sanitized flat period dict — fills missing keys with safe defaults."""
+    return {
+        "label":         result.get("label") or label,
+        "risk_score":    result.get("risk_score") or 0,
+        "risk_level":    result.get("risk_level") or "",
+        "temp_mean":     result.get("temp_mean") or 0.0,
+        "temp_trend":    result.get("temp_trend") or 0.0,
+        "precip_trend":  result.get("precip_trend"),
+        "drought_score": result.get("drought_score") or 0,
+        "flood_score":   result.get("flood_score") or 0,
+        "heat_score":    result.get("heat_stress_score") or 0,
+        "key_finding":   result.get("key_finding") or "",
+        "record_count":  result.get("record_count") or 0,
+    }
+
+
 @router.post("/api/analyze/compare")
 @limiter.limit("5/hour")
 async def compare_periods(request: Request, body: CompareRequest) -> dict:

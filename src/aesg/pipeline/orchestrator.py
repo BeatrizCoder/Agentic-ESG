@@ -947,6 +947,9 @@ async def run_comparison_pipeline(
     # mean), add an absolute temperature component so both periods are scored
     # against the SAME reference rather than each period's own first-3-year
     # baseline.  Each 1°C above the reference adds up to 8 points of risk.
+    temps = [r.get("temp_mean_celsius") or 0 for r in unified_records]
+    temp_mean = round(sum(temps) / len(temps), 2) if temps else 0.0
+
     if reference_temp_mean is not None:
         temp_above_ref = temp_mean - reference_temp_mean
         absolute_component = int(min(25, max(-15, temp_above_ref * 8)))
@@ -967,9 +970,6 @@ async def run_comparison_pipeline(
     elif risk_score > 45: risk_level = "high"
     elif risk_score > 25: risk_level = "medium"
     else:                 risk_level = "low"
-
-    temps = [r.get("temp_mean_celsius") or 0 for r in unified_records]
-    temp_mean = round(sum(temps) / len(temps), 2) if temps else 0.0
 
     return {
         "label":             f"{start_year}–{end_year}",
