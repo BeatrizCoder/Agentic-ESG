@@ -403,17 +403,15 @@ async def fetch_ipcc_projections(
         ]
         daily_precips.append(sum(prec_vals) / len(prec_vals) if prec_vals else None)
 
+    logger.info("First 10 dates: %s", dates[:10])
+    logger.info("First 10 ensemble temps:  %s", [round(t, 2) if t is not None else None for t in daily_temps[:10]])
+    logger.info("First 10 ensemble precip: %s", [round(p, 2) if p is not None else None for p in daily_precips[:10]])
+
     annual_temps   = aggregate_daily_to_annual(dates, daily_temps,  method="mean")
     annual_precips = aggregate_daily_to_annual(dates, daily_precips, method="sum")
 
-    logger.info(
-        "Annual temps (first 5):   %s",
-        {k: round(v, 1) for k, v in list(annual_temps.items())[:5]},
-    )
-    logger.info(
-        "Annual precip (first 5):  %s",
-        {k: round(v, 0) for k, v in list(annual_precips.items())[:5]},
-    )
+    logger.info("Annual temps all years:  %s", {k: round(v, 2) for k, v in annual_temps.items()})
+    logger.info("Annual precip all years: %s", {k: round(v, 1) for k, v in annual_precips.items()})
 
     for year, precip in list(annual_precips.items()):
         if precip > 3000:
