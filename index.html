@@ -4825,12 +4825,16 @@ function _renderBatchResults(data) {
     const isErr = r.status === 'error';
     const tr = document.createElement('tr');
 
+    const errMsg    = r.error || 'Unknown error';
+    const errShort  = errMsg.length > 60 ? errMsg.substring(0, 57) + '…' : errMsg;
+    const errEscape = errMsg.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
     const scoreHtml = isErr
-      ? `<span style="color:var(--risk-high);font-size:.72rem">Error</span>`
+      ? `<span style="color:var(--risk-high);font-size:.72rem;cursor:help" title="${errEscape}">Error ⓘ</span>`
       : `<strong style="color:${_scoreColor(r.risk_score)}">${r.risk_score}</strong>`;
 
     const levelHtml = isErr
-      ? `<span style="color:var(--muted);font-size:.7rem">${(r.error || '').substring(0, 45)}</span>`
+      ? `<span style="color:var(--muted);font-size:.68rem;cursor:help" title="${errEscape}">${errShort}</span>`
       : `<span class="risk-badge ${r.risk_level}" style="font-size:.62rem;padding:.12rem .4rem">${r.risk_level.toUpperCase()}</span>`;
 
     const modeHtml = r.comparison_mode

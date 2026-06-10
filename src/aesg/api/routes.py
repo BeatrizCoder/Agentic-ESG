@@ -610,18 +610,34 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                 })
                 logger.info("Batch %s row %d/%d done: %r score=%d", job_id, i + 1, job["total"], region, result.risk_score)
 
-        except Exception as exc:
-            logger.warning("Batch %s row %d/%d failed: %r error=%s", job_id, i + 1, job["total"], region, exc)
+        except asyncio.TimeoutError:
+            err_msg = "Pipeline timed out after 120s — NASA API may be slow, please retry"
+            logger.warning("Batch %s row %d/%d TIMEOUT: %r", job_id, i + 1, job["total"], region)
             job["results"].append({
                 "region": region, "latitude": lat, "longitude": lon,
                 "sector": sector, "scenario": scenario,
                 "risk_score": 0, "risk_level": "", "investment_status": "",
                 "confidence_score": 0, "analysis_id": "",
                 "comparison_mode": False,
-                "period_1": None,
-                "period_2": None,
-                "delta": None,
-                "status": "error", "error": str(exc)[:200],
+                "period_1": None, "period_2": None, "delta": None,
+                "status": "error", "error": err_msg,
+            })
+            job["failed"] += 1
+        except Exception as exc:
+            err_msg = str(exc) or f"{type(exc).__name__} (no message)"
+            logger.warning(
+                "Batch %s row %d/%d failed: %r — %s: %s",
+                job_id, i + 1, job["total"], region, type(exc).__name__, err_msg,
+                exc_info=True,
+            )
+            job["results"].append({
+                "region": region, "latitude": lat, "longitude": lon,
+                "sector": sector, "scenario": scenario,
+                "risk_score": 0, "risk_level": "", "investment_status": "",
+                "confidence_score": 0, "analysis_id": "",
+                "comparison_mode": False,
+                "period_1": None, "period_2": None, "delta": None,
+                "status": "error", "error": f"{type(exc).__name__}: {err_msg}"[:300],
             })
             job["failed"] += 1
 
