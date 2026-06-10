@@ -26,8 +26,12 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
     if sector_thresholds:
         thresholds.update(sector_thresholds)
 
-    nasa_records = [r for r in annual_records if r.get("source") == "nasa"]
-    calc_records = nasa_records if len(nasa_records) >= 3 else annual_records
+    nasa_records  = [r for r in annual_records if r.get("source") == "nasa"]
+    era5_records  = [r for r in annual_records if r.get("source") == "era5"]
+    proj_records  = [r for r in annual_records if r.get("source") == "projection"]
+
+    observed = nasa_records + era5_records
+    calc_records = observed if len(observed) >= 3 else annual_records
 
     temps   = [r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0 for r in calc_records]
     precips = [r.get("precip_total_mm") or 0 for r in calc_records]
@@ -95,7 +99,6 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
     hottest_year = max(nasa_temps, key=lambda x: x[1])[0] if nasa_temps else None
     driest_year  = years[precips.index(min(precips))] if precips else None
 
-    proj_records = [r for r in annual_records if r.get("source") == "projection"]
     proj_temps = [(r.get("year"), r.get("temp_mean_celsius") or r.get("temp_mean_c") or 0) for r in proj_records]
     projected_hottest = max(proj_temps, key=lambda x: x[1])[0] if proj_temps else None
 

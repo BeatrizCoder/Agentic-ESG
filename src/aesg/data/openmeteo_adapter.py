@@ -17,7 +17,14 @@ logger = logging.getLogger(__name__)
 _ERA5_URL        = "https://archive-api.open-meteo.com/v1/archive"
 _FORECAST_URL    = "https://api.open-meteo.com/v1/forecast"
 _PROJECTION_URL  = "https://climate-api.open-meteo.com/v1/climate"
-_PROJECTION_MODEL = "EC_Earth3P_HR"  # Default: SSP2-4.5
+_PROJECTION_MODEL = "EC_Earth3P_HR"  # kept for backward compat
+_PROJECTION_ENSEMBLE = ",".join([
+    "CMCC_CM2_VHR4",
+    "MRI_AGCM3_2_S",
+    "EC_Earth3P_HR",
+    "MPI_ESM1_2_XR",
+    "NICAM16_8S",
+])
 
 TEMP_RANGE   = (-5.0, 40.0)
 PRECIP_RANGE = (0.0, 4000.0)
@@ -51,6 +58,26 @@ def filter_valid_records(records: list, region: str) -> list:
         logger.warning("%d/%d records discarded for %r due to invalid values", discarded, total, region)
     return valid
 _FILL = -999.0
+
+
+def aggregate_daily_to_annual(
+    dates: list[str],
+    values: list,
+    method: str = "mean",
+) -> dict[int, float]:
+    """Group daily values by year and reduce to annual mean or sum."""
+    yearly: dict[int, list[float]] = {}
+    for date, val in zip(dates, values):
+        if val is None or float(val) == _FILL:
+            continue
+        year = int(date[:4])
+        yearly.setdefault(year, []).append(float(val))
+    result: dict[int, float] = {}
+    for year, vals in yearly.items():
+        if not vals:
+            continue
+        result[year] = sum(vals) / len(vals) if method == "mean" else sum(vals)
+    return result
 
 # IPCC Shared Socioeconomic Pathways (SSP) scenario mapping
 SCENARIO_MODELS = {
@@ -316,21 +343,20 @@ async def fetch_projection_range(
     scenario: str = "SSP2-4.5",
 ) -> "OpenMeteoResult":
     """Fetch IPCC projections for an explicit year range with specified scenario."""
-    model = SCENARIO_MODELS.get(scenario, SCENARIO_MODELS["SSP2-4.5"])
     try:
         records, url = await _fetch_projections(
-            latitude, longitude, start_year, end_year, model
+            latitude, longitude, start_year, end_year
         )
         logger.info(
-            "OpenMeteo projection: lat=%.4f lon=%.4f years=%d-%d scenario=%s model=%s records=%d",
-            latitude, longitude, start_year, end_year, scenario, model, len(records),
+            "OpenMeteo projection: lat=%.4f lon=%.4f years=%d-%d scenario=%s ensemble records=%d",
+            latitude, longitude, start_year, end_year, scenario, len(records),
         )
         return OpenMeteoResult(
             latitude=latitude,
             longitude=longitude,
             projection_records=records,
             projection_url=url,
-            model=model,
+            model=_PROJECTION_ENSEMBLE,
         )
     except Exception as exc:
         logger.warning("fetch_projection_range failed: %s", exc)
@@ -342,15 +368,14 @@ async def _fetch_projections(
     longitude: float,
     start_year: int = 2024,
     end_year: int = 2050,
-    model: str = _PROJECTION_MODEL,
 ) -> tuple[list[ProjectionRecord], str]:
     params = {
-        "latitude": latitude,
-        "longitude": longitude,
+        "latitude":   latitude,
+        "longitude":  longitude,
         "start_date": f"{start_year}-01-01",
         "end_date":   f"{end_year}-12-31",
-        "models": model,
-        "daily": "temperature_2m_mean,precipitation_sum,et0_fao_evapotranspiration",
+        "models":     _PROJECTION_ENSEMBLE,
+        "daily":      "temperature_2m_mean,precipitation_sum,et0_fao_evapotranspiration",
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         req = client.build_request("GET", _PROJECTION_URL, params=params)
@@ -360,7 +385,7 @@ async def _fetch_projections(
         payload = resp.json()
 
     daily = payload.get("daily", {})
-    logger.info("OpenMeteo fields: %s", list(daily.keys()))
+    logger.info("OpenMeteo projection fields: %s", list(daily.keys()))
 
     dates  = daily.get("time", [])
     temps  = daily.get("temperature_2m_mean",        [])
@@ -372,33 +397,35 @@ async def _fetch_projections(
         [t for t in temps[:3] if t is not None],
     )
 
-    # Aggregate to annual means/totals
-    annual_temps:   dict[int, list[float]] = {}
-    annual_precips: dict[int, list[float]] = {}
-    annual_et0:     dict[int, list[float]] = {}
-    for i, date_str in enumerate(dates):
-        year = int(date_str[:4])
-        t = temps[i]  if i < len(temps)  else None
-        p = precip[i] if i < len(precip) else None
-        e = et0[i]    if i < len(et0)    else None
-        if t is not None and float(t) != _FILL:
-            annual_temps.setdefault(year, []).append(float(t))
-        if p is not None and float(p) != _FILL:
-            annual_precips.setdefault(year, []).append(float(p))
-        if e is not None and float(e) != _FILL:
-            annual_et0.setdefault(year, []).append(float(e))
+    annual_temps   = aggregate_daily_to_annual(dates, temps,  method="mean")
+    annual_precips = aggregate_daily_to_annual(dates, precip, method="sum")
+    annual_et0     = aggregate_daily_to_annual(dates, et0,    method="sum")
+
+    # Sanity check: warn on implausible individual values
+    for year, temp in annual_temps.items():
+        if temp < 10 or temp > 40:
+            logger.warning(
+                "Suspicious projection temp %.2f°C for year %d (lat=%.4f lon=%.4f)",
+                temp, year, latitude, longitude,
+            )
+
+    # Sanity check: constant temperatures indicate broken aggregation
+    if len(annual_temps) >= 3:
+        unique_rounded = set(round(t, 1) for t in annual_temps.values())
+        if len(unique_rounded) < 3:
+            logger.error(
+                "Projection temperatures appear constant (%s) — "
+                "ensemble aggregation may be broken (lat=%.4f lon=%.4f)",
+                unique_rounded, latitude, longitude,
+            )
+            return [], url
 
     records = [
         ProjectionRecord(
             year=year,
-            # Only compute mean when the year has actual temperature data;
-            # years with only precipitation data must not default to 0°C as
-            # that would artificially depress the projected annual mean.
-            temp_mean_c=round(
-                sum(annual_temps[year]) / len(annual_temps[year]), 3
-            ) if year in annual_temps else 0.0,
-            precip_total_mm=round(sum(annual_precips.get(year, [0])), 1),
-            evapotranspiration_mm=round(sum(annual_et0.get(year, [0])), 1),
+            temp_mean_c=round(annual_temps[year], 3) if year in annual_temps else 0.0,
+            precip_total_mm=round(annual_precips.get(year, 0.0), 1),
+            evapotranspiration_mm=round(annual_et0.get(year, 0.0), 1),
         )
         for year in sorted(set(annual_temps) | set(annual_precips))
     ]
@@ -412,9 +439,9 @@ async def _fetch_projections(
             if mean_t < 5.0:
                 logger.warning(
                     "Projected mean temperature %.2f°C looks low — "
-                    "verify temperature_2m_mean is returned by model %s "
+                    "verify temperature_2m_mean is in ensemble response "
                     "(lat=%.4f lon=%.4f). Check for fill values or unit issues.",
-                    mean_t, model, latitude, longitude,
+                    mean_t, latitude, longitude,
                 )
 
     records = filter_valid_records(records, f"projection:{latitude:.4f},{longitude:.4f}")

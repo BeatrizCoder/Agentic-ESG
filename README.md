@@ -127,7 +127,7 @@ Location Input (lat/lon)
 - Same 5-parameter coverage as NASA POWER
 
 **OpenMeteo IPCC Climate API (2027–2050)**
-- IPCC AR6 climate projections using EC_Earth3P_HR model
+- IPCC AR6 climate projections using a 5-model ensemble (CMCC_CM2_VHR4, MRI_AGCM3_2_S, EC_Earth3P_HR, MPI_ESM1_2_XR, NICAM16_8S)
 - Three emissions scenarios: SSP1-2.6 (optimistic), SSP2-4.5 (moderate), SSP5-8.5 (high)
 - Daily resolution: temperature, precipitation, evapotranspiration (ET0)
 - Enables long-term risk forecasting across scenario space
@@ -356,6 +356,7 @@ When data quality issues are detected:
 ### Known Limitations
 - NASA POWER data available from 1981 to 2025
 - OpenMeteo IPCC projections available from 2026 to 2050
+- Climate projections use an ensemble of 5 IPCC models (CMCC_CM2_VHR4, MRI_AGCM3_2_S, EC_Earth3P_HR, MPI_ESM1_2_XR, NICAM16_8S) to improve reliability. Risk scores are calculated exclusively from observed NASA POWER and ERA5 data. Projections are used only for visualization of future climate trajectories.
 - Spatial resolution: ~0.5° × 0.5° (~55km at equator)
 - Some remote locations may have sparse satellite coverage
 - Mountain regions above 2,000m altitude may show reduced data quality due to topographic effects
