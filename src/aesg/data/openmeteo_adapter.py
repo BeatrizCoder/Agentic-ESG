@@ -71,7 +71,7 @@ def aggregate_daily_to_annual(
     """Group daily values by year and reduce to annual mean or sum."""
     yearly: Dict[int, List[float]] = defaultdict(list)
     for date_str, val in zip(dates, values):
-        if val is None:
+        if val is None or val == -999.0:
             continue
         year = int(date_str[:4])
         yearly[year].append(float(val))
@@ -405,6 +405,28 @@ async def fetch_ipcc_projections(
 
     annual_temps   = aggregate_daily_to_annual(dates, daily_temps,  method="mean")
     annual_precips = aggregate_daily_to_annual(dates, daily_precips, method="sum")
+
+    logger.info(
+        "Annual temps (first 5):   %s",
+        {k: round(v, 1) for k, v in list(annual_temps.items())[:5]},
+    )
+    logger.info(
+        "Annual precip (first 5):  %s",
+        {k: round(v, 0) for k, v in list(annual_precips.items())[:5]},
+    )
+
+    for year, precip in list(annual_precips.items()):
+        if precip > 3000:
+            logger.error(
+                "Precipitation %.0fmm for %d is impossible — removing from results",
+                precip, year,
+            )
+            del annual_precips[year]
+        elif precip < 50:
+            logger.warning(
+                "Precipitation %.0fmm for %d is suspiciously low",
+                precip, year,
+            )
 
     unique_temps = set(round(t, 1) for t in annual_temps.values())
     if len(annual_temps) > 1 and len(unique_temps) < 2:
