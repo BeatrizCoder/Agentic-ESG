@@ -531,7 +531,7 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                         sector=sector,
                         start_year=compare_start_year, end_year=compare_end_year,
                     ),
-                    timeout=120,
+                    timeout=180,
                 )
                 await asyncio.sleep(2)
                 p2 = await asyncio.wait_for(
@@ -540,7 +540,7 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                         sector=sector,
                         start_year=start_year, end_year=end_year,
                     ),
-                    timeout=120,
+                    timeout=180,
                 )
                 p1["risk_score"] = _extract_comparison_score(p1) or 0
                 p2["risk_score"] = _extract_comparison_score(p2) or 0
@@ -565,7 +565,7 @@ async def _process_batch(job_id: str, rows: list, session_id: str | None) -> Non
                         start_year=start_year, end_year=end_year,
                         sector=sector, scenario=scenario,
                     ),
-                    timeout=120,
+                    timeout=180,
                 )
 
             if compare_mode:
