@@ -1247,12 +1247,14 @@
     .compliance-card  { grid-column: 1 / -1; }
 
     /* ── Projection chart ────────────────────────────────────────────────── */
-    .proj-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    .proj-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; min-width: 0; }
+    .proj-header > div:first-child { min-width: 0; overflow: hidden; }
+    .proj-header .card-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .proj-toggle { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
     .proj-toggle button { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .68rem; padding: .25rem .75rem; cursor: pointer; transition: background .15s, color .15s; white-space: nowrap; }
     .proj-toggle button.active { background: var(--green2); color: var(--text); }
     .proj-legend { display: flex; gap: 1.1rem; margin-bottom: .5rem; flex-wrap: wrap; }
-    .proj-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); }
+    .proj-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); white-space: nowrap; }
     .proj-legend-line { width: 22px; height: 2px; }
     .proj-legend-line.nasa   { background: #2e7d9a; }
     .proj-legend-line.dashed { background: repeating-linear-gradient(90deg, #c46a2a 0, #c46a2a 4px, transparent 4px, transparent 8px); }
@@ -3987,7 +3989,7 @@ function _drawProjectionChart() {
   ctx.scale(dpr, dpr);
 
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  const PAD = { top: 20, right: 16, bottom: 28, left: 46 };
+  const PAD = { top: 20, right: 28, bottom: 28, left: 46 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top  - PAD.bottom;
 
@@ -4110,8 +4112,9 @@ function _drawProjectionChart() {
   }
   if (hasProj) {
     const mid = _projFuture[Math.floor(_projFuture.length / 2)].year;
+    const labelX = Math.min(xOf(mid), W - PAD.right - 38);
     ctx.fillStyle = 'rgba(196,106,42,0.7)';
-    ctx.fillText('IPCC Projected', xOf(mid), PAD.top + 12);
+    ctx.fillText('IPCC Projected', labelX, PAD.top + 12);
   }
 
   // ── X-axis labels ─────────────────────────────────────────────────────────
