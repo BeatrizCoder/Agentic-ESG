@@ -3588,12 +3588,14 @@ function renderResults(data) {
   });
 
   if (annual.length) {
-    const last    = annual[annual.length - 1];
-    const nasaRecs = annual.filter(r => (r.source || 'nasa') === 'nasa');
-    const temps    = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
-    const precips  = annual.map(r => r.precip_total_mm   ?? 0);
-    const solars   = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
-    const soils    = annual.map(r => r.soil_moisture_m3m3   ?? 0);
+    const last      = annual[annual.length - 1];
+    const nasaRecs  = annual.filter(r => (r.source || 'nasa') === 'nasa');
+    const era5Recs  = annual.filter(r => r.source === 'era5');
+    const projRecs  = annual.filter(r => r.source === 'projection');
+    const allTemps  = annual.map(r => r.temp_mean_celsius ?? r.temp_mean_c ?? 0);
+    const allPrecips = annual.map(r => r.precip_total_mm  ?? 0);
+    const solars    = annual.map(r => r.solar_mean_kwh_m2 ?? 0);
+    const soils     = annual.map(r => r.soil_moisture_m3m3 ?? 0);
 
     document.getElementById('chart-temp-val').textContent   = (last.temp_mean_celsius   ?? last.temp_mean_c ?? 0).toFixed(1);
     document.getElementById('chart-precip-val').textContent = (last.precip_total_mm     ?? 0).toFixed(0);
@@ -3674,8 +3676,8 @@ function renderResults(data) {
     if (!soils.some(v => v > 0))  { const c = document.getElementById('chart-soil-card');  if (c) c.style.display = 'none'; }
 
     setTimeout(() => {
-      drawBars('canvas-temp',   temps,   'rising');
-      drawBars('canvas-precip', precips, 'declining');
+      drawBars('canvas-temp',   allTemps,   'rising');
+      drawBars('canvas-precip', allPrecips, 'declining');
       if (solars.some(v => v > 0)) drawBars('canvas-solar', solars, 'stable');
       if (soils.some(v => v > 0))  drawBars('canvas-soil', soils, 'stable');
     }, 50);
@@ -3961,6 +3963,14 @@ function renderProjections(annualRecords) {
   _projHistorical = annualRecords.filter(r => (r.source || 'nasa') === 'nasa').map(toPoint);
   _projEra5       = annualRecords.filter(r => r.source === 'era5').map(toPoint);
   _projFuture     = annualRecords.filter(r => r.source === 'projection').map(toPoint);
+
+  // Bridge: prepend last observed point to projection series so the line is continuous
+  if (_projFuture.length > 0) {
+    const anchor = _projEra5.length > 0
+      ? _projEra5[_projEra5.length - 1]
+      : _projHistorical.length > 0 ? _projHistorical[_projHistorical.length - 1] : null;
+    if (anchor) _projFuture.unshift(anchor);
+  }
 
   if (_projHistorical.length < 2 && !_projEra5.length) return;
   document.getElementById('proj-card').style.display = '';
