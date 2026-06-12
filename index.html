@@ -2734,6 +2734,7 @@ async function viewAnalysis(analysisId) {
     if (data.sector)   { const el = document.getElementById('inp-sector');   if (el) el.value = data.sector;   }
     if (data.scenario) { const el = document.getElementById('inp-scenario'); if (el) el.value = data.scenario; }
 
+    _currentId = analysisId;
     renderResults(data);
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
@@ -3538,6 +3539,9 @@ function renderComparison(data) {
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
 function renderResults(data) {
+  _currentId = data.analysis_id || data.id || '';
+  console.log('renderResults: analysis_id =', _currentId);
+
   const score  = data.risk_score  || 0;
   const level  = data.risk_level  || 'low';
   const badge  = (RISK_LABELS[_lang] || RISK_LABELS.en)[level] || data.risk_badge_label || level.toUpperCase() + ' RISK';
@@ -3747,7 +3751,8 @@ function renderResults(data) {
 
 /* ── PDF export ──────────────────────────────────────────────────────────── */
 async function exportPdf() {
-  if (!_currentId) { alert('No analysis to export'); return; }
+  console.log('Export PDF: using analysis_id =', _currentId);
+  if (!_currentId) { alert('No analysis loaded. Please run an analysis first.'); return; }
 
   const btn = document.getElementById('t-export-pdf');
   const origText = btn ? btn.textContent : '';
@@ -3778,7 +3783,8 @@ async function exportPdf() {
 }
 
 async function exportExcel() {
-  if (!_currentId) { alert('No analysis to export'); return; }
+  console.log('Export Excel: using analysis_id =', _currentId);
+  if (!_currentId) { alert('No analysis loaded. Please run an analysis first.'); return; }
   const btn = document.querySelector('.export-btn[onclick="exportExcel()"]');
   const origText = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
