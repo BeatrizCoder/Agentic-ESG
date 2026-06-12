@@ -2520,14 +2520,17 @@ let COOKIES_ACCEPTED = false;
 let currentGlossaryLang = 'en';
 
 function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  const value = match ? match[2] : null;
+  console.log('[Cookie] get:', name, '=', value);
+  return value;
 }
 
-function setCookie(name, value, maxAgeSeconds) {
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+function setCookie(name, value, days) {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  console.log('[Cookie] set:', name, '=', value);
 }
 
 function deleteCookie(name) {
@@ -2541,8 +2544,8 @@ function generateSessionId() {
 function acceptCookies() {
   COOKIES_ACCEPTED = true;
   SESSION_ID = generateSessionId();
-  setCookie('aesg_session_id', SESSION_ID, 2592000); // 30 days
-  setCookie('aesg_consent', 'accepted', 86400);
+  setCookie('aesg_session_id', SESSION_ID, 30);
+  setCookie('aesg_consent', 'accepted', 1);
   document.getElementById('cookie-banner').classList.remove('visible');
   loadHistory();
 }
@@ -2551,7 +2554,7 @@ function declineCookies() {
   COOKIES_ACCEPTED = false;
   SESSION_ID = null;
   deleteCookie('aesg_session_id');
-  setCookie('aesg_consent', 'declined', 86400);
+  setCookie('aesg_consent', 'declined', 1);
   document.getElementById('cookie-banner').classList.remove('visible');
 }
 
@@ -2571,7 +2574,7 @@ function checkCookieConsent() {
       getCookie('cs_session_id');
     if (!SESSION_ID) {
       SESSION_ID = generateSessionId();
-      setCookie('aesg_session_id', SESSION_ID, 2592000);
+      setCookie('aesg_session_id', SESSION_ID, 30);
     }
     loadHistory();
   }
@@ -4507,7 +4510,11 @@ function _hideGate() {
   checkCookieConsent();
 }
 
+let _gateInitialized = false;
 function initGate() {
+  if (_gateInitialized) return;
+  _gateInitialized = true;
+
   const overlay = document.getElementById('gate-overlay');
   if (!overlay) return;
 
@@ -4518,10 +4525,14 @@ function initGate() {
     getCookie('aesg_privacy_accepted') ||
     getCookie('cs_privacy_accepted');
 
+  console.log('[Gate] terms:', termsAccepted, 'privacy:', privacyAccepted);
+
   if (termsAccepted && privacyAccepted) {
-    overlay.style.display = 'none';
+    _hideGate();
+    console.log('[Gate] opened — cookies found');
   } else {
-    overlay.style.display = 'flex';
+    _showGate();
+    console.log('[Gate] blocked — cookies missing');
     openModal('modal-terms');
   }
 }
@@ -4584,16 +4595,16 @@ function acceptModalTerms(modalId) {
   const gateActive = document.getElementById('gate-overlay').classList.contains('active');
 
   if (modalId === 'modal-terms') {
-    setCookie('aesg_terms_accepted', 'true', 365 * 86400);
-    setCookie('cs_terms_accepted', 'true', 365 * 86400); // legacy
+    setCookie('aesg_terms_accepted', 'true', 365);
+    setCookie('cs_terms_accepted', 'true', 365);
     closeModal('modal-terms');
     if (gateActive) {
       // Gate flow: advance to Privacy next
       setTimeout(() => openModal('modal-privacy'), 150);
     }
   } else if (modalId === 'modal-privacy') {
-    setCookie('aesg_privacy_accepted', 'true', 365 * 86400);
-    setCookie('cs_privacy_accepted', 'true', 365 * 86400); // legacy
+    setCookie('aesg_privacy_accepted', 'true', 365);
+    setCookie('cs_privacy_accepted', 'true', 365);
     closeModal('modal-privacy');
     if (gateActive && _termsAccepted()) {
       _hideGate();
