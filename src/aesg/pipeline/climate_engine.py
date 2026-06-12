@@ -19,7 +19,7 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
     
     # Default thresholds (General sector)
     thresholds = {
-        "drought_critical": 75,
+        "drought_critical": 45,
         "heat_critical": 50,
         "flood_critical": 40,
     }
@@ -163,6 +163,19 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         else:
             urgency = "LOW"
 
+    # Composite risk score (0-100) — canonical formula used by all callers
+    _score = 0
+    if heat_stress_score > 70:   _score += 35
+    elif heat_stress_score > 45: _score += 20
+    if drought_score > 70:       _score += 25
+    elif drought_score > 45:     _score += 15
+    if flood_score > 70:         _score += 25
+    elif flood_score > 45:       _score += 15
+    if temp_trend > 0.5:         _score += 5
+    if precip_trend_display is not None and precip_trend_display < -10:
+        _score += 5
+    risk_score = min(100, max(0, _score))
+
     return {
         # Trends
         "temp_trend_c_per_decade":     temp_trend,
@@ -184,6 +197,7 @@ def calculate_climate_risk(annual_records: list, sector_thresholds: dict | None 
         "driest_year":            driest_year,
         "anomaly_years":          anomaly_years,
         # Scores
+        "risk_score":        risk_score,
         "drought_score":     round(drought_score, 1),
         "heat_stress_score": round(heat_stress_score, 1),
         "flood_score":       round(flood_score, 1),

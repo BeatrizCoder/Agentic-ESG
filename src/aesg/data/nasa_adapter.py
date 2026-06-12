@@ -25,6 +25,9 @@ from ..core.config import (
 
 logger = logging.getLogger(__name__)
 
+# EVPTRNS = NASA POWER parameter for evapotranspiration
+# Equivalent to FAO-56 ET0 reference evapotranspiration
+# Documentation: https://power.larc.nasa.gov/
 _PARAMETERS = "T2M,PRECTOTCORR,ALLSKY_SFC_SW_DWN,EVPTRNS"
 _FILL_VALUE = -999.0
 

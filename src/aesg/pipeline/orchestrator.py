@@ -1,4 +1,4 @@
-"""CS analysis pipeline — sequential orchestration of the 4 agents."""
+"""Agentic ESG pipeline — sequential orchestration of 5 agents: Climate Interpreter, ESG Strategist, Report Writer, Quality Judge + Climate Risk Engine."""
 
 import asyncio
 import json
@@ -926,22 +926,8 @@ async def run_comparison_pipeline(
     })
     climate_narrative, _ = await run_climate_analysis_crew(climate_task_input)
 
-    # Derive risk score using the same scoring matrix as the Report Writer
-    hs = climate_metrics.get("heat_stress_score") or 0
-    dr = climate_metrics.get("drought_score") or 0
-    fl = climate_metrics.get("flood_score") or 0
-    tt = climate_metrics.get("temp_trend_c_per_decade") or 0
-    pt = climate_metrics.get("precip_trend_pct_per_decade") or 0
-
-    score = 0
-    if hs > 70:   score += 35
-    elif hs > 45: score += 20
-    if dr > 70:   score += 25
-    elif dr > 45: score += 15
-    if fl > 70:   score += 25
-    elif fl > 45: score += 15
-    if tt > 0.5:  score += 5
-    if pt < -10:  score += 5
+    # Base risk score from calculate_climate_risk() — same formula for all callers
+    score = climate_metrics.get("risk_score", 0)
 
     # When a fixed reference baseline is provided (i.e. the historical period's
     # mean), add an absolute temperature component so both periods are scored
@@ -963,7 +949,13 @@ async def run_comparison_pipeline(
 
     logger.info(
         "run_comparison_pipeline %r %d-%d: hs=%.1f dr=%.1f fl=%.1f tt=%.3f pt=%s → score=%d",
-        label, start_year, end_year, hs, dr, fl, tt, pt, risk_score,
+        label, start_year, end_year,
+        climate_metrics.get("heat_stress_score", 0),
+        climate_metrics.get("drought_score", 0),
+        climate_metrics.get("flood_score", 0),
+        climate_metrics.get("temp_trend_c_per_decade", 0),
+        climate_metrics.get("precip_trend_pct_per_decade"),
+        risk_score,
     )
 
     if risk_score > 70:   risk_level = "critical"

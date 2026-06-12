@@ -424,6 +424,7 @@ When data quality issues are detected:
 - **Missing values:** Handled via -999.0 fill value detection and exclusion
 - **Spatial resolution:** 0.5° × 0.5° grid (~55km at equator) — not building-level precision
 - **Temporal gaps:** Occasional missing days in NASA data (excluded from annual aggregates)
+- **Evapotranspiration:** NASA POWER parameter EVPTRNS (evapotranspiration) is equivalent to FAO-56 ET0 reference standard
 - Data quality validation is automatic but not infallible. Always validate findings with qualified ESG consultants before regulatory filings — especially for high-altitude regions, small islands, and areas with sparse satellite coverage.
 
 ### System Limitations
