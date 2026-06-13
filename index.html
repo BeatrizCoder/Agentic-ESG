@@ -2334,6 +2334,7 @@
         <div class="comp-header">
           <h3>Climate Risk Comparison</h3>
           <span class="comp-region" id="comp-region">—</span>
+          <button onclick="closeComparison()" class="comp-close-btn">✕ Close</button>
         </div>
         <div class="comp-grid">
           <div class="comp-label">Metric</div>
@@ -3319,6 +3320,11 @@ async function runAnalysis() {
     ? `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`
     : document.getElementById('inp-label').value.trim();
 
+  // Hide old comparison results
+  const compResults = document.getElementById('comparison-results');
+  if (compResults) compResults.style.display = 'none';
+  const compInvite = document.getElementById('comparison-invite');
+  if (compInvite) compInvite.style.display = 'none';
   _comparisonData = null;
 
   const btn = document.getElementById('analyze-btn');
@@ -3540,9 +3546,14 @@ function renderComparison(data) {
   if (xlsxBtn) xlsxBtn.textContent = 'Export Full Report Excel ↓';
 }
 
+function closeComparison() {
+  document.getElementById('comparison-results').style.display = 'none';
+  _comparisonData = null;
+}
+
 /* ── Render ──────────────────────────────────────────────────────────────── */
 function renderResults(data) {
-  _currentId = data.analysis_id || data.id || '';
+  _currentId = data.analysis_id;
   console.log('renderResults: analysis_id =', _currentId);
 
   const score  = data.risk_score  || 0;
