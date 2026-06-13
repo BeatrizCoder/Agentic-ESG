@@ -118,6 +118,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: .5rem;
+      flex-wrap: nowrap;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -143,10 +145,13 @@
       padding: .2rem .5rem;
       border-radius: 20px;
     }
-    .topbar-center {
-      font-size: .72rem;
+    .topbar-powered {
+      font-size: .62rem;
       color: var(--muted);
-      letter-spacing: .02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 40%;
     }
     .topbar-right { display: flex; align-items: center; gap: 1rem; }
     .topbar-links { display: flex; align-items: center; gap: .25rem; }
@@ -624,19 +629,38 @@
     }
     .batch-view-btn:hover { background: var(--green-lt); border-color: var(--green); }
 
-    .presets { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+    .presets {
+      display: flex;
+      gap: .5rem;
+      margin-top: 1rem;
+      overflow-x: auto;
+      padding-bottom: .5rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      scroll-snap-type: x mandatory;
+    }
+    .presets::-webkit-scrollbar { display: none; }
     .preset-btn {
       background: var(--bg2);
-      border: 1px solid var(--border);
+      border: 0.5px solid var(--border);
       border-radius: 20px;
       color: var(--text2);
-      font-size: .72rem;
+      font-size: .75rem;
       font-weight: 500;
-      padding: .35rem .75rem;
+      padding: .45rem .85rem;
       cursor: pointer;
-      transition: all .3s ease;
+      white-space: nowrap;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      transition: all .2s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      scroll-snap-align: start;
+      flex-shrink: 0;
     }
-    .preset-btn:hover {
+    .preset-btn:hover,
+    .preset-btn:active {
       border-color: var(--green);
       color: var(--green);
       background: var(--green-lt);
@@ -1830,6 +1854,52 @@
       .offset-grid, .dm-panels { grid-template-columns: 1fr; }
       .compliance-grid { grid-template-columns: 1fr; }
     }
+
+    @media (max-width: 768px) {
+      header { padding: .5rem .75rem; height: auto; min-height: 52px; }
+
+      .field-group select,
+      .field-group input:not([type="hidden"]):not([type="number"]),
+      #inp-location {
+        height: 42px;
+        font-size: .85rem;
+        padding: 0 .75rem;
+        border-radius: 10px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .search-row {
+        flex-direction: column;
+        gap: .65rem;
+      }
+
+      .date-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+      }
+
+      .sector-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+      }
+
+      .action-row {
+        grid-column: 1 / -1;
+      }
+
+      #analyze-btn {
+        width: 100%;
+        height: 46px;
+        font-size: .95rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .topbar-powered { display: none; }
+    }
   </style>
 </head>
 
@@ -1841,7 +1911,7 @@
     <span class="logo-name">Agentic <span class="esg">ESG</span></span>
     <span class="logo-badge">Climate Intelligence</span>
   </div>
-  <div class="topbar-center">Powered by NASA POWER · Claude AI</div>
+  <div class="topbar-powered">Powered by NASA POWER · Claude AI</div>
   <nav class="topbar-links">
     <button class="topbar-link" onclick="openModal('modal-glossary')">📚 Glossary</button>
   </nav>
@@ -1909,6 +1979,7 @@
         </div>
         <a class="coords-toggle" id="coords-toggle" href="#" onclick="toggleCoords(event)"><span id="t-coords-toggle">📍 Use coordinates instead</span></a>
       </div>
+      <div class="date-row">
       <div class="field-group">
         <label><span id="t-from">From</span>
           <span class="tooltip-trigger"
@@ -2006,7 +2077,8 @@
           <option value="2050">2050 ✦</option>
         </select>
       </div>
-      <div class="sector-scenario-panel">
+      </div><!-- .date-row -->
+      <div class="sector-scenario-panel sector-row">
         <div class="field-group">
           <label><span id="t-sector">Sector</span>
             <span class="tooltip-trigger"
