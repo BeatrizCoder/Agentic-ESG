@@ -4027,11 +4027,14 @@ function _drawProjectionChart() {
   const hasProj = _projFuture.length > 0;
 
   const allPts  = [..._projHistorical, ..._projEra5, ..._projFuture];
-  const allVals = allPts.map(val).filter(v => v > 0);
+  const allVals = allPts.map(val).filter(v => Number.isFinite(v) && v !== 0);
   if (!allVals.length) return;
 
-  const minV = Math.min(...allVals) * (isTemp ? 0.97 : 0.6);
-  const maxV = Math.max(...allVals) * (isTemp ? 1.03 : 1.1);
+  const rawMin = Math.min(...allVals);
+  const rawMax = Math.max(...allVals);
+  const pad    = (rawMax - rawMin) * 0.03 || 1;
+  const minV   = isTemp ? rawMin - pad : rawMin * 0.6;
+  const maxV   = isTemp ? rawMax + pad : rawMax * 1.1;
   const allYears = allPts.map(r => r.year);
   const minY = Math.min(...allYears), maxY = Math.max(...allYears);
   const rangeY = maxY - minY || 1, rangeV = maxV - minV || 1;
