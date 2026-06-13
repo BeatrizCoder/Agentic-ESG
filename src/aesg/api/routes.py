@@ -53,7 +53,7 @@ _PIPELINE_TIMEOUT_SEC = 300  # 5-agent pipeline; NASA + 4 LLM calls (projection 
 
 
 @router.post("/api/analyze", response_model=AnalysisResponse)
-@limiter.limit("10/hour")
+@limiter.limit("3/day")
 async def analyze(
     request: Request,
     body: AnalyzeRequest,
@@ -333,7 +333,7 @@ def _safe_extract_period(result: dict, label: str) -> dict:
 
 
 @router.post("/api/analyze/compare")
-@limiter.limit("5/hour")
+@limiter.limit("2/day")
 async def compare_periods(request: Request, body: CompareRequest) -> dict:
     """Lightweight dual-period comparison: Data Collector + Climate Engine + Haiku only."""
     from ..pipeline.orchestrator import run_comparison_pipeline
@@ -435,7 +435,7 @@ async def compare_periods(request: Request, body: CompareRequest) -> dict:
 
 
 @router.post("/api/analyze/batch")
-@limiter.limit("3/hour")
+@limiter.limit("1/day")
 async def start_batch(
     request: Request,
     background_tasks: BackgroundTasks,

@@ -3374,6 +3374,9 @@ async function runAnalysis() {
         scenario: scenario
       }),
     });
+    if (res.status === 429) {
+      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     window.annualRecords = data.annual_records || [];
@@ -3451,6 +3454,9 @@ async function runComparison() {
         period_2: { start_year: start2, end_year: Math.min(end2, 2025) },
       }),
     });
+    if (res.status === 429) {
+      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `HTTP ${res.status}`);
@@ -4893,6 +4899,9 @@ async function runBatchAnalysis() {
     const startResp = await fetch(`${API_BASE}/api/analyze/batch`, {
       method: 'POST', headers, body: formData,
     });
+    if (startResp.status === 429) {
+      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+    }
     if (!startResp.ok) {
       const err = await startResp.json().catch(() => ({ detail: startResp.statusText }));
       throw new Error(err.detail || `HTTP ${startResp.status}`);
