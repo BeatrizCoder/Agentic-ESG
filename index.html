@@ -2582,6 +2582,7 @@
   </div>
   <div class="footer-bottom" id="t-footer-text">
     🌿 Analysis history is stored for 30 days using an anonymous session cookie. No personal data is collected.
+    &nbsp;·&nbsp; Free tier: 3 analyses per week per IP address.
     &nbsp;·&nbsp; Powered by NASA POWER API &amp; Claude AI (Anthropic)
   </div>
 
@@ -3467,7 +3468,7 @@ async function runAnalysis() {
       }),
     });
     if (res.status === 429) {
-      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+      throw new Error('Weekly analysis limit reached (3/week). Please try again next week. · Limite semanal atingido (3/semana). Tente novamente na próxima semana.');
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -3547,7 +3548,7 @@ async function runComparison() {
       }),
     });
     if (res.status === 429) {
-      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+      throw new Error('Weekly analysis limit reached (3/week). Please try again next week. · Limite semanal atingido (3/semana). Tente novamente na próxima semana.');
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -5003,7 +5004,7 @@ async function runBatchAnalysis() {
       method: 'POST', headers, body: formData,
     });
     if (startResp.status === 429) {
-      throw new Error('Daily analysis limit reached. Please try again tomorrow. / Limite diário atingido. Tente novamente amanhã.');
+      throw new Error('Weekly analysis limit reached (3/week). Please try again next week. · Limite semanal atingido (3/semana). Tente novamente na próxima semana.');
     }
     if (!startResp.ok) {
       const err = await startResp.json().catch(() => ({ detail: startResp.statusText }));
