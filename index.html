@@ -418,6 +418,7 @@
       align-items: center;
       justify-content: center;
       transition: all .2s;
+      flex-shrink: 0;
     }
     .comp-close-btn:hover { border-color: var(--risk-high); color: var(--risk-high); }
     .comp-grid {
@@ -2422,7 +2423,7 @@
           <h3>Climate Risk Comparison</h3>
           <div style="display:flex; align-items:center; gap:.75rem">
             <span class="comp-region" id="comp-region">—</span>
-            <button onclick="closeComparison()" class="comp-close-btn">✕</button>
+            <button onclick="closeComparison()" class="comp-close-btn" title="Close comparison">✕</button>
           </div>
         </div>
         <div class="comp-grid">
