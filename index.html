@@ -405,6 +405,21 @@
     }
     .comp-header h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
     .comp-region { font-size: .78rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .comp-close-btn {
+      background: transparent;
+      border: 0.5px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      font-size: .8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+    }
+    .comp-close-btn:hover { border-color: var(--risk-high); color: var(--risk-high); }
     .comp-grid {
       display: grid;
       grid-template-columns: 1.5fr 1fr 1fr 1fr;
@@ -2405,8 +2420,10 @@
       <div class="comparison-card">
         <div class="comp-header">
           <h3>Climate Risk Comparison</h3>
-          <span class="comp-region" id="comp-region">—</span>
-          <button onclick="closeComparison()" class="comp-close-btn">✕ Close</button>
+          <div style="display:flex; align-items:center; gap:.75rem">
+            <span class="comp-region" id="comp-region">—</span>
+            <button onclick="closeComparison()" class="comp-close-btn">✕</button>
+          </div>
         </div>
         <div class="comp-grid">
           <div class="comp-label">Metric</div>
@@ -3397,6 +3414,8 @@ async function runAnalysis() {
   if (compResults) compResults.style.display = 'none';
   const compInvite = document.getElementById('comparison-invite');
   if (compInvite) compInvite.style.display = 'none';
+  const compPeriod = document.getElementById('comparison-period');
+  if (compPeriod) compPeriod.style.display = 'none';
   _comparisonData = null;
 
   const btn = document.getElementById('analyze-btn');
@@ -3625,8 +3644,11 @@ function renderComparison(data) {
 }
 
 function closeComparison() {
-  document.getElementById('comparison-results').style.display = 'none';
+  const compResults = document.getElementById('comparison-results');
+  if (compResults) compResults.style.display = 'none';
   _comparisonData = null;
+  const invite = document.getElementById('comparison-invite');
+  if (invite) invite.style.display = 'flex';
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
@@ -4594,7 +4616,12 @@ function _showGate() {
 }
 
 function _hideGate() {
-  document.getElementById('gate-overlay').classList.remove('active');
+  const overlay = document.getElementById('gate-overlay');
+  overlay.classList.remove('active');
+  overlay.style.display = 'none';
+  overlay.style.visibility = 'hidden';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.zIndex = '-1';
   _enablePlatform();
   const banner = document.getElementById('terms-gate');
   if (banner) banner.style.display = 'none';

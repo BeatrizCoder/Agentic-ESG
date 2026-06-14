@@ -417,7 +417,7 @@ async def fetch_ipcc_projections(
                 precip, year,
             )
             del annual_precips[year]
-        elif precip < 50:
+        elif precip < 5:
             logger.warning(
                 "Precipitation %.0fmm for %d is suspiciously low",
                 precip, year,
