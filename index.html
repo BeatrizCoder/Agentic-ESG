@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agentic ESG — Climate Risk Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1922,6 +1922,14 @@
 
     @media (max-width: 768px) {
       .topbar-powered { display: none; }
+
+      /* Prevent horizontal overflow on results page */
+      html { overflow-x: hidden; }
+      .card { overflow: hidden; }
+      .hitl-reason,
+      .hitl-desc { word-break: break-word; overflow-wrap: break-word; white-space: normal; }
+      .score-meta-value,
+      .map-coords { word-break: break-word; overflow-wrap: break-word; }
     }
   </style>
 </head>
